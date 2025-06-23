@@ -2,6 +2,8 @@ import BigCommerceService from './BigCommerceService.js'
 import Variant from '../models/Variant.js'
 import Product from '../models/Product.js'
 import CategoryProduct from '../models/CategoryProduct.js'
+import CategoryService from './CategoryService.js'
+import env from '#start/env'
 
 export default class ProductService {
   private bigCommerceService: BigCommerceService
@@ -28,19 +30,32 @@ export default class ProductService {
   }
 
   public async formatVariants(variants?: Variant[]) {
+    // Obtener todos los category_id que son hijos de la categoría
+    const childTags = await CategoryService.getChildCategories(Number(env.get('ID_BENEFITS')))
+    const childCampaigns = await CategoryService.getChildCategories(Number(env.get('ID_CAMPAIGNS')))
     if (variants) {
       const formattedVariants = await Promise.all(
         variants.map(async (variant) => {
-          // Buscar el producto y precargar las categorías
+          // Buscar el producto y precargar las categorías y la marca
           const product = await Product.query()
             .where('id', variant.product_id)
             .preload('categories')
+            .preload('brand')
             .first()
 
           // Extraer los category_id de la relación categories
           const categories_array = product
             ? product.categories.map((catProd: CategoryProduct) => catProd.category_id)
             : []
+          let tags: string[] = []
+          let campaigns: string[] = []
+          if (product) {
+            tags = await CategoryService.getCampaignsByCategory(product.id, childTags)
+            tags = tags.length ? [...new Set(tags)] : []
+            campaigns = await CategoryService.getCampaignsByCategory(product.id, childCampaigns)
+            campaigns = campaigns.length ? [...new Set(campaigns)] : []
+          }
+
           return {
             id: variant.id,
             product_id: variant.product_id,
@@ -52,6 +67,7 @@ export default class ProductService {
             description: product?.description,
             brand_id: product?.brand_id,
             categories_array: categories_array,
+            categories: categories_array,
             stock: variant.stock,
             warning_stock: variant.warning_stock,
             normal_price: variant.normal_price,
@@ -74,7 +90,14 @@ export default class ProductService {
             is_visible: product?.is_visible,
             turbo: product?.turbo,
             meta_keywords: product?.meta_keywords,
-            meta_description: product?.meta_description
+            meta_description: product?.meta_description,
+            variants: [],
+            options: [],
+            packs: [],
+            sizes: [],
+            tags: tags,
+            campaigns: campaigns,
+            brand: product?.brand ? product.brand.name : null,
           }
         })
       )
