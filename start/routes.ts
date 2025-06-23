@@ -11,6 +11,7 @@ import router from '@adonisjs/core/services/router'
 import BrandsController from '../app/controllers/BrandsController.js'
 import CategoriesController from '../app/controllers/CategoriesController.js'
 import ProductsController from '../app/controllers/ProductsController.js'
+import VariantController from '#controllers/VariantController'
 
 
 router.get('/', async () => {
@@ -24,6 +25,11 @@ router.group(() => {
   router.get('/products', [ProductsController, 'index'])
   router.get('/products/:id', [ProductsController, 'show'])
   router.get('/sincronizar-productos', [ProductsController, 'sync'])
+}).prefix('api')
+
+// Rutas de variantes
+router.group(() => {
+  router.get('/variants', [VariantController, 'index'])
 }).prefix('api')
 
 // Rutas de marcas

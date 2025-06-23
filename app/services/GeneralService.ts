@@ -88,6 +88,7 @@ interface FormattedVariant {
   sku: string
   type: string
   image: string
+  hover?: string
   stock: number
   main_title: string
   normal_price: number
@@ -143,7 +144,11 @@ export class GeneralService {
   /**
    * Calcula el precio de transferencia
    */
-  static async calculateTranferPrice(price = 0, sale_price = 0, percentTrasnfer = 2): Promise<number> {
+  static async calculateTranferPrice(
+    price = 0,
+    sale_price = 0,
+    percentTrasnfer = 2
+  ): Promise<number> {
     if (price === 0 && sale_price === 0) {
       return 0
     }
@@ -189,7 +194,11 @@ export class GeneralService {
   /**
    * Obtiene las imágenes del producto por variación
    */
-  static async getImagesByVariation(images: ProductImage[], sku: string, thumb: string): Promise<string[]> {
+  static async getImagesByVariation(
+    images: ProductImage[],
+    sku: string,
+    thumb: string
+  ): Promise<string[]> {
     let arrayImages: string[] = []
     arrayImages.push(thumb)
     await Promise.all(
@@ -212,7 +221,9 @@ export class GeneralService {
     let arrayOptions: FormattedOption[] = []
     await Promise.all(
       options.map(async function (elem: OptionValue) {
-        let value_data = elem.value_data?.colors ? elem.value_data.colors : elem.value_data?.image_url
+        let value_data = elem.value_data?.colors
+          ? elem.value_data.colors
+          : elem.value_data?.image_url
         let returnOptions = { id: elem.id, label: elem.label, value_data: value_data }
         arrayOptions.push(returnOptions)
       })
@@ -226,9 +237,11 @@ export class GeneralService {
   static async FormatProductsArray(products: Product[]): Promise<any[]> {
     try {
       const productInfoArray = await Promise.all(
-        products.map(async product => {
+        products.map(async (product) => {
           const sku = product.variants[0].sku
-          const inventoryLevel = await CatalogSafeStock.query().where('sku', sku.trim()).pojo() as SafeStockItem[]
+          const inventoryLevel = (await CatalogSafeStock.query()
+            .where('sku', sku.trim())
+            .pojo()) as SafeStockItem[]
 
           const volumetric = (product.width * product.depth * product.height) / 4000
           let weight = volumetric > product.weight ? volumetric : product.weight
@@ -236,9 +249,12 @@ export class GeneralService {
 
           return {
             id: product.id,
-            image: product.images.find((image: ProductImage) => image.is_thumbnail)?.url_standard || '',
+            image:
+              product.images.find((image: ProductImage) => image.is_thumbnail)?.url_standard || '',
             images: Array.isArray(product.images) ? [...product.images].reverse() : [],
-            hover: product.images.find((image: ProductImage) => image?.description?.includes('hover'))?.url_standard || '',
+            hover:
+              product.images.find((image: ProductImage) => image?.description?.includes('hover'))
+                ?.url_standard || '',
             title: product.name,
             page_title: product.name,
             description: product.description,
@@ -248,7 +264,10 @@ export class GeneralService {
                 ? inventoryLevel[0].available_to_sell
                 : Math.max(
                     0,
-                    product.inventory_level - (typeof inventoryLevel[0]?.safety_stock === 'number' ? inventoryLevel[0].safety_stock : 0)
+                    product.inventory_level -
+                      (typeof inventoryLevel[0]?.safety_stock === 'number'
+                        ? inventoryLevel[0].safety_stock
+                        : 0)
                   ),
             warning_stock: inventoryLevel[0]?.safety_stock || 0,
             normal_price: product.price,
@@ -269,7 +288,10 @@ export class GeneralService {
             is_visible: product.is_visible,
             meta_keywords: Array.isArray(product.meta_keywords) ? product.meta_keywords : [],
             meta_description: product?.meta_description ?? '',
-            reviews: typeof product.reviews === 'object' && product.reviews !== null ? product.reviews : null,
+            reviews:
+              typeof product.reviews === 'object' && product.reviews !== null
+                ? product.reviews
+                : null,
             sizes: Array.isArray(product.sizes) ? product.sizes : null,
           }
         })
@@ -284,7 +306,9 @@ export class GeneralService {
   /**
    * Formatea las opciones por variante del producto
    */
-  static async formatOptionsByVariantByProduct(product: Product): Promise<FormattedProductOption[]> {
+  static async formatOptionsByVariantByProduct(
+    product: Product
+  ): Promise<FormattedProductOption[]> {
     let data = await GeneralService.bigCommerceService.getVariantsOptionsOfProduct(product.id)
 
     if (!data || data.length === 0) {
@@ -319,14 +343,25 @@ export class GeneralService {
       data.map(async function (elem: ProductVariant) {
         let price = elem.sale_price !== null ? elem.sale_price : elem.calculated_price
         let discount = await GeneralService.calculateDiscount(elem.price, price)
-        let tranferPrice = await GeneralService.calculateTranferPrice(elem.price, price, Number(Env.get('PERCENT_DISCOUNT_TRANSFER_PRICE')))
+        let tranferPrice = await GeneralService.calculateTranferPrice(
+          elem.price,
+          price,
+          Number(Env.get('PERCENT_DISCOUNT_TRANSFER_PRICE'))
+        )
 
         const volumetric = (elem.width * elem.depth * elem.height) / 4000
         let weight = volumetric > elem.calculated_weight ? volumetric : elem.calculated_weight
         weight = Env.get('COUNTRY_CODE') === 'PE' ? elem.calculated_weight : weight
 
-        const inventoryLevel = await CatalogSafeStock.query().where('sku', elem.sku.trim()).pojo() as SafeStockItem[]
-        let imagesVariation = await GeneralService.getImagesByVariation(product.images, elem.sku, elem.image_url)
+        const inventoryLevel = (await CatalogSafeStock.query()
+          .where('sku', elem.sku.trim())
+          .pojo()) as SafeStockItem[]
+        let imagesVariation = await GeneralService.getImagesByVariation(
+          product.images,
+          elem.sku,
+          elem.image_url
+        )
+        let hover = GeneralService.getHoverImageByVariation(product.images, elem.sku)
 
         let returnVariants: FormattedVariant = {
           id: elem.id,
@@ -334,12 +369,16 @@ export class GeneralService {
           sku: elem.sku,
           type: 'variant',
           image: imagesVariation[0],
+          hover: hover,
           stock:
             inventoryLevel && inventoryLevel.length
               ? inventoryLevel[0].available_to_sell
               : Math.max(
                   0,
-                  elem.inventory_level - (typeof inventoryLevel[0]?.safety_stock === 'number' ? inventoryLevel[0].safety_stock : 0)
+                  elem.inventory_level -
+                    (typeof inventoryLevel[0]?.safety_stock === 'number'
+                      ? inventoryLevel[0].safety_stock
+                      : 0)
                 ),
           main_title: product.name,
           normal_price: elem.price,
@@ -363,4 +402,12 @@ export class GeneralService {
 
     return arrayVariants
   }
-} 
+
+  //obtener hover del producto por variacion
+  static getHoverImageByVariation(images: ProductImage[], sku: string): string | undefined {
+    const hoverImage = images.find(
+      (elem) => elem.description.includes(sku) && elem.description.includes('hover')
+    )
+    return hoverImage?.url_standard
+  }
+}

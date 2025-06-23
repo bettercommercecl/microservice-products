@@ -17,6 +17,7 @@ export default class extends BaseSchema {
       table.integer('warning_stock').notNullable()
       table.string('image', 255).notNullable()
       table.specificType('images', 'text[]').notNullable()
+      table.string('hover', 255).notNullable()
       table.integer('quantity').notNullable()
       table.float('armed_cost').notNullable()
       table.integer('armed_quantity').notNullable()

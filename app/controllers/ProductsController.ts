@@ -14,6 +14,7 @@ export default class ProductsController {
   async index({ response }: HttpContext) {
     try {
       const products = await this.productService.getAllProducts()
+
       return response.ok(products)
     } catch (error) {
       return response.internalServerError({

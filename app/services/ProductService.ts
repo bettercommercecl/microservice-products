@@ -125,7 +125,6 @@ export default class ProductService {
       throw new Error(`Error al obtener productos: ${error instanceof Error ? error.message : 'Error desconocido'}`)
     }
   }
-
   /**
    * Obtiene un producto por ID
    */
@@ -439,6 +438,7 @@ export default class ProductService {
                       warning_stock: variant.warning_stock,
                       image: variant.image,
                       images: Array.isArray(variant.images) ? variant.images : [],
+                      hover: variant.hover,
                       quantity: variant.quantity,
                       armed_cost: variant.armed_cost,
                       armed_quantity: variant.armed_quantity,

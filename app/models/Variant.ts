@@ -44,6 +44,9 @@ export default class Variant extends BaseModel {
   declare images: string[] | null
 
   @column()
+  declare hover: string | null
+
+  @column()
   declare quantity: number
 
   @column()
