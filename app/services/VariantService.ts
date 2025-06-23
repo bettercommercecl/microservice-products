@@ -107,4 +107,18 @@ export default class ProductService {
     }
     return []
   }
+
+  public async getVariantsByIds(ids: number[]) {
+    try {
+      const variants = await Variant.query().whereIn('id', ids)
+      return {
+        success: true,
+        data: variants,
+      }
+    } catch (error) {
+      throw new Error(
+        `Error al obtener variantes por IDs: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      )
+    }
+  }
 }

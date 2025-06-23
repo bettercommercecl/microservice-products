@@ -30,6 +30,7 @@ router.group(() => {
 // Rutas de variantes
 router.group(() => {
   router.get('/variants', [VariantController, 'index'])
+  router.post('/variants/formatted-by-ids', 'VariantsController.getFormattedByIds')
 }).prefix('api')
 
 // Rutas de marcas
