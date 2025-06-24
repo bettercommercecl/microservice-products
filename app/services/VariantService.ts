@@ -65,6 +65,7 @@ export default class ProductService {
             title: variant.title,
             page_title: variant.title,
             description: product?.description,
+            sku:variant.sku,
             brand_id: product?.brand_id,
             categories_array: categories_array,
             categories: categories_array,
