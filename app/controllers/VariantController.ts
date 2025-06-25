@@ -13,13 +13,11 @@ export default class VariantController {
   /**
    * Obtiene todos los productos
    */
-  async index({ request, response }: HttpContext) {
+  async index({ response }: HttpContext) {
     try {
-      // Paginación por defecto: 200 por página
-      const page = Number(request.input('page', 1))
-      const limit = Number(request.input('limit', 200))
-      const variants = await this.variantService.getAllVariantsPaginated(page, limit)
-      return response.ok(variants)
+      const variants = await this.variantService.getAllVariants()
+      const formattedProducts = await this.variantService.formatVariants(variants.data)
+      return response.ok(formattedProducts)
     } catch (error) {
       return response.internalServerError({
         error: 'Error',

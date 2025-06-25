@@ -165,9 +165,4 @@ export default class ProductService {
       )
     }
   }
-
-  // Nuevo: variantes paginadas
-  public async getAllVariantsPaginated(page = 1, limit = 200) {
-    return await Variant.query().paginate(page, limit)
-  }
 }
