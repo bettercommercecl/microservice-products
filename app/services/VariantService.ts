@@ -47,6 +47,48 @@ export default class ProductService {
           const categories_array = product
             ? product.categories.map((catProd: CategoryProduct) => catProd.category_id)
             : []
+
+          // Obtener los nombres de las categorías SOLO si son visibles
+          let categoryNames: string[] = []
+          if (categories_array.length) {
+            const categories = await CategoryProduct.query()
+              .whereIn('category_id', categories_array)
+              .preload('category')
+            categoryNames = categories
+              .filter((catProd) => catProd.category?.is_visible)
+              .map((catProd) => catProd.category?.title)
+              .filter(Boolean)
+          }
+
+          // Obtener los labels de las opciones de la variante
+          let optionLabels: string[] = []
+          if (variant.options && Array.isArray(variant.options) && variant.options.length > 0) {
+            // Si las opciones están serializadas como string, parsear
+            let optionsArr = typeof variant.options === 'string' ? JSON.parse(variant.options) : variant.options
+            optionLabels = optionsArr.map((opt: any) => opt.label).filter(Boolean)
+          } else {
+            // Si no están en el campo options, buscar en la tabla Option por product_id
+            const OptionModel = (await import('../models/Option.js')).default
+            const options = await OptionModel.query().where('product_id', variant.product_id)
+            optionLabels = options.flatMap(opt => {
+              if (Array.isArray(opt.options)) {
+                return opt.options.map((val: any) => val.label).filter(Boolean)
+              } else if (typeof opt.options === 'string') {
+                try {
+                  const arr = JSON.parse(opt.options)
+                  return Array.isArray(arr) ? arr.map((val: any) => val.label).filter(Boolean) : []
+                } catch {
+                  return []
+                }
+              }
+              return []
+            })
+          }
+
+          // Unir todo en un solo string separado por coma, eliminando duplicados
+          const keywordsArr = [...categoryNames, ...optionLabels]
+          const keywords = Array.from(new Set(keywordsArr)).join(', ')
+
           let tags: string[] = []
           let campaigns: string[] = []
           if (product) {
@@ -65,7 +107,7 @@ export default class ProductService {
             title: variant.title,
             page_title: variant.title,
             description: product?.description,
-            sku:variant.sku,
+            sku: variant.sku,
             brand_id: product?.brand_id,
             categories_array: categories_array,
             categories: categories_array,
@@ -99,6 +141,7 @@ export default class ProductService {
             tags: tags,
             campaigns: campaigns,
             brand: product?.brand ? product.brand.name : null,
+            keywords,
           }
         })
       )
