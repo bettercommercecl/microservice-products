@@ -141,7 +141,7 @@ export default class ProductService {
             tags: tags,
             campaigns: campaigns,
             brand: product?.brand ? product.brand.name : null,
-            keywords,
+            keywords: variant.keywords,
           }
         })
       )

@@ -26,6 +26,7 @@ export default class extends BaseSchema {
       table.float('width').nullable()
       table.float('depth').nullable()
       table.string('type', 255).nullable()
+      table.text('keywords').nullable()
       table.jsonb('options').nullable().defaultTo('[]')
       table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(this.now())
       table.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(this.now())

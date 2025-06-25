@@ -424,6 +424,43 @@ export default class ProductService {
             if (variants.length > 0) {
               await Promise.all(
                 variants.map(async (variant: any) => {
+                  // --- Calcular keywords aquí ---
+                  // Obtener los nombres de las categorías SOLO si son visibles
+                  let categoryNames: string[] = []
+                  const categories = await CategoryProduct.query()
+                    .where('product_id', product.id)
+                    .preload('category')
+                  categoryNames = categories
+                    .filter((catProd) => catProd.category?.is_visible)
+                    .map((catProd) => catProd.category?.title)
+                    .filter(Boolean)
+
+                  // Obtener los labels de las opciones de la variante
+                  let optionLabels: string[] = []
+                  if (variant.options && Array.isArray(variant.options) && variant.options.length > 0) {
+                    let optionsArr = typeof variant.options === 'string' ? JSON.parse(variant.options) : variant.options
+                    optionLabels = optionsArr.map((opt: any) => opt.label).filter(Boolean)
+                  } else {
+                    const OptionModel = (await import('../models/Option.js')).default
+                    const options = await OptionModel.query().where('product_id', product.id)
+                    optionLabels = options.flatMap(opt => {
+                      if (Array.isArray(opt.options)) {
+                        return opt.options.map((val: any) => val.label).filter(Boolean)
+                      } else if (typeof opt.options === 'string') {
+                        try {
+                          const arr = JSON.parse(opt.options)
+                          return Array.isArray(arr) ? arr.map((val: any) => val.label).filter(Boolean) : []
+                        } catch {
+                          return []
+                        }
+                      }
+                      return []
+                    })
+                  }
+                  const keywordsArr = [...categoryNames, ...optionLabels]
+                  const keywords = Array.from(new Set(keywordsArr)).join(', ')
+                  // --- Fin cálculo keywords ---
+
                   try {
                     await Variant.create({
                       id: variant.id,
@@ -448,6 +485,7 @@ export default class ProductService {
                       depth: variant.depth,
                       type: variant.type,
                       options: Array.isArray(variant.options) ? variant.options : [],
+                      keywords: keywords,
                     }, { client: trx })
                   } catch (error) {
                     console.error('❌ Error al guardar variante:', {
