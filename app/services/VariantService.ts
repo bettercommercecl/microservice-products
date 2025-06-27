@@ -103,24 +103,7 @@ export default class ProductService {
           }
         })
       )
-      // Filtro para no repetir variantes solo por talla
-      const filteredVariants: any[] = []
-      const seen = new Set()
-      for (const variant of formattedVariants) {
-        // Extrae el valor de color (puedes agregar más opciones relevantes)
-        let color = ''
-        if (variant.options && Array.isArray(variant.options)) {
-          const colorOpt = variant.options.find((opt: any) => opt.label?.toLowerCase() === 'color')
-          color = colorOpt?.value || ''
-        }
-        // Clave única por producto y color
-        const key = `${variant.product_id}_${color}`
-        if (!seen.has(key)) {
-          filteredVariants.push(variant)
-          seen.add(key)
-        }
-      }
-      return filteredVariants
+      return formattedVariants
     } else {
       // fetch all variants and format them
     }
