@@ -110,8 +110,8 @@ export default class ProductService {
         // Extrae el valor de color (puedes agregar más opciones relevantes)
         let color = ''
         if (variant.options && Array.isArray(variant.options)) {
-          const colorOpt = (variant.options as any[]).find((opt: any) => opt.label?.toLowerCase() === 'color')
-          color = colorOpt ? (colorOpt['value'] ?? colorOpt['label'] ?? '') : ''
+          const colorOpt = variant.options.find((opt: any) => opt.label?.toLowerCase() === 'color')
+          color = colorOpt?.value || ''
         }
         // Clave única por producto y color
         const key = `${variant.product_id}_${color}`
@@ -125,5 +125,36 @@ export default class ProductService {
       // fetch all variants and format them
     }
     return []
+  }
+
+
+  public async getVariantsByIds(ids: number[]) {
+    try {
+      const variants = await Variant.query().whereIn('id', ids)
+      return {
+        success: true,
+        data: variants,
+      }
+    } catch (error) {
+      throw new Error(
+        `Error al obtener variantes por IDs: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      )
+    }
+  }
+
+  // Nuevo: variantes paginadas
+  public async getAllVariantsPaginated(page = 1, limit = 200, channelId?: number) {
+    if (channelId) {
+      // Buscar los product_id que están en el canal
+      const channelProducts = await (await import('#models/ChannelProduct')).default.query().where('channel_id', channelId)
+      const productIds = channelProducts.map(cp => cp.product_id)
+      if (productIds.length === 0) {
+        // Si no hay productos en el canal, retorna paginación vacía
+        return { data: [], meta: { pagination: { total: 0, per_page: limit, current_page: page, total_pages: 0 } } }
+      }
+      return await Variant.query().whereIn('product_id', productIds).paginate(page, limit)
+    } else {
+      return await Variant.query().paginate(page, limit)
+    }
   }
 }
