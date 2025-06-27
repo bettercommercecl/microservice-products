@@ -7,7 +7,7 @@ export const PARENT = {
   1461778: 0, // TS
   1573014: 0,  // SF
   1598942: env.get('COUNTRY_CODE') === 'CL' ? 1828 : env.get('COUNTRY_CODE') === 'CO' ? 2423 : 2203,// UC
-  1420393: env.get('COUNTRY_CODE') === 'CL' ? 1338  : 1470 //  <----FC PE
+  1420393: env.get('COUNTRY_CODE') === 'CL' ? 1338  : 1470, //  <----FC PE
   1567036: env.get('COUNTRY_CODE') === 'CL' ? 1342 : 0, // C.C
 } as const;
   
