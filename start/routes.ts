@@ -24,11 +24,12 @@ router.get('/', async () => {
 router.group(() => {
   router.get('/products', [ProductsController, 'index'])
   router.get('/products/:id', [ProductsController, 'show'])
-  router.get('/sincronizar-productos', [ProductsController, 'sync'])
+  router.get('/sincronizar-productos/:channel_id', [ProductsController, 'sync'])
 }).prefix('api')
 
 // Rutas de variantes
 router.group(() => {
+  // Ejemplo de uso: /api/variants?channel=123 para filtrar variantes por canal
   router.get('/variants', [VariantController, 'index'])
   router.post('/variants/formatted-by-ids', [VariantController, 'getFormattedByIds'])
 }).prefix('api')

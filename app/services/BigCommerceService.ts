@@ -1,5 +1,6 @@
 import axios from 'axios'
 import env from '#start/env'
+import { PARENT } from '../constants/brands.js'
 
 interface ProductVariant {
   id: number
@@ -179,27 +180,38 @@ export default class BigCommerceService {
    * Obtiene los productos por canal
    */
 
-  async getProductsByChannel(channelId: number, page = 1, limit = 2000) {
+  //obtener productos por canal
+  async getProductsByChannel(channel : number, page = 1, limit = 2000) {
+    const options = {
+      method: 'GET',
+      url:
+        this.baseUrl + 
+        `/v3/catalog/products/channel-assignments?channel_id:in=${channel}&limit=${limit}&page=${page}`,
+      headers: this.headers
+    }
+
     try {
-      const response = await axios.get(`${this.baseUrl}/v3/catalog/products?channel_id=${channelId}&limit=${limit}&page=${page}`, {
-        headers: this.headers
-      })
-      return {
-        data: response.data.data,
-        meta: response.data.meta
-      }
+      const response = await axios.request(options)
+      return response.data
     } catch (error) {
-      throw new Error(`Error fetching products by channel from BigCommerce: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      return { status: error.response.status, message: error.response.statusText }
     }
   }
 
   /**
    * Obtiene productos detallados por IDs
    */
-  async getAllProductsRefactoring(products: number[], visible = 1, limit = 2000) {
+  async getAllProductsRefactoring(products: number[], visible = 1, limit = 2000, channel : number) {
+    // Aseguramos que channel es uno de los índices válidos de PARENT
+    let parent_id : any = PARENT[channel as keyof typeof PARENT]
+
+    if (!parent_id === undefined) {
+      return { error: 'Canal no válido' }
+}
     const baseUrl = this.baseUrl + '/v3/catalog/products'
     const visibilityParam = visible == 1 ? 'is_visible=1&' : ''
-    const commonParams = `id:in=${products}&availability=available&sort=id&direction=desc&include=images,variants&limit=${limit}&categories:in=${env.get('PARENT_CATEGORY')}`
+    const categoriesParam = parent_id == 0 ? '' : `&categories:in=${parent_id}`
+    const commonParams = `id:in=${products}&availability=available&sort=id&direction=desc&include=images,variants&limit=${limit}${categoriesParam}`
     const url = `${baseUrl}?${visibilityParam}${commonParams}`
     try {
       const { data } = await axios.get(url, { headers: this.headers })

@@ -42,9 +42,11 @@ export default class ProductsController {
   /**
    * Sincroniza los productos desde BigCommerce
    */
-  async sync({ response }: HttpContext) {
+  async sync({ params, response }: HttpContext) {
     try {
-      const result = await this.productService.syncProducts()
+      const result = await this.productService.syncProducts(params.channel_id)
+
+      return result
       
       // Si hay errores en los resultados, devolver un 400 con los detalles
       if (!result.success) {

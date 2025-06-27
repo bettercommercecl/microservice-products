@@ -18,7 +18,9 @@ export default class VariantController {
       // Paginación por defecto: 200 por página
       const page = Number(request.input('page', 1))
       const limit = Number(request.input('limit', 200))
-      const variants = await this.variantService.getAllVariantsPaginated(page, limit)
+      const channel = request.input('channel')
+      const channelId = channel ? Number(channel) : undefined
+      const variants = await this.variantService.getAllVariantsPaginated(page, limit, channelId)
       return response.ok(variants)
     } catch (error) {
       return response.internalServerError({

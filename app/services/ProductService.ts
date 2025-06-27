@@ -8,6 +8,9 @@ import Env from '#start/env'
 import { GeneralService } from './GeneralService.js'
 import CatalogSafeStock from '#models/CatalogSafeStock'
 import pLimit from 'p-limit'
+import ChannelProduct from '#models/ChannelProduct'
+import { channel } from 'diagnostics_channel'
+import Database from '@adonisjs/lucid/services/db'
 
 interface BigCommerceProduct {
   id: number
@@ -168,7 +171,7 @@ export default class ProductService {
   /**
    * Sincroniza los productos desde BigCommerce
    */
-  async syncProducts() {
+  async syncProducts(channel_id : number) {
     try {
       let productsData: BigCommerceProduct[] = []
       let failedProducts: number[] = []
@@ -184,8 +187,8 @@ export default class ProductService {
       }
 
       // Obtener productos por canal (IDs completos paginados)
-      const channelId = Number(Env.get('BIGCOMMERCE_CHANNEL_ID'))
-      const productIds = await this.getAllProductIdsByChannel(channelId, 200)
+      // const channelId = Number(Env.get('BIGCOMMERCE_CHANNEL_ID'))
+      const productIds = await this.getAllProductIdsByChannel(channel_id, 200)
       console.log('🔢 Total de IDs de productos obtenidos del canal:', productIds.length)
 
       if (productIds.length === 0) {
@@ -200,7 +203,6 @@ export default class ProductService {
           }
         }
       }
-
       // Procesar productos en lotes de 20
       const batchSize = 20
       const batches = []
@@ -216,7 +218,7 @@ export default class ProductService {
         batches.map((batchIds, index) =>
           limit(async () => {
             console.log(`🔄 Procesando lote ${index + 1}/${batches.length} con ${batchIds.length} productos`)
-            const productsPerPage = await this.bigCommerceService.getAllProductsRefactoring(batchIds, 0)
+            const productsPerPage = await this.bigCommerceService.getAllProductsRefactoring(batchIds, 0, 2000, channel_id)
             console.log(`✅ Lote ${index + 1} completado, productos obtenidos:`, productsPerPage.data?.length || 0)
             return productsPerPage.data
           })
@@ -275,6 +277,7 @@ export default class ProductService {
         .map((product: FormattedProduct) => product.id)
 
       // Sincronizar relaciones
+      const channelResult = await this.syncChannelByProduct(productsData, channel_id)
       const categoriesResult = await this.syncCategoriesByProduct(productsData)
       const optionsResult = await this.syncOptionsByProduct(productsData)
       const variantsResult = await this.syncVariantsByProduct(productsData)
@@ -287,6 +290,7 @@ export default class ProductService {
             total: formatProducts.length,
             failed: failedProducts
           },
+          channels: channelResult,
           categories: categoriesResult,
           options: optionsResult,
           variants: variantsResult
@@ -308,8 +312,9 @@ export default class ProductService {
   private async syncCategoriesByProduct(products: BigCommerceProduct[]) {
     const trx = await db.transaction()
     try {
-      // Limpiar categorías existentes
-      await CategoryProduct.query().useTransaction(trx).delete()
+      // Limpiar categorías existentes SOLO de los productos actuales
+      const productIds = products.map(product => product.id)
+      await CategoryProduct.query().useTransaction(trx).whereIn('product_id', productIds).delete()
 
       // Preparar datos de categorías
       const productsList = products.map(product => {
@@ -321,6 +326,8 @@ export default class ProductService {
 
       // Guardar nuevas categorías
       await CategoryProduct.createMany(productsList, { client: trx })
+      console.log(`✅ Guardadas ${productsList.length} relaciones en category_products`)
+
       await trx.commit()
 
       return {
@@ -337,7 +344,39 @@ export default class ProductService {
       }
     }
   }
+  /**
+   * Sincroniza los canales por producto
+   */
+  private async syncChannelByProduct(products: BigCommerceProduct[], channel_id: number) {
+    const trx = await db.transaction()
+    try {
+      // Limpiar SOLO los registros del canal actual
+      await ChannelProduct.query().useTransaction(trx).where('channel_id', channel_id).delete()
 
+      // Preparar datos de canales
+      const productsList = products.map(product => ({
+        product_id: product.id,
+        channel_id: channel_id
+      }))
+
+      // Guardar nuevas relaciones
+      await ChannelProduct.createMany(productsList, { client: trx })
+      await trx.commit()
+
+      return {
+        success: true,
+        message: 'Canales sincronizados correctamente',
+        total: productsList.length
+      }
+    } catch (error) {
+      await trx.rollback()
+      return {
+        success: false,
+        message: 'Error al sincronizar canales',
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      }
+    }
+  }
   /**
    * Sincroniza las opciones por producto
    */
@@ -354,7 +393,7 @@ export default class ProductService {
             return
           }
 
-          // Eliminar opciones anteriores
+          // Eliminar opciones anteriores SOLO del producto actual
           await OptionOfProducts.query().useTransaction(trx).where('product_id', product.id).delete()
 
           // Crear nuevas opciones
@@ -382,6 +421,7 @@ export default class ProductService {
               }
             })
           )
+          console.log(`✅ Guardadas opciones para producto ${product.id} en options`)
         })
       )
 
@@ -406,7 +446,6 @@ export default class ProductService {
    * Sincroniza las variantes por producto
    */
   private async syncVariantsByProduct(products: BigCommerceProduct[]) {
-    const trx = await db.transaction()
     const failedVariants: any[] = []
     const limit = pLimit(2) // Limita la concurrencia a 2
 
@@ -418,49 +457,12 @@ export default class ProductService {
             await new Promise(res => setTimeout(res, 300));
             const variants = await withRetry(() => GeneralService.formatVariantsByProduct(product as any));
 
-            // Eliminar variantes anteriores
-            await Variant.query().useTransaction(trx).where('product_id', product.id).delete()
+            // Eliminar variantes anteriores SOLO del producto actual
+            await Variant.query().where('product_id', product.id).delete()
 
             if (variants.length > 0) {
               await Promise.all(
                 variants.map(async (variant: any) => {
-                  // --- Calcular keywords aquí ---
-                  // Obtener los nombres de las categorías SOLO si son visibles
-                  let categoryNames: string[] = []
-                  const categories = await CategoryProduct.query()
-                    .where('product_id', product.id)
-                    .preload('category')
-                  categoryNames = categories
-                    .filter((catProd) => catProd.category?.is_visible)
-                    .map((catProd) => catProd.category?.title)
-                    .filter(Boolean)
-
-                  // Obtener los labels de las opciones de la variante
-                  let optionLabels: string[] = []
-                  if (variant.options && Array.isArray(variant.options) && variant.options.length > 0) {
-                    let optionsArr = typeof variant.options === 'string' ? JSON.parse(variant.options) : variant.options
-                    optionLabels = optionsArr.map((opt: any) => opt.label).filter(Boolean)
-                  } else {
-                    const OptionModel = (await import('../models/Option.js')).default
-                    const options = await OptionModel.query().where('product_id', product.id)
-                    optionLabels = options.flatMap(opt => {
-                      if (Array.isArray(opt.options)) {
-                        return opt.options.map((val: any) => val.label).filter(Boolean)
-                      } else if (typeof opt.options === 'string') {
-                        try {
-                          const arr = JSON.parse(opt.options)
-                          return Array.isArray(arr) ? arr.map((val: any) => val.label).filter(Boolean) : []
-                        } catch {
-                          return []
-                        }
-                      }
-                      return []
-                    })
-                  }
-                  const keywordsArr = [...categoryNames, ...optionLabels]
-                  const keywords = Array.from(new Set(keywordsArr)).join(', ')
-                  // --- Fin cálculo keywords ---
-
                   try {
                     await Variant.create({
                       id: variant.id,
@@ -485,8 +487,8 @@ export default class ProductService {
                       depth: variant.depth,
                       type: variant.type,
                       options: Array.isArray(variant.options) ? variant.options : [],
-                      keywords: keywords,
-                    }, { client: trx })
+                      keywords: variant.keywords,
+                    })
                   } catch (error) {
                     console.error('❌ Error al guardar variante:', {
                       product_id: product.id,
@@ -503,12 +505,11 @@ export default class ProductService {
                   }
                 })
               )
+              console.log(`✅ Guardadas variantes para producto ${product.id} en variants`)
             }
           })
         )
       )
-
-      await trx.commit()
 
       return {
         success: failedVariants.length === 0,
@@ -516,7 +517,6 @@ export default class ProductService {
         failed: failedVariants
       }
     } catch (error) {
-      await trx.rollback()
       return {
         success: false,
         message: 'Error al sincronizar variantes',

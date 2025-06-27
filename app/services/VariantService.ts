@@ -126,7 +126,18 @@ export default class ProductService {
   }
 
   // Nuevo: variantes paginadas
-  public async getAllVariantsPaginated(page = 1, limit = 200) {
-    return await Variant.query().paginate(page, limit)
+  public async getAllVariantsPaginated(page = 1, limit = 200, channelId?: number) {
+    if (channelId) {
+      // Buscar los product_id que están en el canal
+      const channelProducts = await (await import('#models/ChannelProduct')).default.query().where('channel_id', channelId)
+      const productIds = channelProducts.map(cp => cp.product_id)
+      if (productIds.length === 0) {
+        // Si no hay productos en el canal, retorna paginación vacía
+        return { data: [], meta: { pagination: { total: 0, per_page: limit, current_page: page, total_pages: 0 } } }
+      }
+      return await Variant.query().whereIn('product_id', productIds).paginate(page, limit)
+    } else {
+      return await Variant.query().paginate(page, limit)
+    }
   }
 }
