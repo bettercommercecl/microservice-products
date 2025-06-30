@@ -116,9 +116,9 @@ export default class ProductService {
       // Convertir los IDs a números y filtrar valores no válidos
       const numericIds = ids.map(Number).filter(id => !isNaN(id))
       const variants = await Variant.query()
-        .whereIn('id', numericIds)
+        .whereIn('variants.id', numericIds)
         .join('products', 'variants.product_id', 'products.id')
-        .where('products.is_visible', 1)
+        .where('products.is_visible', true)
         .select('variants.*')
       // No es necesario filtrar nulos porque whereIn solo devuelve los que existen
       return {
