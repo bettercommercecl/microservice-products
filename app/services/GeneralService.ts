@@ -1,6 +1,9 @@
 import CatalogSafeStock from '#models/CatalogSafeStock'
 import Env from '#start/env'
 import BigCommerceService from './BigCommerceService.js'
+import PriceService from './PriceService.js'
+import InventoryService from './InventoryService.js'
+
 
 interface ProductImage {
   is_thumbnail: boolean
@@ -341,11 +344,12 @@ export class GeneralService {
     let arrayVariants: FormattedVariant[] = []
     await Promise.all(
       data.map(async function (elem: ProductVariant) {
-        let price = elem.sale_price !== null ? elem.sale_price : elem.calculated_price
-        let discount = await GeneralService.calculateDiscount(elem.price, price)
+        const prices = await PriceService.getPriceByVariantId(elem.id)
+        const inventory = await InventoryService.getInventoryByVariantId(elem.id)
+        let discount = await GeneralService.calculateDiscount(prices.price, prices.calculatedPrice)
         let tranferPrice = await GeneralService.calculateTranferPrice(
-          elem.price,
-          price,
+          prices.price,
+          prices.calculatedPrice,
           Number(Env.get('PERCENT_DISCOUNT_TRANSFER_PRICE'))
         )
 
@@ -371,18 +375,12 @@ export class GeneralService {
           image: imagesVariation[0],
           hover: hover,
           stock:
-            inventoryLevel && inventoryLevel.length
-              ? inventoryLevel[0].available_to_sell
-              : Math.max(
-                  0,
-                  elem.inventory_level -
-                    (typeof inventoryLevel[0]?.safety_stock === 'number'
-                      ? inventoryLevel[0].safety_stock
-                      : 0)
-                ),
+            typeof inventory?.availableToSell === 'number'
+              ? inventory.availableToSell
+              : 0,
           main_title: product.name,
-          normal_price: elem.price,
-          discount_price: price,
+          normal_price: prices.price,
+          discount_price: prices.calculatedPrice,
           cash_price: tranferPrice,
           discount_rate: discount,
           warning_stock: inventoryLevel[0]?.safety_stock || 0,

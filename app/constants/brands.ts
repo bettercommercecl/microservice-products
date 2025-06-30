@@ -10,7 +10,7 @@ export const PARENT = {
   1420393: env.get('COUNTRY_CODE') === 'CL' ? 1338  : 1470, //  <----FC PE
   1567036: env.get('COUNTRY_CODE') === 'CL' ? 1342 : 0, // C.C
 } as const;
-  
+
 
 
   
