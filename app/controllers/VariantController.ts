@@ -42,8 +42,8 @@ export default class VariantController {
       }
 
       const { data: variants } = await this.variantService.getVariantsByIds(ids)
-
-      const formatted = await this.variantService.formatVariants(variants)
+      const onlyValidVariants = variants.filter(Boolean)
+      const formatted = await this.variantService.formatVariants(onlyValidVariants)
       return response.ok(formatted)
     } catch (error) {
       return response.internalServerError({
