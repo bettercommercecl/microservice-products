@@ -42,6 +42,7 @@ export default class VariantController {
       }
 
       const { data: variants } = await this.variantService.getVariantsByIds(ids)
+
       const formatted = await this.variantService.formatVariants(variants)
       return response.ok(formatted)
     } catch (error) {

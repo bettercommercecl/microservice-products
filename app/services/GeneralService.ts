@@ -375,7 +375,7 @@ export class GeneralService {
           image: imagesVariation[0],
           hover: hover,
           stock:
-            typeof inventory?.availableToSell === 'number'
+            (inventory && inventory.availableToSell && inventory.availableToSell !== undefined) || inventory.availableToSell !== null
               ? inventory.availableToSell
               : 0,
           main_title: product.name,

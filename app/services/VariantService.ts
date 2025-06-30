@@ -113,7 +113,10 @@ export default class ProductService {
 
   public async getVariantsByIds(ids: number[]) {
     try {
-      const variants = await Variant.query().whereIn('id', ids)
+      // Convertir los IDs a números y filtrar valores no válidos
+      const numericIds = ids.map(Number).filter(id => !isNaN(id))
+      const variants = await Variant.query().whereIn('id', numericIds)
+      // No es necesario filtrar nulos porque whereIn solo devuelve los que existen
       return {
         success: true,
         data: variants,
