@@ -473,11 +473,11 @@ export default class ProductService {
                   try {
                     // Obtener los IDs de categorías del producto
                     const categoryIds = Array.isArray(product.categories)
-                      ? product.categories.map((cat: any) => cat.id || cat)
+                      ? product.categories.map((cat: any) => cat.category_id || cat)
                       : []
                     // Buscar los títulos de esas categorías en la tabla categories
                     const categoryRecords = categoryIds.length
-                      ? await Category.query().whereIn('id', categoryIds)
+                      ? await Category.query().whereIn('category_id', categoryIds)
                       : []
                     const categoryTitles = categoryRecords.map(cat => cat.title).filter(Boolean)
                     // Tags y campañas como antes
