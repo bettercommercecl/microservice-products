@@ -43,3 +43,10 @@ new Ignitor(APP_ROOT, { importer: IMPORTER })
     process.exitCode = 1
     prettyPrintError(error)
   })
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection:', reason);
+});

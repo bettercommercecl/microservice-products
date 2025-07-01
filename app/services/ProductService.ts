@@ -285,6 +285,8 @@ export default class ProductService {
       const optionsResult = await this.syncOptionsByProduct(productsData)
       const variantsResult = await this.syncVariantsByProduct(productsData)
 
+      console.log('🎉 Sincronización COMPLETA');
+
       return {
         success: true,
         message: 'Proceso de sincronización completado',
