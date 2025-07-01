@@ -10,6 +10,7 @@ class PriceService {
         headers: {
           'Content-Type': 'application/json',
         },
+        timeout: 15000
       })
       return response.data
     } catch (error) {

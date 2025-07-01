@@ -9,7 +9,8 @@ class InventoryService {
       const response = await axios.get(url, {
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        timeout: 15000
       })
       return response.data
 
@@ -26,7 +27,8 @@ class InventoryService {
       const response = await axios.patch(url, {
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        timeout: 15000
       })
       return response.data
 

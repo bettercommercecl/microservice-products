@@ -456,12 +456,16 @@ export default class ProductService {
       await Promise.all(
         products.map(product =>
           limit(async () => {
+            console.log(`🔄 Iniciando sincronización de producto ${product.id}`);
             // Espera 300ms entre peticiones para evitar el 429
             await new Promise(res => setTimeout(res, 300));
+            console.log(`⏳ [${product.id}] Antes de formatVariantsByProduct`);
             const variants = await withRetry(() => GeneralService.formatVariantsByProduct(product as any));
+            console.log(`✅ [${product.id}] Después de formatVariantsByProduct`);
 
-            // Eliminar variantes anteriores SOLO del producto actual
-            await Variant.query().where('product_id', product.id).delete()
+            console.log(`⏳ [${product.id}] Antes de eliminar variantes`);
+            await Variant.query().where('product_id', product.id).delete();
+            console.log(`✅ [${product.id}] Después de eliminar variantes`);
 
             if (variants.length > 0) {
               await Promise.all(
@@ -473,7 +477,7 @@ export default class ProductService {
                       : []
                     // Buscar los títulos de esas categorías en la tabla categories
                     const categoryRecords = categoryIds.length
-                      ? await Category.query().whereIn('category_id', categoryIds)
+                      ? await Category.query().whereIn('id', categoryIds)
                       : []
                     const categoryTitles = categoryRecords.map(cat => cat.title).filter(Boolean)
                     // Tags y campañas como antes
@@ -487,6 +491,7 @@ export default class ProductService {
                       ...campaigns
                     ].filter(Boolean).join(', ')
 
+                    console.log(`⏳ [${product.id}] Antes de crear variante ${variant.id}`);
                     await Variant.create({
                       id: variant.id,
                       product_id: product.id,
@@ -512,6 +517,7 @@ export default class ProductService {
                       options: Array.isArray(variant.options) ? variant.options : [],
                       keywords: keywords,
                     })
+                    console.log(`✅ [${product.id}] Variante ${variant.id} creada`);
                   } catch (error) {
                     console.error('❌ Error al guardar variante:', {
                       product_id: product.id,

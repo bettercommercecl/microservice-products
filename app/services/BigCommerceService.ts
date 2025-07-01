@@ -76,7 +76,8 @@ export default class BigCommerceService {
         : `${this.baseUrl}/v3/catalog/brands?limit=200`
 
       const response = await axios.get(urlEndpoint, {
-        headers: this.headers
+        headers: this.headers,
+        timeout: 15000
       })
       return response.data.data
 
@@ -102,6 +103,7 @@ export default class BigCommerceService {
             limit: 250,
             page: currentPage,
           },
+          timeout: 15000
         })
 
         const { data, meta } = results.data
@@ -126,7 +128,8 @@ export default class BigCommerceService {
   async getProducts() {
     try {
       const response = await axios.get(`${this.baseUrl}/v3/catalog/products`, {
-        headers: this.headers
+        headers: this.headers,
+        timeout: 15000
       })
       return response.data.data
     } catch (error) {
@@ -140,7 +143,8 @@ export default class BigCommerceService {
   async getProductById(id: number) {
     try {
       const response = await axios.get(`${this.baseUrl}/v3/catalog/products/${id}`, {
-        headers: this.headers
+        headers: this.headers,
+        timeout: 15000
       })
       return response.data.data
     } catch (error) {
@@ -154,7 +158,8 @@ export default class BigCommerceService {
   async getVariantsOptionsOfProduct(productId: number): Promise<ProductOption[]> {
     try {
       const response = await axios.get(`${this.baseUrl}/v3/catalog/products/${productId}/options`, {
-        headers: this.headers
+        headers: this.headers,
+        timeout: 15000
       })
       return response.data.data
     } catch (error) {
@@ -168,7 +173,8 @@ export default class BigCommerceService {
   async getVariantsOfProduct(productId: number): Promise<ProductVariant[]> {
     try {
       const response = await axios.get(`${this.baseUrl}/v3/catalog/products/${productId}/variants`, {
-        headers: this.headers
+        headers: this.headers,
+        timeout: 15000
       })
       return response.data.data
     } catch (error) {
@@ -191,7 +197,10 @@ export default class BigCommerceService {
     }
 
     try {
-      const response = await axios.request(options)
+      const response = await axios.request({
+        ...options,
+        timeout: 15000
+      })
       return response.data
     } catch (error) {
       return { status: error.response.status, message: error.response.statusText }
@@ -214,7 +223,7 @@ export default class BigCommerceService {
     const commonParams = `id:in=${products}&availability=available&sort=id&direction=desc&include=images,variants&limit=${limit}${categoriesParam}`
     const url = `${baseUrl}?${visibilityParam}${commonParams}`
     try {
-      const { data } = await axios.get(url, { headers: this.headers })
+      const { data } = await axios.get(url, { headers: this.headers, timeout: 15000 })
       return data
     } catch (error) {
       throw error
