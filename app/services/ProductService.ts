@@ -468,7 +468,7 @@ export default class ProductService {
                   try {
                     // Obtener nombres de categorías
                     const categoryNames = Array.isArray(product.categories)
-                      ? product.categories.map((cat: any) => cat.name).filter(Boolean)
+                      ? product.categories.map((cat: any) => cat.title).filter(Boolean)
                       : []
                     // Lógica para tags y campaigns como antes
                     const childTags = await CategoryService.getChildCategories(Number(env.get('ID_BENEFITS')))
