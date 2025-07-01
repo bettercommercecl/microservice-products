@@ -13,6 +13,7 @@ import { channel } from 'diagnostics_channel'
 import Database from '@adonisjs/lucid/services/db'
 import CategoryService from './CategoryService.js'
 import env from '#start/env'
+import Category from '../models/Category.js'
 
 interface BigCommerceProduct {
   id: number
@@ -466,17 +467,22 @@ export default class ProductService {
               await Promise.all(
                 variants.map(async (variant: any) => {
                   try {
-                    // Obtener nombres de categorías
-                    const categoryNames = Array.isArray(product.categories)
-                      ? product.categories.map((cat: any) => cat.title).filter(Boolean)
+                    // Obtener los IDs de categorías del producto
+                    const categoryIds = Array.isArray(product.categories)
+                      ? product.categories.map((cat: any) => cat.id || cat)
                       : []
-                    // Lógica para tags y campaigns como antes
+                    // Buscar los títulos de esas categorías en la tabla categories
+                    const categoryRecords = categoryIds.length
+                      ? await Category.query().whereIn('id', categoryIds)
+                      : []
+                    const categoryTitles = categoryRecords.map(cat => cat.title).filter(Boolean)
+                    // Tags y campañas como antes
                     const childTags = await CategoryService.getChildCategories(Number(env.get('ID_BENEFITS')))
                     const childCampaigns = await CategoryService.getChildCategories(Number(env.get('ID_CAMPAIGNS')))
                     const tags = await CategoryService.getCampaignsByCategory(product.id, childTags)
                     const campaigns = await CategoryService.getCampaignsByCategory(product.id, childCampaigns)
                     const keywords = [
-                      ...categoryNames,
+                      ...categoryTitles,
                       ...tags,
                       ...campaigns
                     ].filter(Boolean).join(', ')
