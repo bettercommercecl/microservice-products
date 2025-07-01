@@ -73,6 +73,9 @@ export default class Variant extends BaseModel {
   @column()
   declare keywords: string | null
 
+  @column()
+  declare option_label: string | null
+
   @belongsTo(() => Product, {
     foreignKey: 'product_id',
   })

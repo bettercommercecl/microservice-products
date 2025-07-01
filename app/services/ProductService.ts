@@ -11,6 +11,8 @@ import pLimit from 'p-limit'
 import ChannelProduct from '#models/ChannelProduct'
 import { channel } from 'diagnostics_channel'
 import Database from '@adonisjs/lucid/services/db'
+import CategoryService from './CategoryService.js'
+import env from '#start/env'
 
 interface BigCommerceProduct {
   id: number
@@ -464,6 +466,21 @@ export default class ProductService {
               await Promise.all(
                 variants.map(async (variant: any) => {
                   try {
+                    // Obtener nombres de categorías
+                    const categoryNames = Array.isArray(product.categories)
+                      ? product.categories.map((cat: any) => cat.name).filter(Boolean)
+                      : []
+                    // Lógica para tags y campaigns como antes
+                    const childTags = await CategoryService.getChildCategories(Number(env.get('ID_BENEFITS')))
+                    const childCampaigns = await CategoryService.getChildCategories(Number(env.get('ID_CAMPAIGNS')))
+                    const tags = await CategoryService.getCampaignsByCategory(product.id, childTags)
+                    const campaigns = await CategoryService.getCampaignsByCategory(product.id, childCampaigns)
+                    const keywords = [
+                      ...categoryNames,
+                      ...tags,
+                      ...campaigns
+                    ].filter(Boolean).join(', ')
+
                     await Variant.create({
                       id: variant.id,
                       product_id: product.id,
@@ -487,7 +504,7 @@ export default class ProductService {
                       depth: variant.depth,
                       type: variant.type,
                       options: Array.isArray(variant.options) ? variant.options : [],
-                      keywords: variant.keywords,
+                      keywords: keywords,
                     })
                   } catch (error) {
                     console.error('❌ Error al guardar variante:', {
