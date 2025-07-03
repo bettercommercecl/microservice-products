@@ -342,10 +342,15 @@ export default class ProductService {
       }
     } catch (error) {
       await trx.rollback()
+      let errorMessage = error instanceof Error ? error.message : 'Error desconocido'
+      // Si el error es de foreign key en category_id, agrega mensaje explicativo
+      if (errorMessage.includes('category_products_category_id_fkey')) {
+        errorMessage += ' — Probablemente se han creado nuevas categorías en BigCommerce que aún no existen en la base de datos local. Por favor, sincroniza las categorías antes de volver a intentar.'
+      }
       return {
         success: false,
         message: 'Error al sincronizar categorías',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: errorMessage
       }
     }
   }
