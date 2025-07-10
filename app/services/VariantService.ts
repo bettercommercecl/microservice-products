@@ -150,18 +150,18 @@ export default class ProductService {
       }
       const paginated = await Variant.query().whereIn('product_id', productIds).paginate(page, limit)
       // Agregar filters a cada variante
-      const FiltersProduct = (await import('#models/FiltersProduct')).default
       const variantsWithFilters = await Promise.all(paginated.all().map(async (variant) => {
         const filters = (await FiltersProduct.query().where('product_id', variant.product_id)).map(fp => fp.category_id)
-        return { ...variant.toJSON(), filters }
+        const variantData = variant.toJSON()
+        return { ...variantData, filters }
       }))
       return { data: variantsWithFilters, meta: paginated.getMeta() }
     } else {
       const paginated = await Variant.query().paginate(page, limit)
-      const FiltersProduct = (await import('#models/FiltersProduct')).default
       const variantsWithFilters = await Promise.all(paginated.all().map(async (variant) => {
         const filters = (await FiltersProduct.query().where('product_id', variant.product_id)).map(fp => fp.category_id)
-        return { ...variant.toJSON(), filters }
+        const variantData = variant.toJSON()
+        return { ...variantData, filters }
       }))
       return { data: variantsWithFilters, meta: paginated.getMeta() }
     }
