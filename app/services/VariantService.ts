@@ -4,6 +4,8 @@ import Product from '../models/Product.js'
 import CategoryProduct from '../models/CategoryProduct.js'
 import CategoryService from './CategoryService.js'
 import env from '#start/env'
+import Category from '../models/Category.js'
+import FiltersProduct from '../models/FiltersProduct.js'
 
 export default class ProductService {
   private bigCommerceService: BigCommerceService
@@ -47,6 +49,9 @@ export default class ProductService {
           const categories_array = product
             ? product.categories.map((catProd: CategoryProduct) => catProd.category_id)
             : []
+
+          // Obtener los ids de filtros (de la tabla filters_products)
+          const filters = (await FiltersProduct.query().where('product_id', variant.product_id)).map(fp => fp.category_id)
           let tags: string[] = []
           let campaigns: string[] = []
           if (product) {
@@ -69,6 +74,7 @@ export default class ProductService {
             brand_id: product?.brand_id,
             categories_array: categories_array,
             categories: categories_array,
+            filters: filters,
             stock: variant.stock,
             warning_stock: variant.warning_stock,
             normal_price: variant.normal_price,

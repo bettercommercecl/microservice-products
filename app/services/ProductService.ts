@@ -282,6 +282,8 @@ export default class ProductService {
       // Sincronizar relaciones
       const channelResult = await this.syncChannelByProduct(productsData, channel_id)
       const categoriesResult = await this.syncCategoriesByProduct(productsData)
+      // Sincronizar filtros-productos después de categorías-productos
+      const filtersProductsResult = await this.syncFiltersProducts()
       const optionsResult = await this.syncOptionsByProduct(productsData)
       const variantsResult = await this.syncVariantsByProduct(productsData)
 
@@ -298,7 +300,8 @@ export default class ProductService {
           channels: channelResult,
           categories: categoriesResult,
           options: optionsResult,
-          variants: variantsResult
+          variants: variantsResult,
+          filters_products: filtersProductsResult
         }
       }
     } catch (error) {
@@ -594,6 +597,52 @@ export default class ProductService {
         message: 'Error al sincronizar el stock de seguridad',
         error: error instanceof Error ? error.message : 'Error desconocido'
       }
+    }
+  }
+
+  /**
+   * Sincroniza las relaciones producto-categoría hija de TODAS las categorías "Filtros" en filters_products
+   */
+  private async syncFiltersProducts() {
+    const FiltersProduct = (await import('#models/FiltersProduct')).default
+    // 1. Buscar TODAS las categorías cuyo título contenga "Filtros"
+    const filtrosCategories = await Category.query().whereILike('title', '%Filtros%')
+    if (filtrosCategories.length === 0) {
+      console.warn('No existen categorías con el título Filtros')
+      return { success: false, message: 'No existen categorías con el título Filtros' }
+    }
+    const filtrosCategoryIds = filtrosCategories.map(cat => cat.category_id)
+
+    // 2. Obtener los hijos de Filtros
+    const hijos = filtrosCategoryIds.length > 0 ? await Category.query().whereIn('parent_id', filtrosCategoryIds) : []
+    const hijosIds = hijos.map(cat => cat.category_id)
+
+    // 3. Obtener los hijos de esos hijos (nietos de Filtros)
+    const nietos = hijosIds.length > 0 ? await Category.query().whereIn('parent_id', hijosIds) : []
+    const nietosIds = nietos.map(cat => cat.category_id)
+    if (nietosIds.length === 0) {
+      return { success: false, message: 'No hay categorías nietas de Filtros' }
+    }
+
+    // 4. Obtener todas las relaciones producto-categoría para esos nietos
+    const relations = await CategoryProduct.query().whereIn('category_id', nietosIds)
+
+    // 5. Limpiar tabla filters_products (opcional, si quieres reemplazar todo)
+    await FiltersProduct.truncate()
+
+    // 6. Guardar las relaciones en filters_products
+    if (relations.length > 0) {
+      await FiltersProduct.createMany(
+        relations.map(rel => ({
+          product_id: rel.product_id,
+          category_id: rel.category_id
+        }))
+      )
+    }
+
+    return {
+      success: true,
+      message: `Sincronizadas ${relations.length} relaciones en filters_products (nietos de Filtros)`
     }
   }
 } 
