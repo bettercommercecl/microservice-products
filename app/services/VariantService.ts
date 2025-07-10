@@ -148,9 +148,22 @@ export default class ProductService {
         // Si no hay productos en el canal, retorna paginación vacía
         return { data: [], meta: { pagination: { total: 0, per_page: limit, current_page: page, total_pages: 0 } } }
       }
-      return await Variant.query().whereIn('product_id', productIds).paginate(page, limit)
+      const paginated = await Variant.query().whereIn('product_id', productIds).paginate(page, limit)
+      // Agregar filters a cada variante
+      const FiltersProduct = (await import('#models/FiltersProduct')).default
+      const variantsWithFilters = await Promise.all(paginated.all().map(async (variant) => {
+        const filters = (await FiltersProduct.query().where('product_id', variant.product_id)).map(fp => fp.category_id)
+        return { ...variant.toJSON(), filters }
+      }))
+      return { data: variantsWithFilters, meta: paginated.getMeta() }
     } else {
-      return await Variant.query().paginate(page, limit)
+      const paginated = await Variant.query().paginate(page, limit)
+      const FiltersProduct = (await import('#models/FiltersProduct')).default
+      const variantsWithFilters = await Promise.all(paginated.all().map(async (variant) => {
+        const filters = (await FiltersProduct.query().where('product_id', variant.product_id)).map(fp => fp.category_id)
+        return { ...variant.toJSON(), filters }
+      }))
+      return { data: variantsWithFilters, meta: paginated.getMeta() }
     }
   }
 }
