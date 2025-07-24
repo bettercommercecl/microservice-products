@@ -606,10 +606,10 @@ export default class ProductService {
   private async syncFiltersProducts() {
     const FiltersProduct = (await import('#models/FiltersProduct')).default
     // 1. Buscar TODAS las categorías cuyo título contenga "Filtros"
-    const filtrosCategories = await Category.query().whereILike('title', '%Filtros%')
+    const filtrosCategories = await Category.query().whereILike('title', '%Avanzados%')
     if (filtrosCategories.length === 0) {
-      console.warn('No existen categorías con el título Filtros')
-      return { success: false, message: 'No existen categorías con el título Filtros' }
+      console.warn('No existen categorías con el título Avanzados')
+      return { success: false, message: 'No existen categorías con el título Avanzados' }
     }
     const filtrosCategoryIds = filtrosCategories.map(cat => cat.category_id)
 
@@ -621,7 +621,7 @@ export default class ProductService {
     const nietos = hijosIds.length > 0 ? await Category.query().whereIn('parent_id', hijosIds) : []
     const nietosIds = nietos.map(cat => cat.category_id)
     if (nietosIds.length === 0) {
-      return { success: false, message: 'No hay categorías nietas de Filtros' }
+      return { success: false, message: 'No hay categorías nietas de Avanzados' }
     }
 
     // 4. Obtener todas las relaciones producto-categoría para esos nietos
