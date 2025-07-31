@@ -44,8 +44,7 @@ export default class ProductsController {
    */
   async sync({ params, response }: HttpContext) {
     try {
-      const result = await this.productService.syncProducts(params.channel_id)
-      
+      const result = await this.productService.syncProducts(params.channel_id)      
       // Si hay errores en los resultados, devolver un 400 con los detalles
       if (!result.success) {
         return response.badRequest({

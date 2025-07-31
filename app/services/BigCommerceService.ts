@@ -210,7 +210,7 @@ export default class BigCommerceService {
   /**
    * Obtiene productos detallados por IDs
    */
-  async getAllProductsRefactoring(products: number[], visible = 1, limit = 2000, channel : number) {
+  async getAllProductsRefactoring(products: number[], visible = 1, channel : number) {
     // Aseguramos que channel es uno de los índices válidos de PARENT
     let parent_id : any = PARENT[channel as keyof typeof PARENT]
 
@@ -220,10 +220,10 @@ export default class BigCommerceService {
     const baseUrl = this.baseUrl + '/v3/catalog/products'
     const visibilityParam = visible == 1 ? 'is_visible=1&' : ''
     const categoriesParam = parent_id == 0 ? '' : `&categories:in=${parent_id}`
-    const commonParams = `id:in=${products}&availability=available&sort=id&direction=desc&include=images,variants&limit=${limit}${categoriesParam}`
+    const commonParams = `id:in=${products}&availability=available&sort=id&direction=desc&include=images,variants&${categoriesParam}`
     const url = `${baseUrl}?${visibilityParam}${commonParams}`
     try {
-      const { data } = await axios.get(url, { headers: this.headers, timeout: 15000 })
+      const { data } = await axios.get(url, { headers: this.headers, timeout: 30000 })
       return data
     } catch (error) {
       throw error

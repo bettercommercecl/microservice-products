@@ -150,24 +150,43 @@ export default class ProductService {
    * Obtiene todos los IDs de productos asignados a un canal, recorriendo todas las páginas
    */
   async getAllProductIdsByChannel(channelId: number, limit = 200) {
+    console.time('getAllProductIdsByChannel')
     let allIds: number[] = [];
-    let page = 1;
-    let totalPages = 1;
-    do {
-      const response = await this.bigCommerceService.getProductsByChannel(channelId, page, limit);
-      const { data, meta } = response;
-      if (!data || data.length === 0) break;
-      // Si la respuesta es de assignments, usa product_id
-      const ids = data.map((item: any) => item.product_id || item.id);
-      allIds.push(...ids);
-      // Calcula totalPages si la respuesta tiene meta.pagination
-      if (meta && meta.pagination) {
-        totalPages = meta.pagination.total_pages;
-      } else {
-        break;
-      }
-      page++;
-    } while (page <= totalPages);
+    // 1. Primera petición para saber cuántas páginas hay
+    const firstResponse = await this.bigCommerceService.getProductsByChannel(channelId, 1, limit);
+    const { data: firstData, meta } = firstResponse;
+    if (!firstData || firstData.length === 0) {
+      console.timeEnd('getAllProductIdsByChannel')
+      return [];
+    }
+    const ids = firstData.map((item: any) => item.product_id || item.id);
+    allIds.push(...ids);
+
+    // 2. Calcular total de páginas
+    const totalPages = meta && meta.pagination ? meta.pagination.total_pages : 1;
+    console.log(`[getAllProductIdsByChannel] Total páginas: ${totalPages}`)
+    if (totalPages === 1) {
+      console.timeEnd('getAllProductIdsByChannel')
+      return allIds.filter(Boolean);
+    }
+
+    // 3. Lanzar el resto de páginas en paralelo (con límite de concurrencia)
+    const limitConcurrency = pLimit(4); // Puedes ajustar el número
+    const pagePromises = [];
+    for (let page = 2; page <= totalPages; page++) {
+      pagePromises.push(
+        limitConcurrency(async () => {
+          console.time(`[getAllProductIdsByChannel] Página ${page}`)
+          const response = await this.bigCommerceService.getProductsByChannel(channelId, page, limit)
+          console.timeEnd(`[getAllProductIdsByChannel] Página ${page}`)
+          return response.data.map((item: any) => item.product_id || item.id)
+        })
+      );
+    }
+    const results = await Promise.all(pagePromises);
+    results.forEach(ids => allIds.push(...ids));
+
+    console.timeEnd('getAllProductIdsByChannel')
     return allIds.filter(Boolean);
   }
 
@@ -206,8 +225,8 @@ export default class ProductService {
           }
         }
       }
-      // Procesar productos en lotes de 20
-      const batchSize = 20
+      // Procesar productos en lotes de 50
+      const batchSize = 50
       const batches = []
       for (let i = 0; i < productIds.length; i += batchSize) {
         batches.push(productIds.slice(i, i + batchSize))
@@ -216,12 +235,14 @@ export default class ProductService {
       console.log('📋 Procesando en lotes:', batches.length)
 
       // Obtener detalles de productos en paralelo (limitando concurrencia)
-      const limit = pLimit(5) // máximo 5 lotes en paralelo
+      const limit = pLimit(8) // máximo 8 lotes en paralelo
       const batchResults = await Promise.all(
         batches.map((batchIds, index) =>
           limit(async () => {
+            console.time(`Lote ${index + 1}`)
             console.log(`🔄 Procesando lote ${index + 1}/${batches.length} con ${batchIds.length} productos`)
-            const productsPerPage = await this.bigCommerceService.getAllProductsRefactoring(batchIds, 0, 2000, channel_id)
+            const productsPerPage = await this.bigCommerceService.getAllProductsRefactoring(batchIds, 0, channel_id)
+            console.timeEnd(`Lote ${index + 1}`)
             console.log(`✅ Lote ${index + 1} completado, productos obtenidos:`, productsPerPage.data?.length || 0)
             return productsPerPage.data
           })
@@ -265,20 +286,23 @@ export default class ProductService {
       }
 
       // Guardar productos en lotes pequeños y con concurrencia limitada
-      const saveLimit = pLimit(5)
+      const saveLimit = pLimit(8)
       let savedProducts: any[] = []
+      let failedBatchProducts: { batch: number, error: any, products: any[] }[] = []
       for (let i = 0; i < saveBatches.length; i++) {
-        console.log(`💾 Guardando lote de productos ${i + 1}/${saveBatches.length}...`)
-        const result = await saveLimit(() => Product.updateOrCreateMany('id', saveBatches[i]))
-        savedProducts = savedProducts.concat(result)
-        console.log(`✅ Lote de productos ${i + 1} guardado (${result.length} productos)`)
+        try {
+          console.log(`💾 Guardando lote de productos ${i + 1}/${saveBatches.length}...`)
+          const result = await saveLimit(() => Product.updateOrCreateMany('id', saveBatches[i]))
+          savedProducts = savedProducts.concat(result)
+          console.log(`✅ Lote de productos ${i + 1} guardado (${result.length} productos)`)
+        } catch (error) {
+          console.error(`❌ Error en lote ${i + 1}:`, error)
+          failedBatchProducts.push({ batch: i + 1, error, products: saveBatches[i] })
+        }
       }
 
-      // Identificar productos fallidos
-      failedProducts = formatProducts
-        .filter((product: FormattedProduct, index: number) => savedProducts[index]?.id === undefined)
-        .map((product: FormattedProduct) => product.id)
-
+      // Identificar productos fallidos por ID
+      failedProducts = failedBatchProducts.flatMap(f => f.products.map((p: any) => p.id))
       // Sincronizar relaciones
       const channelResult = await this.syncChannelByProduct(productsData, channel_id)
       const categoriesResult = await this.syncCategoriesByProduct(productsData)
@@ -318,33 +342,43 @@ export default class ProductService {
    * Sincroniza las categorías por producto
    */
   private async syncCategoriesByProduct(products: BigCommerceProduct[]) {
-    const trx = await db.transaction()
     try {
       // Limpiar categorías existentes SOLO de los productos actuales
+      console.time('Limpieza categorías existentes')
       const productIds = products.map(product => product.id)
-      await CategoryProduct.query().useTransaction(trx).whereIn('product_id', productIds).delete()
+      await CategoryProduct.query().whereIn('product_id', productIds).delete()
+      console.timeEnd('Limpieza categorías existentes')
 
       // Preparar datos de categorías
+      console.time('Preparación datos categorías')
       const productsList = products.map(product => {
         return product.categories.map((categoryId: number) => ({
           product_id: product.id,
           category_id: categoryId
         }))
       }).flat()
+      console.timeEnd('Preparación datos categorías')
+      console.log(`📊 Total de relaciones a insertar: ${productsList.length}`)
 
-      // Guardar nuevas categorías
-      await CategoryProduct.createMany(productsList, { client: trx })
-      console.log(`✅ Guardadas ${productsList.length} relaciones en category_products`)
-
-      await trx.commit()
+      // Guardar nuevas categorías en batches de 10,000 (sin transacción)
+      console.time('Inserción categorías')
+      const batchSize = 10000;
+      let totalInserted = 0;
+      for (let i = 0; i < productsList.length; i += batchSize) {
+        const batch = productsList.slice(i, i + batchSize);
+        await CategoryProduct.createMany(batch);
+        totalInserted += batch.length;
+        console.log(`✅ Insertadas ${batch.length} relaciones en category_products (batch ${i / batchSize + 1}) - Total: ${totalInserted}`);
+      }
+      console.timeEnd('Inserción categorías')
+      console.log(`✅ Guardadas ${totalInserted} relaciones en category_products`)
 
       return {
         success: true,
         message: 'Categorías sincronizadas correctamente',
-        total: productsList.length
+        total: totalInserted
       }
     } catch (error) {
-      await trx.rollback()
       let errorMessage = error instanceof Error ? error.message : 'Error desconocido'
       // Si el error es de foreign key en category_id, agrega mensaje explicativo
       if (errorMessage.includes('category_products_category_id_fkey')) {
@@ -394,59 +428,87 @@ export default class ProductService {
    * Sincroniza las opciones por producto
    */
   private async syncOptionsByProduct(products: BigCommerceProduct[]) {
-    const trx = await db.transaction()
+    console.log('🔄 Iniciando syncOptionsByProduct...')
     const failedOptions: any[] = []
+    const batchSize = 10 // Procesar solo 10 productos a la vez
+    const pLimit = (await import('p-limit')).default
+    const limit = pLimit(4) // Máximo 4 productos concurrentes
 
     try {
-      await Promise.all(
-        products.map(async product => {
-          const options = await GeneralService.formatOptionsByVariantByProduct(product as any)
-
-          if (!Array.isArray(options) || options.length === 0) {
-            return
-          }
-
-          // Eliminar opciones anteriores SOLO del producto actual
-          await OptionOfProducts.query().useTransaction(trx).where('product_id', product.id).delete()
-
-          // Crear nuevas opciones
-          await Promise.all(
-            options.map(async option => {
+      console.time('Procesamiento total de opciones')
+      
+      // Procesar productos en batches pequeños
+      for (let i = 0; i < products.length; i += batchSize) {
+        const batch = products.slice(i, i + batchSize)
+        console.log(`📦 Procesando batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(products.length/batchSize)} (${batch.length} productos)`)
+        
+        await Promise.all(
+          batch.map(product => 
+            limit(async () => {
               try {
-                const formattedOptions = option.options.map((opt: any) => ({
-                  id: opt.id,
-                  label: opt.label,
-                  value: opt.value_data || ''
-                }))
+                console.time(`Producto ${product.id} - formatOptionsByVariantByProduct`)
+                const options = await GeneralService.formatOptionsByVariantByProduct(product as any)
+                console.timeEnd(`Producto ${product.id} - formatOptionsByVariantByProduct`)
 
-                await OptionOfProducts.create({
-                  label: option.label,
-                  product_id: option.product_id,
-                  option_id: option.id,
-                  options: toJsonField(formattedOptions)
-                }, { client: trx })
+                if (!Array.isArray(options) || options.length === 0) {
+                  console.log(`⚠️ Producto ${product.id} - Sin opciones`)
+                  return
+                }
+
+                // Eliminar opciones anteriores SOLO del producto actual
+                console.time(`Producto ${product.id} - eliminar opciones anteriores`)
+                await OptionOfProducts.query().where('product_id', product.id).delete()
+                console.timeEnd(`Producto ${product.id} - eliminar opciones anteriores`)
+
+                // Crear nuevas opciones
+                console.time(`Producto ${product.id} - crear nuevas opciones`)
+                await Promise.all(
+                  options.map(async option => {
+                    try {
+                      const formattedOptions = option.options.map((opt: any) => ({
+                        id: opt.id,
+                        label: opt.label,
+                        value: opt.value_data || ''
+                      }))
+
+                      await OptionOfProducts.create({
+                        label: option.label,
+                        product_id: option.product_id,
+                        option_id: option.id,
+                        options: toJsonField(formattedOptions)
+                      })
+                    } catch (error) {
+                      failedOptions.push({
+                        product_id: product.id,
+                        option_id: option.id,
+                        error: error instanceof Error ? error.message : 'Error desconocido'
+                      })
+                    }
+                  })
+                )
+                console.timeEnd(`Producto ${product.id} - crear nuevas opciones`)
+                console.log(`✅ Guardadas opciones para producto ${product.id} en options`)
               } catch (error) {
+                console.error(`❌ Error procesando producto ${product.id}:`, error instanceof Error ? error.message : 'Error desconocido')
                 failedOptions.push({
                   product_id: product.id,
-                  option_id: option.id,
                   error: error instanceof Error ? error.message : 'Error desconocido'
                 })
               }
             })
           )
-          console.log(`✅ Guardadas opciones para producto ${product.id} en options`)
-        })
-      )
-
-      await trx.commit()
+        )
+      }
+      
+      console.timeEnd('Procesamiento total de opciones')
 
       return {
         success: failedOptions.length === 0,
-        message: failedOptions.length > 0 ? 'Algunas opciones no se sincronizaron correctamente' : 'Opciones sincronizadas correctamente',
+        message: failedOptions.length > 0 ? `Algunas opciones no se sincronizaron correctamente (${failedOptions.length} errores)` : 'Opciones sincronizadas correctamente',
         failed: failedOptions
       }
     } catch (error) {
-      await trx.rollback()
+      console.error('❌ Error general en syncOptionsByProduct:', error instanceof Error ? error.message : 'Error desconocido')
       return {
         success: false,
         message: 'Error al sincronizar opciones',
@@ -459,103 +521,143 @@ export default class ProductService {
    * Sincroniza las variantes por producto
    */
   private async syncVariantsByProduct(products: BigCommerceProduct[]) {
+    console.log('🔄 Iniciando syncVariantsByProduct...')
     const failedVariants: any[] = []
-    const limit = pLimit(2) // Limita la concurrencia a 2
+    const batchSize = 20 // Aumentar batch size
+    const pLimit = (await import('p-limit')).default
+    const limit = pLimit(8) // Aumentar concurrencia a 8
 
     try {
-      await Promise.all(
-        products.map(product =>
-          limit(async () => {
-            console.log(`🔄 Iniciando sincronización de producto ${product.id}`);
-            // Espera 300ms entre peticiones para evitar el 429
-            await new Promise(res => setTimeout(res, 300));
-            console.log(`⏳ [${product.id}] Antes de formatVariantsByProduct`);
-            const variants = await withRetry(() => GeneralService.formatVariantsByProduct(product as any));
-            console.log(`✅ [${product.id}] Después de formatVariantsByProduct`);
+      console.time('Procesamiento total de variantes')
+      
+      // Cache de categorías para evitar queries repetidas
+      const categoryCache = new Map()
+      const childTags = await CategoryService.getChildCategories(Number(env.get('ID_BENEFITS')))
+      const childCampaigns = await CategoryService.getChildCategories(Number(env.get('ID_CAMPAIGNS')))
+      
+      // Procesar productos en batches más grandes
+      for (let i = 0; i < products.length; i += batchSize) {
+        const batch = products.slice(i, i + batchSize)
+        console.log(`📦 Procesando batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(products.length/batchSize)} (${batch.length} productos)`)
+        
+        await Promise.all(
+          batch.map(product => 
+            limit(async () => {
+              try {
+                console.time(`Producto ${product.id} - TOTAL`)
+                
+                // 1. FORMATVARIANTSBYPRODUCT
+                const variants = await withRetry(() => GeneralService.formatVariantsByProduct(product as any))
 
-            console.log(`⏳ [${product.id}] Antes de eliminar variantes`);
-            await Variant.query().where('product_id', product.id).delete();
-            console.log(`✅ [${product.id}] Después de eliminar variantes`);
+                if (!Array.isArray(variants) || variants.length === 0) {
+                  console.log(`⚠️ Producto ${product.id} - Sin variantes`)
+                  console.timeEnd(`Producto ${product.id} - TOTAL`)
+                  return
+                }
 
-            if (variants.length > 0) {
-              await Promise.all(
-                variants.map(async (variant: any) => {
-                  try {
-                    // Obtener los IDs de categorías del producto
-                    const categoryIds = Array.isArray(product.categories)
-                      ? product.categories.map((cat: any) => cat.category_id || cat)
-                      : []
-                    // Buscar los títulos de esas categorías en la tabla categories
-                    const categoryRecords = categoryIds.length
-                      ? await Category.query().whereIn('category_id', categoryIds)
-                      : []
-                    const categoryTitles = categoryRecords.map(cat => cat.title).filter(Boolean)
-                    // Tags y campañas como antes
-                    const childTags = await CategoryService.getChildCategories(Number(env.get('ID_BENEFITS')))
-                    const childCampaigns = await CategoryService.getChildCategories(Number(env.get('ID_CAMPAIGNS')))
-                    const tags = await CategoryService.getCampaignsByCategory(product.id, childTags)
-                    const campaigns = await CategoryService.getCampaignsByCategory(product.id, childCampaigns)
-                    const keywords = [
-                      ...categoryTitles,
-                      ...tags,
-                      ...campaigns
-                    ].filter(Boolean).join(', ')
+                // 2. ELIMINAR VARIANTES ANTERIORES
+                await Variant.query().where('product_id', product.id).delete()
 
-                    console.log(`⏳ [${product.id}] Antes de crear variante ${variant.id}`);
-                    await Variant.create({
-                      id: variant.id,
-                      product_id: product.id,
-                      title: variant.main_title,
-                      sku: variant.sku,
-                      normal_price: variant.normal_price,
-                      discount_price: variant.discount_price,
-                      cash_price: variant.cash_price,
-                      discount_rate: variant.discount_rate,
-                      stock: variant.stock,
-                      warning_stock: variant.warning_stock,
-                      image: variant.image,
-                      images: Array.isArray(variant.images) ? variant.images : [],
-                      hover: variant.hover,
-                      quantity: variant.quantity,
-                      armed_cost: variant.armed_cost,
-                      armed_quantity: variant.armed_quantity,
-                      weight: variant.weight,
-                      height: variant.height,
-                      width: variant.width,
-                      depth: variant.depth,
-                      type: variant.type,
-                      options: Array.isArray(variant.options) ? variant.options : [],
-                      keywords: keywords,
-                    })
-                    console.log(`✅ [${product.id}] Variante ${variant.id} creada`);
-                  } catch (error) {
-                    console.error('❌ Error al guardar variante:', {
-                      product_id: product.id,
-                      variant_id: variant.id,
-                      sku: variant.sku,
-                      error: error instanceof Error ? error.message : error
-                    });
-                    failedVariants.push({
-                      product_id: product.id,
-                      variant_id: variant.id,
-                      sku: variant.sku,
-                      error: error instanceof Error ? error.message : 'Error desconocido'
+                // 3. PROCESAR CATEGORÍAS
+                const categoryIds = Array.isArray(product.categories)
+                  ? product.categories.map((cat: any) => cat.category_id || cat)
+                  : []
+                
+                let categoryTitles: string[] = []
+                if (categoryIds.length > 0) {
+                  // Usar cache para evitar queries repetidas
+                  const uncachedIds = categoryIds.filter(id => !categoryCache.has(id))
+                  if (uncachedIds.length > 0) {
+                    const categoryRecords = await Category.query().whereIn('category_id', uncachedIds)
+                    categoryRecords.forEach(cat => {
+                      categoryCache.set(cat.category_id, cat.title)
                     })
                   }
+                  categoryTitles = categoryIds
+                    .map(id => categoryCache.get(id))
+                    .filter(Boolean)
+                }
+
+                // 4. QUERIES DE TAGS/CAMPAIGNS
+                const [tags, campaigns] = await Promise.all([
+                  CategoryService.getCampaignsByCategory(product.id, childTags),
+                  CategoryService.getCampaignsByCategory(product.id, childCampaigns)
+                ])
+
+                const keywords = [
+                  ...categoryTitles,
+                  ...tags,
+                  ...campaigns
+                ].filter(Boolean).join(', ')
+
+                // 5. CREAR VARIANTES
+                await Promise.all(
+                  variants.map(async (variant: any) => {
+                    try {
+                      await Variant.create({
+                        id: variant.id,
+                        product_id: product.id,
+                        title: variant.main_title,
+                        sku: variant.sku,
+                        normal_price: variant.normal_price,
+                        discount_price: variant.discount_price,
+                        cash_price: variant.cash_price,
+                        discount_rate: variant.discount_rate,
+                        stock: variant.stock,
+                        warning_stock: variant.warning_stock,
+                        image: variant.image,
+                        images: Array.isArray(variant.images) ? variant.images : [],
+                        hover: variant.hover,
+                        quantity: variant.quantity,
+                        armed_cost: variant.armed_cost,
+                        armed_quantity: variant.armed_quantity,
+                        weight: variant.weight,
+                        height: variant.height,
+                        width: variant.width,
+                        depth: variant.depth,
+                        type: variant.type,
+                        options: Array.isArray(variant.options) ? variant.options : [],
+                        keywords: keywords,
+                      })
+                    } catch (error) {
+                      console.error('❌ Error al guardar variante:', {
+                        product_id: product.id,
+                        variant_id: variant.id,
+                        sku: variant.sku,
+                        error: error instanceof Error ? error.message : error
+                      })
+                      failedVariants.push({
+                        product_id: product.id,
+                        variant_id: variant.id,
+                        sku: variant.sku,
+                        error: error instanceof Error ? error.message : 'Error desconocido'
+                      })
+                    }
+                  })
+                )
+                console.log(`✅ Guardadas variantes para producto ${product.id} en variants`)
+                console.timeEnd(`Producto ${product.id} - TOTAL`)
+              } catch (error) {
+                console.error(`❌ Error procesando producto ${product.id}:`, error instanceof Error ? error.message : 'Error desconocido')
+                failedVariants.push({
+                  product_id: product.id,
+                  error: error instanceof Error ? error.message : 'Error desconocido'
                 })
-              )
-              console.log(`✅ Guardadas variantes para producto ${product.id} en variants`)
-            }
-          })
+              }
+            })
+          )
         )
-      )
+      }
+      
+      console.timeEnd('Procesamiento total de variantes')
 
       return {
         success: failedVariants.length === 0,
-        message: failedVariants.length > 0 ? 'Algunas variantes no se sincronizaron correctamente' : 'Variantes sincronizadas correctamente',
+        message: failedVariants.length > 0 ? `Algunas variantes no se sincronizaron correctamente (${failedVariants.length} errores)` : 'Variantes sincronizadas correctamente',
         failed: failedVariants
       }
     } catch (error) {
+      console.error('❌ Error general en syncVariantsByProduct:', error instanceof Error ? error.message : 'Error desconocido')
       return {
         success: false,
         message: 'Error al sincronizar variantes',
@@ -606,39 +708,70 @@ export default class ProductService {
   private async syncFiltersProducts() {
     const FiltersProduct = (await import('#models/FiltersProduct')).default
     // 1. Buscar TODAS las categorías cuyo título contenga "Filtros"
-    const filtrosCategories = await Category.query().whereILike('title', '%Avanzados%')
+    console.log('🔍 Buscando categorías Filtros...')
+    console.time('Búsqueda categorías Filtros')
+    const filtrosCategories = await Category.query().whereILike('title', '%Filtros%')
+    console.timeEnd('Búsqueda categorías Filtros')
     if (filtrosCategories.length === 0) {
-      console.warn('No existen categorías con el título Avanzados')
-      return { success: false, message: 'No existen categorías con el título Avanzados' }
+      console.warn('No existen categorías con el título Filtros')
+      return { success: false, message: 'No existen categorías con el título Filtros' }
     }
+    console.log(`✅ Encontradas ${filtrosCategories.length} categorías Filtros`)
     const filtrosCategoryIds = filtrosCategories.map(cat => cat.category_id)
 
     // 2. Obtener los hijos de Filtros
+    console.log('🔍 Obteniendo hijos de Filtros...')
+    console.time('Obtención hijos')
     const hijos = filtrosCategoryIds.length > 0 ? await Category.query().whereIn('parent_id', filtrosCategoryIds) : []
+    console.timeEnd('Obtención hijos')
     const hijosIds = hijos.map(cat => cat.category_id)
+    console.log(`✅ Encontrados ${hijos.length} hijos de Filtros`)
 
     // 3. Obtener los hijos de esos hijos (nietos de Filtros)
+    console.log('🔍 Obteniendo nietos de Filtros...')
+    console.time('Obtención nietos')
     const nietos = hijosIds.length > 0 ? await Category.query().whereIn('parent_id', hijosIds) : []
+    console.timeEnd('Obtención nietos')
     const nietosIds = nietos.map(cat => cat.category_id)
     if (nietosIds.length === 0) {
-      return { success: false, message: 'No hay categorías nietas de Avanzados' }
+      return { success: false, message: 'No hay categorías nietas de Filtros' }
     }
+    console.log(`✅ Encontrados ${nietos.length} nietos de Filtros`)
 
     // 4. Obtener todas las relaciones producto-categoría para esos nietos
+    console.log('🔍 Obteniendo relaciones producto-categoría para nietos...')
+    console.time('Búsqueda relaciones')
     const relations = await CategoryProduct.query().whereIn('category_id', nietosIds)
+    console.timeEnd('Búsqueda relaciones')
+    console.log(`✅ Encontradas ${relations.length} relaciones producto-categoría`)
 
     // 5. Limpiar tabla filters_products (opcional, si quieres reemplazar todo)
+    console.log('🧹 Limpiando tabla filters_products...')
+    console.time('Limpieza tabla')
     await FiltersProduct.truncate()
+    console.timeEnd('Limpieza tabla')
+    console.log('✅ Tabla filters_products limpiada')
 
     // 6. Guardar las relaciones en filters_products
+    console.log('💾 Insertando relaciones en filters_products...')
+    console.time('Inserción relaciones')
     if (relations.length > 0) {
-      await FiltersProduct.createMany(
-        relations.map(rel => ({
-          product_id: rel.product_id,
-          category_id: rel.category_id
-        }))
-      )
+      const batchSize = 5000;
+      let totalInserted = 0;
+      for (let i = 0; i < relations.length; i += batchSize) {
+        const batch = relations.slice(i, i + batchSize);
+        await FiltersProduct.createMany(
+          batch.map(rel => ({
+            product_id: rel.product_id,
+            category_id: rel.category_id
+          }))
+        );
+        totalInserted += batch.length;
+        console.log(`✅ Insertadas ${batch.length} relaciones (batch ${Math.floor(i / batchSize) + 1}) - Total: ${totalInserted}`);
+      }
     }
+    console.timeEnd('Inserción relaciones')
+    console.log('✅ Relaciones insertadas en filters_products')
 
     return {
       success: true,
