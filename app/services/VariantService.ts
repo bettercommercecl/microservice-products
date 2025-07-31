@@ -149,7 +149,6 @@ export default class ProductService {
       // Agregar filters a cada variante
       const variantsWithFilters = await Promise.all(paginated.all().map(async (variant) => {
         const filters = (await FiltersProduct.query().where('product_id', variant.product_id)).map(fp => fp.category_id)
-        return filters
         const variantData = variant.toJSON()
         return { ...variantData, filters }
       }))
@@ -158,7 +157,6 @@ export default class ProductService {
       const paginated = await Variant.query().paginate(page, limit)
       const variantsWithFilters = await Promise.all(paginated.all().map(async (variant) => {
         const filters = (await FiltersProduct.query().where('product_id', variant.product_id)).map(fp => fp.category_id)
-        return filters
 
         const variantData = variant.toJSON()
         return { ...variantData, filters }
