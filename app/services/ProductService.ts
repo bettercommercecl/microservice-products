@@ -710,7 +710,11 @@ export default class ProductService {
     // 1. Buscar TODAS las categorías cuyo título contenga "Filtros"
     console.log('🔍 Buscando categorías Filtros...')
     console.time('Búsqueda categorías Filtros')
-    const filtrosCategories = await Category.query().whereILike('title', '%Filtros%')
+    const idAdvanced = Number(env.get('ID_ADVANCED'))
+    if (!idAdvanced) {
+      throw new Error('ID_ADVANCED no está configurado en las variables de entorno')
+    }
+    const filtrosCategories = await Category.query().where('parent_id', idAdvanced)
     console.timeEnd('Búsqueda categorías Filtros')
     if (filtrosCategories.length === 0) {
       console.warn('No existen categorías con el título Filtros')
