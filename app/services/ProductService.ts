@@ -717,10 +717,11 @@ export default class ProductService {
     const filtrosCategories = await Category.query().where('parent_id', idAdvanced)
     console.timeEnd('Búsqueda categorías Filtros')
     if (filtrosCategories.length === 0) {
-      console.warn('No existen categorías con el título Filtros')
-      return { success: false, message: 'No existen categorías con el título Filtros' }
+      console.warn(`No existen categorías hijas de la categoría ${idAdvanced}`)
+      return { success: false, message: `No existen categorías hijas de la categoría ${idAdvanced}` }
     }
-    console.log(`✅ Encontradas ${filtrosCategories.length} categorías Filtros`)
+    console.log(`✅ Encontradas ${filtrosCategories.length} categorías hijas de ${idAdvanced}`)
+    console.log('Categorías encontradas:', filtrosCategories.map(cat => ({ id: cat.category_id, title: cat.title })))
     const filtrosCategoryIds = filtrosCategories.map(cat => cat.category_id)
 
     // 2. Obtener los hijos de Filtros
@@ -730,22 +731,21 @@ export default class ProductService {
     console.timeEnd('Obtención hijos')
     const hijosIds = hijos.map(cat => cat.category_id)
     console.log(`✅ Encontrados ${hijos.length} hijos de Filtros`)
-
-    // 3. Obtener los hijos de esos hijos (nietos de Filtros)
-    console.log('🔍 Obteniendo nietos de Filtros...')
-    console.time('Obtención nietos')
-    const nietos = hijosIds.length > 0 ? await Category.query().whereIn('parent_id', hijosIds) : []
-    console.timeEnd('Obtención nietos')
-    const nietosIds = nietos.map(cat => cat.category_id)
-    if (nietosIds.length === 0) {
-      return { success: false, message: 'No hay categorías nietas de Filtros' }
+    if (hijos.length > 0) {
+      console.log('Hijos encontrados:', hijos.map(cat => ({ id: cat.category_id, title: cat.title, parent_id: cat.parent_id })))
     }
-    console.log(`✅ Encontrados ${nietos.length} nietos de Filtros`)
 
-    // 4. Obtener todas las relaciones producto-categoría para esos nietos
-    console.log('🔍 Obteniendo relaciones producto-categoría para nietos...')
+    // 3. Usar directamente los hijos (no necesitamos nietos)
+    console.log('🔍 Usando categorías hijas directamente...')
+    if (hijosIds.length === 0) {
+      return { success: false, message: 'No hay categorías hijas de Filtros' }
+    }
+    console.log(`✅ Usando ${hijos.length} categorías hijas de Filtros`)
+
+    // 4. Obtener todas las relaciones producto-categoría para esos hijos
+    console.log('🔍 Obteniendo relaciones producto-categoría para hijos...')
     console.time('Búsqueda relaciones')
-    const relations = await CategoryProduct.query().whereIn('category_id', nietosIds)
+    const relations = await CategoryProduct.query().whereIn('category_id', hijosIds)
     console.timeEnd('Búsqueda relaciones')
     console.log(`✅ Encontradas ${relations.length} relaciones producto-categoría`)
 
@@ -779,7 +779,7 @@ export default class ProductService {
 
     return {
       success: true,
-      message: `Sincronizadas ${relations.length} relaciones en filters_products (nietos de Filtros)`
+      message: `Sincronizadas ${relations.length} relaciones en filters_products (hijos de Filtros)`
     }
   }
 } 
