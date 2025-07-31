@@ -382,7 +382,8 @@ export class GeneralService {
     console.timeEnd(`formatVariantsByProduct - batch CatalogSafeStock query (producto ${product.id})`)
     console.log(`📦 Cache de CatalogSafeStock creado con ${safeStockBatch.length} registros para ${skus.length} SKUs`)
     
-    await Promise.all(
+    // Procesar todas las variantes en paralelo
+    const processedVariants = await Promise.all(
       data.map(async function (elem: ProductVariant, index: number) {
         console.time(`formatVariantsByProduct - variante ${elem.id} (${index + 1}/${data.length})`)
         
@@ -481,8 +482,8 @@ export class GeneralService {
       })
     )
     
-    // Filtrar variantes que fallaron
-    arrayVariants = arrayVariants.filter(variant => variant !== null) as FormattedVariant[]
+    // Filtrar variantes que fallaron y asignar al array
+    arrayVariants = processedVariants.filter(variant => variant !== null) as FormattedVariant[]
     
     console.timeEnd(`formatVariantsByProduct - TOTAL (producto ${product.id})`)
     return arrayVariants
