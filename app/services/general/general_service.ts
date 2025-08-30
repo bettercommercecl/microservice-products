@@ -1,127 +1,19 @@
-import CatalogSafeStock from '#models/CatalogSafeStock'
+import CatalogSafeStock from '#models/catalog.safe.stock'
 import Env from '#start/env'
-import BigCommerceService from './BigCommerceService.js'
-import PriceService from './PriceService.js'
-import InventoryService from './InventoryService.js'
-
-
-interface ProductImage {
-  is_thumbnail: boolean
-  url_standard: string
-  url_zoom: string
-  description: string
-  sort_order: number
-}
-
-interface ProductVariant {
-  id: number
-  sku: string
-  price: number
-  sale_price: number | null
-  calculated_price: number
-  inventory_level: number
-  calculated_weight: number
-  width: number
-  depth: number
-  height: number
-  image_url: string
-  option_values: any[]
-}
-
-interface Product {
-  id: number
-  name: string
-  description: string
-  brand_id: number
-  categories: number[]
-  price: number
-  sale_price: number
-  inventory_level: number
-  quantity: number
-  weight: number
-  width: number
-  depth: number
-  height: number
-  sort_order: number
-  is_featured: boolean
-  is_visible: boolean
-  meta_keywords?: string[]
-  meta_description?: string
-  custom_url?: {
-    url: string
-  }
-  images: ProductImage[]
-  variants: ProductVariant[]
-  reviews?: any
-  sizes?: any
-}
-
-interface OptionValue {
-  id: number
-  label: string
-  value_data?: {
-    colors?: any
-    image_url?: string
-  }
-}
-
-interface ProductOption {
-  id: number
-  display_name: string
-  product_id: number
-  option_values: OptionValue[]
-}
-
-interface FormattedOption {
-  id: number
-  label: string
-  value_data: any
-}
-
-interface FormattedProductOption {
-  id: number
-  label: string
-  product_id: number
-  options: FormattedOption[]
-}
-
-interface FormattedVariant {
-  id: number
-  product_id: number
-  sku: string
-  type: string
-  image: string
-  hover?: string
-  stock: number
-  main_title: string
-  normal_price: number
-  discount_price: number
-  cash_price: number
-  discount_rate: string
-  warning_stock: number
-  images: string[]
-  quantity: number
-  armed_cost: number
-  armed_quantity: number
-  weight: number
-  height: number
-  width: number
-  depth: number
-  options?: string
-}
-
-interface SafeStockItem {
-  id: number
-  product_id: number
-  sku: string
-  variant_id: number | null
-  safety_stock: number
-  warning_level: number
-  available_to_sell: number
-  bin_picking_number: string | null
-  createdAt: Date
-  updatedAt: Date
-}
+import BigCommerceService from '#services/bigcommerce_service'
+import PriceService from '#services/price_service'
+import InventoryService from '#services/inventory_service'
+import {
+  FormattedOption,
+  FormattedProductOption,
+  FormattedVariant,
+  ProductImage,
+  ProductOption,
+  ProductVariant,
+  Product,
+  SafeStockItem,
+  OptionValue,
+} from '#services/general/interfaces/general_interfaces'
 
 export class GeneralService {
   private static bigCommerceService = new BigCommerceService()
@@ -224,10 +116,10 @@ export class GeneralService {
     let arrayOptions: FormattedOption[] = []
     await Promise.all(
       options.map(async function (elem: OptionValue) {
-        let value_data = elem.value_data?.colors
+        let valueData = elem.value_data?.colors
           ? elem.value_data.colors
           : elem.value_data?.image_url
-        let returnOptions = { id: elem.id, label: elem.label, value_data: value_data }
+        let returnOptions = { id: elem.id, label: elem.label, value_data: valueData }
         arrayOptions.push(returnOptions)
       })
     )
@@ -240,30 +132,38 @@ export class GeneralService {
   static async FormatProductsArray(products: Product[]): Promise<any[]> {
     try {
       // 1. Obtener todos los SKUs únicos
-      const skus = products.map(p => p.variants[0].sku.trim());
+      const skus = products.map((p) => p.variants[0].sku.trim())
       // 2. Traer todos los inventarios en una sola query
-      const inventoryLevels = await CatalogSafeStock.query().whereIn('sku', skus).pojo() as SafeStockItem[];
+      const inventoryLevels = (await CatalogSafeStock.query()
+        .whereIn('sku', skus)
+        .pojo()) as SafeStockItem[]
       // 3. Crear un mapa para acceso rápido
-      const inventoryMap = new Map(inventoryLevels.map(item => [item.sku.trim(), item]));
+      const inventoryMap = new Map(inventoryLevels.map((item) => [item.sku.trim(), item]))
 
       const productInfoArray = await Promise.all(
         products.map(async (product) => {
           try {
-            const sku = product.variants && product.variants[0] ? product.variants[0].sku.trim() : '';
-            const inventoryLevel = sku && inventoryMap.get(sku) ? [inventoryMap.get(sku)] : [];
+            const sku =
+              product.variants && product.variants[0] ? product.variants[0].sku.trim() : ''
+            const inventoryLevel = sku && inventoryMap.get(sku) ? [inventoryMap.get(sku)] : []
 
-            const volumetric = (product.width * product.depth * product.height) / 4000;
-            let weight = volumetric > product.weight ? volumetric : product.weight;
-            weight = Env.get('COUNTRY_CODE') === 'PE' ? product.weight : weight;
+            const volumetric = (product.width * product.depth * product.height) / 4000
+            let weight = volumetric > product.weight ? volumetric : product.weight
+            weight = Env.get('COUNTRY_CODE') === 'PE' ? product.weight : weight
 
             return {
               id: product.id,
               image:
-                Array.isArray(product.images) && product.images.find((image: ProductImage) => image.is_thumbnail)?.url_standard || '',
+                (Array.isArray(product.images) &&
+                  product.images.find((image: ProductImage) => image.is_thumbnail)?.url_standard) ||
+                '',
               images: Array.isArray(product.images) ? [...product.images].reverse() : [],
               hover:
-                Array.isArray(product.images) && product.images.find((image: ProductImage) => image?.description?.includes('hover'))
-                  ?.url_standard || '',
+                (Array.isArray(product.images) &&
+                  product.images.find((image: ProductImage) =>
+                    image?.description?.includes('hover')
+                  )?.url_standard) ||
+                '',
               title: product.name,
               page_title: product.name,
               description: product.description,
@@ -304,8 +204,8 @@ export class GeneralService {
               sizes: Array.isArray(product.sizes) ? product.sizes : null,
             }
           } catch (err) {
-            console.error(`[FormatProductsArray] Error en producto ID ${product.id}:`, err);
-            return null;
+            console.error(`[FormatProductsArray] Error en producto ID ${product.id}:`, err)
+            return null
           }
         })
       )
@@ -353,45 +253,47 @@ export class GeneralService {
   static async formatVariantsByProduct(product: Product): Promise<FormattedVariant[]> {
     console.time(`formatVariantsByProduct - TOTAL (producto ${product.id})`)
     console.log(`🔄 Iniciando formatVariantsByProduct para producto ${product.id}`)
-    
+
     console.time(`formatVariantsByProduct - getVariantsOfProduct (producto ${product.id})`)
     let data = await GeneralService.bigCommerceService.getVariantsOfProduct(product.id)
     console.timeEnd(`formatVariantsByProduct - getVariantsOfProduct (producto ${product.id})`)
-    
+
     console.log(`📊 Producto ${product.id} - Procesando ${data.length} variantes`)
-    
+
     let arrayVariants: FormattedVariant[] = []
-    
+
     // Cache de inventario para evitar llamadas repetidas al mismo SKU
     const inventoryCache = new Map<string, any>()
-    
+
     // Cache de CatalogSafeStock para evitar queries repetidas
     const safeStockCache = new Map<string, any>()
-    
+
     // Batch query para CatalogSafeStock - obtener todos los SKUs de una vez
     console.time(`formatVariantsByProduct - batch CatalogSafeStock query (producto ${product.id})`)
-    const skus = data.map(variant => variant.sku)
-    const safeStockBatch = await CatalogSafeStock.query()
-      .whereIn('sku', skus)
-      .pojo()
-    
+    const skus = data.map((variant) => variant.sku)
+    const safeStockBatch = await CatalogSafeStock.query().whereIn('sku', skus).pojo()
+
     // Crear cache con los resultados del batch
     safeStockBatch.forEach((item: any) => {
       safeStockCache.set(item.sku, item)
     })
-    console.timeEnd(`formatVariantsByProduct - batch CatalogSafeStock query (producto ${product.id})`)
-    console.log(`📦 Cache de CatalogSafeStock creado con ${safeStockBatch.length} registros para ${skus.length} SKUs`)
-    
+    console.timeEnd(
+      `formatVariantsByProduct - batch CatalogSafeStock query (producto ${product.id})`
+    )
+    console.log(
+      `📦 Cache de CatalogSafeStock creado con ${safeStockBatch.length} registros para ${skus.length} SKUs`
+    )
+
     // Procesar todas las variantes en paralelo
     const processedVariants = await Promise.all(
       data.map(async function (elem: ProductVariant, index: number) {
         console.time(`formatVariantsByProduct - variante ${elem.id} (${index + 1}/${data.length})`)
-        
+
         try {
           console.time(`formatVariantsByProduct - variante ${elem.id} - PriceService`)
           const priceData = await PriceService.getPriceByVariantId(elem.id)
           console.timeEnd(`formatVariantsByProduct - variante ${elem.id} - PriceService`)
-          
+
           // Verificar si ya tenemos el inventario en cache
           let inventoryData
           if (inventoryCache.has(elem.sku)) {
@@ -401,57 +303,63 @@ export class GeneralService {
             console.time(`formatVariantsByProduct - variante ${elem.id} - InventoryService`)
             inventoryData = await InventoryService.getInventoryByVariantId(elem.id)
             console.timeEnd(`formatVariantsByProduct - variante ${elem.id} - InventoryService`)
-            
+
             // Guardar en cache para futuras variantes con el mismo SKU
             inventoryCache.set(elem.sku, inventoryData)
             console.log(`💾 Cache miss para SKU ${elem.sku} - guardado en cache`)
           }
-          
+
           console.time(`formatVariantsByProduct - variante ${elem.id} - calculateDiscount`)
           const discountRate = await GeneralService.calculateDiscount(
             priceData?.price || 0,
             priceData?.calculatedPrice || 0
           )
           console.timeEnd(`formatVariantsByProduct - variante ${elem.id} - calculateDiscount`)
-          
+
           console.time(`formatVariantsByProduct - variante ${elem.id} - calculateTranferPrice`)
           const transferPrice = await GeneralService.calculateTranferPrice(
             priceData?.price || 0,
             priceData?.calculatedPrice || 0
           )
           console.timeEnd(`formatVariantsByProduct - variante ${elem.id} - calculateTranferPrice`)
-          
+
           console.time(`formatVariantsByProduct - variante ${elem.id} - cálculos volumétricos`)
           const volumetricWeight = Math.max(
             (elem.width * elem.depth * elem.height) / 6000,
             elem.calculated_weight
           )
           console.timeEnd(`formatVariantsByProduct - variante ${elem.id} - cálculos volumétricos`)
-          
+
           // Usar cache de CatalogSafeStock en lugar de query individual
-          console.time(`formatVariantsByProduct - variante ${elem.id} - CatalogSafeStock cache lookup`)
+          console.time(
+            `formatVariantsByProduct - variante ${elem.id} - CatalogSafeStock cache lookup`
+          )
           const safeStock = safeStockCache.get(elem.sku) || null
-          console.timeEnd(`formatVariantsByProduct - variante ${elem.id} - CatalogSafeStock cache lookup`)
-          
+          console.timeEnd(
+            `formatVariantsByProduct - variante ${elem.id} - CatalogSafeStock cache lookup`
+          )
+
           console.time(`formatVariantsByProduct - variante ${elem.id} - getImagesByVariation`)
           const images = await GeneralService.getImagesByVariation(
             product.images || [],
             elem.sku,
-            product.images?.[0]?.url_standard || ''
+            elem.image_url || ''
           )
           console.timeEnd(`formatVariantsByProduct - variante ${elem.id} - getImagesByVariation`)
-          
+
           console.time(`formatVariantsByProduct - variante ${elem.id} - getHoverImageByVariation`)
           const hoverImage = GeneralService.getHoverImageByVariation(product.images, elem.sku)
-          console.timeEnd(`formatVariantsByProduct - variante ${elem.id} - getHoverImageByVariation`)
-          
+          console.timeEnd(
+            `formatVariantsByProduct - variante ${elem.id} - getHoverImageByVariation`
+          )
+
           console.time(`formatVariantsByProduct - variante ${elem.id} - crear objeto`)
           const variant: FormattedVariant = {
             id: elem.id,
             product_id: product.id,
             sku: elem.sku,
             type: product.name,
-            image: product.images[0]?.url_standard || '',
+            image: images[0] || '',
             hover: hoverImage,
             stock: inventoryData?.availableToSell || 0,
             main_title: product.name,
@@ -468,23 +376,27 @@ export class GeneralService {
             height: elem.height,
             width: elem.width,
             depth: elem.depth,
-            options: JSON.stringify(elem.option_values)
+            options: JSON.stringify(elem.option_values),
           }
           console.timeEnd(`formatVariantsByProduct - variante ${elem.id} - crear objeto`)
-          
-          console.timeEnd(`formatVariantsByProduct - variante ${elem.id} (${index + 1}/${data.length})`)
+
+          console.timeEnd(
+            `formatVariantsByProduct - variante ${elem.id} (${index + 1}/${data.length})`
+          )
           return variant
         } catch (error) {
           console.error(`❌ Error procesando variante ${elem.id}:`, error)
-          console.timeEnd(`formatVariantsByProduct - variante ${elem.id} (${index + 1}/${data.length})`)
+          console.timeEnd(
+            `formatVariantsByProduct - variante ${elem.id} (${index + 1}/${data.length})`
+          )
           return null
         }
       })
     )
-    
+
     // Filtrar variantes que fallaron y asignar al array
-    arrayVariants = processedVariants.filter(variant => variant !== null) as FormattedVariant[]
-    
+    arrayVariants = processedVariants.filter((variant) => variant !== null) as FormattedVariant[]
+
     console.timeEnd(`formatVariantsByProduct - TOTAL (producto ${product.id})`)
     return arrayVariants
   }

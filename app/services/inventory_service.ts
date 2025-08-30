@@ -2,7 +2,7 @@ import env from '#start/env'
 import axios from 'axios'
 
 class InventoryService {
-  static async getInventoryByVariantId(variant_id : number) {
+  static async getInventoryByVariantId(variant_id: number) {
     try {
       const locationId = env.get(`INVENTORY_LOCATION_ID_${env.get('COUNTRY_CODE')}`)
       const url = `${env.get('URL_MICROSERVICE_INVENTORY')}/inventory/${variant_id}/${locationId}`
@@ -10,17 +10,16 @@ class InventoryService {
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 15000
+        timeout: 15000,
       })
       return response.data
-
     } catch (error) {
       console.error(error)
       throw error
     }
   }
 
-  static async updateInventory(product_id : number, quantity : number) {
+  static async updateInventory(product_id: number, quantity: number) {
     try {
       const locationId = env.get(`INVENTORY_LOCATION_ID_${env.get('COUNTRY_CODE')}`)
       const url = `${env.get('URL_MICROSERVICE_INVENTORY')}/inventory/${product_id}/${locationId}/${quantity}`
@@ -28,15 +27,13 @@ class InventoryService {
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 15000
+        timeout: 15000,
       })
       return response.data
-
     } catch (error) {
       console.error(error)
       throw error
     }
   }
-
 }
 export default InventoryService

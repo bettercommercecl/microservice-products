@@ -2,7 +2,7 @@ import env from '#start/env'
 import axios from 'axios'
 
 class PriceService {
-  static async getPriceByVariantId(variant_id : number) {
+  static async getPriceByVariantId(variant_id: number) {
     try {
       const listPriceId = env.get(`LIST_PRICE_ID_${env.get('COUNTRY_CODE')}`)
       const url = `${env.get('URL_MICROSERVICE_PRICES')}/price/${variant_id}/${listPriceId}`
@@ -10,7 +10,7 @@ class PriceService {
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 15000
+        timeout: 15000,
       })
       return response.data
     } catch (error) {
