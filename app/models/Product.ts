@@ -1,9 +1,9 @@
 import { DateTime } from 'luxon'
 import { BaseModel, column, hasMany, belongsTo } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
-import Brand from './Brand.js'
-import CategoryProduct from './CategoryProduct.js'
-import ChannelProduct from './ChannelProduct.js'
+import Brand from './brand.js'
+import CategoryProduct from './category_product.js'
+import ChannelProduct from './channel_product.js'
 
 export default class Product extends BaseModel {
   public static table = 'products'

@@ -2,7 +2,7 @@
 import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
-import Product from './Product.js'
+import Product from './product.js'
 
 export default class Variant extends BaseModel {
   public static table = 'variants'
