@@ -1,26 +1,29 @@
-import CategoryProduct from '#models/CategoryProduct'
-import Category from '../models/Category.js'
-import BigCommerceService from './BigCommerceService.js'
+import CategoryProduct from '#models/category_product'
+import Category from '../models/category.js'
+import BigCommerceService from './bigcommerce_service.js'
+import Logger from '@adonisjs/core/services/logger'
 
 export default class CategoryService {
-  private bigCommerceService: BigCommerceService
-
-  constructor() {
-    this.bigCommerceService = new BigCommerceService()
-  }
+  private readonly logger = Logger.child({ service: 'CategoryService' })
 
   /**
    * Obtiene todas las categorías
    */
   async getAllCategories() {
-    return await Category.all()
+    this.logger.info('📂 Obteniendo todas las categorías de la base de datos...')
+    const categories = await Category.all()
+    this.logger.info(`✅ Categorías obtenidas exitosamente: ${categories.length} categorías`)
+    return categories
   }
 
   /**
    * Obtiene una categoría por ID
    */
   async getCategoryById(id: number) {
-    return await Category.findOrFail(id)
+    this.logger.info(`🔍 Obteniendo categoría por ID: ${id}`)
+    const category = await Category.findOrFail(id)
+    this.logger.info(`✅ Categoría obtenida exitosamente: ${category.title}`)
+    return category
   }
 
   /**
@@ -28,10 +31,14 @@ export default class CategoryService {
    */
   async syncCategories() {
     try {
+      this.logger.info('🔄 Iniciando sincronización de categorías desde BigCommerce...')
+
       const bigCommerceService = new BigCommerceService()
       const categories = await bigCommerceService.getCategories()
+      this.logger.info(`📊 Categorías obtenidas de BigCommerce: ${categories.length} categorías`)
 
       // Procesar todas las categorías en paralelo
+      this.logger.info('⚡ Procesando categorías en paralelo...')
       const results = await Promise.all(
         categories.map(async (categoryData) => {
           try {
@@ -53,6 +60,9 @@ export default class CategoryService {
             }
 
             const category = await Category.updateOrCreate(searchPayload, persistancePayload)
+            this.logger.info(
+              `✅ Categoría sincronizada: ${categoryData.name} (ID: ${categoryData.category_id})`
+            )
 
             return {
               error: false,
@@ -60,6 +70,7 @@ export default class CategoryService {
               data: category,
             }
           } catch (error) {
+            this.logger.warn(`⚠️ Error al sincronizar categoría ${categoryData.name}:`, error)
             return {
               error: true,
               message: `Error al sincronizar categoría ${categoryData.name}: ${error instanceof Error ? error.message : 'Error desconocido'}`,
@@ -72,15 +83,22 @@ export default class CategoryService {
       // Filtrar solo las categorías que fallaron
       const failedCategories = results.filter((result) => result.error)
 
+      if (failedCategories.length > 0) {
+        this.logger.warn(`⚠️ Fallaron ${failedCategories.length} categorías en la sincronización`)
+      } else {
+        this.logger.info('🎉 Todas las categorías se sincronizaron correctamente')
+      }
+
       return {
         success: failedCategories.length === 0,
         message:
           failedCategories.length > 0
             ? `Fallaron ${failedCategories.length} categorías en la sincronización`
             : 'Todas las categorías se sincronizaron correctamente',
-        data: failedCategories,
+        data: { faileds: failedCategories },
       }
     } catch (error) {
+      this.logger.error('❌ Error general en sincronización de categorías:', error)
       throw new Error(
         `Error al sincronizar categorías: ${error instanceof Error ? error.message : 'Error desconocido'}`
       )
@@ -89,31 +107,47 @@ export default class CategoryService {
 
   //NUEVO 👀 👀
   static async getChildCategories(category_id: number): Promise<number[]> {
+    const logger = Logger.child({ service: 'CategoryService' })
     try {
+      logger.info(`👶 Obteniendo categorías hijas de la categoría ${category_id}...`)
+
       let childCategoryIds = await Category.query()
         .where('parent_id', category_id)
         .select('category_id')
+
       // Tipar el parámetro category
-      return childCategoryIds.map((category: { category_id: number }) => category.category_id)
+      const result = childCategoryIds.map(
+        (category: { category_id: number }) => category.category_id
+      )
+      logger.info(`✅ Categorías hijas obtenidas: ${result.length} categorías`)
+      return result
     } catch (error) {
-      console.error('Error al obtener categorias hijas:', error)
+      logger.error('❌ Error al obtener categorías hijas:', error)
       return []
     }
   }
 
   //NUEVO 👀 👀
   static async getCampaignsByCategory(product: number, categories: number[]): Promise<string[]> {
+    const logger = Logger.child({ service: 'CategoryService' })
     try {
+      logger.info(
+        `🎯 Obteniendo campañas para producto ${product} con ${categories.length} categorías...`
+      )
+
       let productCategories = await CategoryProduct.query()
         .where('product_id', product)
         .whereIn('category_id', categories)
         .preload('category', (query) => {
           query.select(['title', 'url', 'category_id'])
         })
+
       // Tipar el parámetro item
-      return productCategories.map((item: any) => item.category?.title).filter(Boolean)
+      const result = productCategories.map((item: any) => item.category?.title).filter(Boolean)
+      logger.info(`✅ Campañas obtenidas para producto ${product}: ${result.length} campañas`)
+      return result
     } catch (error) {
-      console.error('Error al obtener campañas por categorías:', error)
+      logger.error('❌ Error al obtener campañas por categorías:', error)
       return []
     }
   }
