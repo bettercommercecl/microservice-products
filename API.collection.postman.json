@@ -1,0 +1,687 @@
+{
+  "info": {
+    "name": "🚀 Microservice Products API",
+    "description": "Colección completa para el microservicio de productos, variantes, marcas y categorías con integración BigCommerce.\n\n**Características:**\n- 📦 Gestión completa de productos\n- 🔧 Manejo de variantes con paginación\n- 🏷️ Sincronización de marcas desde BigCommerce\n- 📁 Sincronización de categorías desde BigCommerce\n- 🔄 Sincronización por canal específico\n- 📊 Logging estructurado y métricas\n\n**Base URL:** {{base_url}}\n**Framework:** AdonisJS 6\n**Base de Datos:** PostgreSQL\n**Integración:** BigCommerce API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "microservice-products-api-2024",
+    "version": {
+      "major": 1,
+      "minor": 0,
+      "patch": 0
+    }
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3333",
+      "type": "string",
+      "description": "URL base del microservicio"
+    },
+    {
+      "key": "channel_id",
+      "value": "123",
+      "type": "string",
+      "description": "ID del canal de BigCommerce para sincronización"
+    },
+    {
+      "key": "channel_id_uf",
+      "value": "1",
+      "type": "string",
+      "description": "Channel ID para UF (Chile: 4159, Colombia: 3056, Perú: 2780)"
+    },
+    {
+      "key": "channel_id_af",
+      "value": "1443267",
+      "type": "string",
+      "description": "Channel ID para AF (Chile: 0, Colombia: 2933, Perú: 1838)"
+    },
+    {
+      "key": "channel_id_tf",
+      "value": "1457601",
+      "type": "string",
+      "description": "Channel ID para TF (Chile: 4158, Colombia: 2931, Perú: 2717)"
+    },
+    {
+      "key": "channel_id_ar",
+      "value": "1501686",
+      "type": "string",
+      "description": "Channel ID para AR (Chile: 0, Colombia: 3057, Perú: 2674)"
+    },
+    {
+      "key": "channel_id_ts",
+      "value": "1461778",
+      "type": "string",
+      "description": "Channel ID para TS (Todos los países: 0)"
+    },
+    {
+      "key": "channel_id_sf",
+      "value": "1573014",
+      "type": "string",
+      "description": "Channel ID para SF (Todos los países: 0)"
+    },
+    {
+      "key": "channel_id_uc",
+      "value": "1598942",
+      "type": "string",
+      "description": "Channel ID para UC (Chile: 1828, Colombia: 2423, Perú: 2203)"
+    },
+    {
+      "key": "product_id",
+      "value": "1",
+      "type": "string",
+      "description": "ID de ejemplo de producto"
+    },
+    {
+      "key": "variant_ids",
+      "value": "[1, 2, 3, 4, 5]",
+      "type": "string",
+      "description": "Array de IDs de variantes para formateo"
+    },
+    {
+      "key": "base_url_localhost",
+      "value": "http://localhost:3333",
+      "type": "string",
+      "description": "URL localhost para desarrollo local"
+    },
+    {
+      "key": "base_url_ip",
+      "value": "http://127.0.0.1:3333",
+      "type": "string",
+      "description": "URL IP local para desarrollo local"
+    },
+    {
+      "key": "base_url_production",
+      "value": "https://products.bettercommerce.cl",
+      "type": "string",
+      "description": "URL de producción"
+    },
+    {
+      "key": "base_url_colombia",
+      "value": "https://co.products.bettercommerce.cl",
+      "type": "string",
+      "description": "URL de producción para Colombia"
+    },
+    {
+      "key": "base_url_peru",
+      "value": "https://pe.products.bettercommerce.cl",
+      "type": "string",
+      "description": "URL de producción para Perú"
+    },
+    {
+      "key": "environment_selector",
+      "value": "local",
+      "type": "string",
+      "description": "Selector de entorno: 'local', 'ip', 'production', 'colombia', 'peru'"
+    }
+  ],
+  "auth": {
+    "type": "noauth"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Log de inicio de request",
+          "console.log(`🚀 Iniciando request: ${pm.request.name}`);",
+          "console.log(`📡 URL: ${pm.request.url}`);",
+          "console.log(`⏰ Timestamp: ${new Date().toISOString()}`);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Tests automáticos para validar respuestas",
+          "pm.test('✅ Status code es 200', function () {",
+          "    pm.response.to.have.status(200);",
+          "});",
+          "",
+          "pm.test('📋 Response time es menor a 5000ms', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "pm.test('🔍 Response tiene estructura válida', function () {",
+          "    const responseJson = pm.response.json();",
+          "    pm.expect(responseJson).to.be.an('object');",
+          "});",
+          "",
+          "// Log de finalización",
+          "console.log(`✅ Request completado: ${pm.request.name}`);",
+          "console.log(`⏱️ Response time: ${pm.response.responseTime}ms`);",
+          "console.log(`📊 Status: ${pm.response.status}`);"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "🏥 Health Check",
+      "item": [
+        {
+          "name": "GET - Health Check",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Endpoint básico para verificar el estado del servicio.\n\n**Respuesta esperada:**\n```json\n{\n  \"hello\": \"world\"\n}\n```"
+          },
+          "response": [
+            {
+              "name": "Health Check Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/",
+                  "host": ["{{base_url}}"],
+                  "path": [""]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "content-type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"hello\": \"world\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Endpoints para verificar el estado del servicio"
+    },
+    {
+      "name": "📦 Productos",
+      "item": [
+        {
+          "name": "GET - Listar todos los productos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            },
+            "description": "Obtiene todos los productos almacenados en la base de datos local.\n\n**Implementación:** `ProductsController.index()`\n**Método del servicio:** `ProductService.getAllProducts()`\n**Logging:** Incluye requestId, duración y conteo de productos\n\n**Respuesta esperada:**\n```json\n{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": 1,\n      \"title\": \"Laptop Gaming Pro\",\n      \"sku\": \"LAP-001\",\n      \"price\": 1299.99,\n      \"brand_id\": 5,\n      \"created_at\": \"2024-01-15T10:30:00Z\",\n      \"updated_at\": \"2024-01-15T10:30:00Z\"\n    }\n  ]\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Obtener producto por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}"]
+            },
+            "description": "Obtiene un producto específico basado en su ID único.\n\n**Implementación:** `ProductsController.show()`\n**Método del servicio:** `ProductService.getProductById(id)`\n**Logging:** Incluye productId, duración y título del producto\n\n**Parámetros:**\n- `id` (path): ID único del producto\n\n**Respuesta esperada:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Producto encontrado exitosamente\",\n  \"data\": {\n    \"id\": 1,\n    \"title\": \"Laptop Gaming Pro\",\n    \"sku\": \"LAP-001\",\n    \"price\": 1299.99,\n    \"brand_id\": 5,\n    \"created_at\": \"2024-01-15T10:30:00Z\",\n    \"updated_at\": \"2024-01-15T10:30:00Z\"\n  }\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Sincronizar productos desde BigCommerce",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/sincronizar-productos/{{channel_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sincronizar-productos", "{{channel_id}}"]
+            },
+            "description": "Sincroniza productos desde BigCommerce hacia la base de datos local, filtrados por canal específico.\n\n**Implementación:** `ProductsController.sync()`\n**Método del servicio:** `ProductService.syncProducts(channelId)`\n**Logging:** Incluye channelId, duración y resultados detallados\n**Proceso:** Sincroniza productos, categorías, opciones y variantes\n\n**Parámetros:**\n- `channel_id` (path): ID del canal de BigCommerce para sincronización\n\n**Respuesta exitosa (200):**\n```json\n{\n  \"message\": \"Sincronización de productos por canal completada\",\n  \"data\": {\n    \"success\": true,\n    \"message\": \"Productos sincronizados exitosamente\",\n    \"products\": {\n      \"total\": 150,\n      \"success\": true\n    },\n    \"categories\": {\n      \"success\": true\n    },\n    \"options\": {\n      \"success\": true\n    },\n    \"variants\": {\n      \"success\": true\n    }\n  }\n}\n```\n\n**Respuesta con errores (400):**\n```json\n{\n  \"error\": \"Error\",\n  \"message\": \"Sincronización completada con algunos errores\",\n  \"data\": {\n    \"success\": false,\n    \"message\": \"Sincronización completada con errores\",\n    \"totalProcessed\": 150,\n    \"successCount\": 147,\n    \"errorCount\": 3\n  }\n}\n```"
+          },
+          "response": []
+        }
+      ],
+      "description": "Gestión completa de productos incluyendo consulta, sincronización y gestión"
+    },
+    {
+      "name": "🔧 Variantes",
+      "item": [
+        {
+          "name": "GET - Listar variantes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/variants?page=1&limit=20&channel=123",
+              "host": ["{{base_url}}"],
+              "path": ["api", "variants"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Número de página para paginación",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Límite de elementos por página (máximo 200)",
+                  "disabled": false
+                },
+                {
+                  "key": "channel",
+                  "value": "123",
+                  "description": "ID del canal para filtrar variantes (opcional)",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Obtiene todas las variantes almacenadas en la base de datos local.\n\n**Implementación:** `VariantController.index()`\n**Método del servicio:** `VariantService.getVariantsByProduct(productId)`\n**Logging:** Incluye page, limit, duración y conteo de variantes\n\n**Parámetros de query:**\n- `page` (opcional): Número de página (default: 1)\n- `limit` (opcional): Límite por página (default: 20, máximo: 200)\n- `channel` (opcional): ID del canal para filtrar\n\n**Respuesta esperada:**\n```json\n[\n  {\n    \"id\": 1,\n    \"product_id\": 1,\n    \"sku\": \"LAP-001-16GB\",\n    \"normal_price\": 1299.99,\n    \"discount_price\": 1199.99,\n    \"stock\": 50,\n    \"weight\": 2.5,\n    \"type\": \"RAM\",\n    \"option_label\": \"16GB RAM\"\n  },\n  {\n    \"id\": 2,\n    \"product_id\": 1,\n    \"sku\": \"LAP-001-32GB\",\n    \"normal_price\": 1499.99,\n    \"discount_price\": 1399.99,\n    \"stock\": 25,\n    \"weight\": 2.5,\n    \"type\": \"RAM\",\n    \"option_label\": \"32GB RAM\"\n  }\n]\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "POST - Obtener variantes formateadas por IDs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variantIds\": [1, 2, 3, 4, 5],\n  \"channel_id\": 123\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/variants/formatted-by-ids",
+              "host": ["{{base_url}}"],
+              "path": ["api", "variants", "formatted-by-ids"]
+            },
+            "description": "Obtiene variantes específicas con formato optimizado para IDs proporcionados.\n\n**Implementación:** `VariantController.getFormattedByIds()`\n**Método del servicio:** `VariantService.getVariantsByIds(variantIds)`\n**Logging:** Incluye variantIds, duración y conteo de variantes\n\n**Body requerido:**\n```json\n{\n  \"variantIds\": [1, 2, 3, 4, 5],\n  \"channel_id\": 123\n}\n```\n\n**Campos:**\n- `variantIds` (requerido): Array de IDs de variantes\n- `channel_id` (opcional): ID del canal para filtrado\n\n**Respuesta esperada:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Variantes formateadas por IDs obtenidas exitosamente\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"product_id\": 1,\n      \"sku\": \"LAP-001-16GB\",\n      \"price\": 1199.99,\n      \"inventory_level\": 50,\n      \"formatted_data\": {\n        \"display_name\": \"Laptop Gaming Pro - 16GB RAM\",\n        \"availability\": \"En Stock\",\n        \"shipping_info\": \"Envío gratis\"\n      }\n    }\n  ]\n}\n```"
+          },
+          "response": []
+        }
+      ],
+      "description": "Gestión de variantes de productos incluyendo consulta, formateo y paginación"
+    },
+    {
+      "name": "🏷️ Marcas",
+      "item": [
+        {
+          "name": "GET - Sincronizar marcas desde BigCommerce",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/sincronizar-marcas",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sincronizar-marcas"]
+            },
+            "description": "Sincroniza todas las marcas disponibles desde BigCommerce.\n\n**Implementación:** `BrandsController.sync()`\n**Método del servicio:** `BrandService.syncBrands()`\n**Logging:** Incluye requestId, duración y resultados de sincronización\n**Proceso:** Descarga marcas desde BigCommerce y las almacena localmente\n\n**Respuesta esperada:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Marcas sincronizadas exitosamente\",\n  \"totalProcessed\": 45,\n  \"successCount\": 45,\n  \"errorCount\": 0,\n  \"data\": {\n    \"brands\": [\n      {\n        \"id\": 1,\n        \"name\": \"Gaming Pro\",\n        \"page_title\": \"Gaming Pro - Marcas de Gaming\",\n        \"is_featured\": true\n      },\n      {\n        \"id\": 2,\n        \"name\": \"Tech Solutions\",\n        \"page_title\": \"Tech Solutions - Soluciones Tecnológicas\",\n        \"is_featured\": false\n      }\n    ]\n  }\n}\n```"
+          },
+          "response": []
+        }
+      ],
+      "description": "Sincronización automática de marcas desde BigCommerce"
+    },
+    {
+      "name": "📁 Categorías",
+      "item": [
+        {
+          "name": "GET - Sincronizar categorías desde BigCommerce",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/sincronizar-categorias",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sincronizar-categorias"]
+            },
+            "description": "Sincroniza todas las categorías y subcategorías desde BigCommerce.\n\n**Implementación:** `CategoriesController.sync()`\n**Método del servicio:** `CategoryService.syncCategories()`\n**Logging:** Incluye requestId, duración y resultados de sincronización\n**Proceso:** Descarga categorías desde BigCommerce y las almacena localmente\n\n**Respuesta esperada:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Categorías sincronizadas exitosamente\",\n  \"totalProcessed\": 23,\n  \"successCount\": 23,\n  \"errorCount\": 0,\n  \"data\": {\n    \"categories\": [\n      {\n        \"id\": 1,\n        \"name\": \"Electrónicos\",\n        \"parent_id\": null,\n        \"sort_order\": 1,\n        \"is_visible\": true\n      },\n      {\n        \"id\": 2,\n        \"name\": \"Laptops\",\n        \"parent_id\": 1,\n        \"sort_order\": 1,\n        \"is_visible\": true\n      },\n      {\n        \"id\": 3,\n        \"name\": \"Gaming\",\n        \"parent_id\": 2,\n        \"sort_order\": 1,\n        \"is_visible\": true\n      }\n    ],\n    \"hierarchy\": {\n      \"total_categories\": 23,\n      \"main_categories\": 8,\n      \"subcategories\": 15\n    }\n  }\n}\n```"
+          },
+          "response": []
+        }
+      ],
+      "description": "Sincronización automática de categorías y jerarquías desde BigCommerce"
+    },
+    {
+      "name": "🧪 Testing & Examples",
+      "item": [
+        {
+          "name": "📋 Ejemplo - Sincronización completa",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/sincronizar-marcas",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sincronizar-marcas"]
+            },
+            "description": "Ejemplo de flujo completo de sincronización:\n\n1. **Sincronizar marcas** (este endpoint)\n2. **Sincronizar categorías**\n3. **Sincronizar productos por canal**\n\n**Orden recomendado:**\n```bash\n# 1. Marcas (base para productos)\nGET /api/sincronizar-marcas\n\n# 2. Categorías (estructura)\nGET /api/sincronizar-categorias\n\n# 3. Productos (con dependencias)\nGET /api/sincronizar-productos/123\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "🔍 Ejemplo - Consulta de productos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            },
+            "description": "Ejemplo de consulta básica de productos después de sincronización.\n\n**Flujo típico:**\n1. Sincronizar datos desde BigCommerce\n2. Consultar productos disponibles\n3. Obtener variantes específicas\n4. Formatear para presentación\n\n**Casos de uso:**\n- Dashboard de administración\n- API para frontend\n- Reportes de inventario\n- Sincronización con otros sistemas"
+          },
+          "response": []
+        },
+        {
+          "name": "⚡ Ejemplo - Variantes con paginación",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/variants?page=1&limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "variants"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Ejemplo de paginación para grandes volúmenes de variantes.\n\n**Parámetros de paginación:**\n- `page`: Número de página (inicia en 1)\n- `limit`: Elementos por página (máximo 200)\n\n**Casos de uso:**\n- Listado de productos con muchas variantes\n- Exportación de datos\n- Análisis de inventario\n- Sincronización incremental"
+          },
+          "response": []
+        }
+      ],
+      "description": "Ejemplos y casos de uso para testing y desarrollo"
+    },
+    {
+      "name": "📱 Ejemplos cURL",
+      "item": [
+        {
+          "name": "🌐 Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "**cURL para Health Check:**\n\n```bash\n# Localhost\ncurl -X GET http://localhost:3333/ \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# IP Local\ncurl -X GET http://127.0.0.1:3333/ \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Producción\ncurl -X GET https://products.bettercommerce.cl/ \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Colombia\ncurl -X GET https://co.products.bettercommerce.cl/ \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Perú\ncurl -X GET https://pe.products.bettercommerce.cl/ \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Respuesta esperada:**\n```json\n{\n  \"hello\": \"world\"\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "📦 Productos - Listar todos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            },
+            "description": "**cURL para listar todos los productos:**\n\n```bash\n# Localhost\ncurl -X GET http://localhost:3333/api/products \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# IP Local\ncurl -X GET http://127.0.0.1:3333/api/products \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Producción\ncurl -X GET https://products.bettercommerce.cl/api/products \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Colombia\ncurl -X GET https://co.products.bettercommerce.cl/api/products \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Perú\ncurl -X GET https://pe.products.bettercommerce.cl/api/products \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Respuesta esperada:**\n```json\n{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": 1,\n      \"title\": \"Laptop Gaming Pro\",\n      \"sku\": \"LAP-001\",\n      \"price\": 1299.99,\n      \"brand_id\": 5\n    }\n  ]\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "🔍 Productos - Obtener por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "1"]
+            },
+            "description": "**cURL para obtener producto por ID:**\n\n```bash\n# Localhost\ncurl -X GET http://localhost:3333/api/products/1 \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# IP Local\ncurl -X GET http://127.0.0.1:3333/api/products/1 \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Producción\ncurl -X GET https://products.bettercommerce.cl/api/products/1 \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Colombia\ncurl -X GET https://co.products.bettercommerce.cl/api/products/1 \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Perú\ncurl -X GET https://pe.products.bettercommerce.cl/api/products/1 \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Respuesta esperada:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Producto encontrado exitosamente\",\n  \"data\": {\n    \"id\": 1,\n    \"title\": \"Laptop Gaming Pro\",\n    \"sku\": \"LAP-001\",\n    \"price\": 1299.99\n  }\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "🔄 Productos - Sincronizar desde BigCommerce",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sincronizar-productos/123",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sincronizar-productos", "123"]
+            },
+            "description": "**cURL para sincronizar productos desde BigCommerce:**\n\n```bash\n# Localhost\ncurl -X GET http://localhost:3333/api/sincronizar-productos/123 \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# IP Local\ncurl -X GET http://127.0.0.1:3333/api/sincronizar-productos/123 \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Producción\ncurl -X GET https://products.bettercommerce.cl/api/sincronizar-productos/123 \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Colombia\ncurl -X GET https://co.products.bettercommerce.cl/api/sincronizar-productos/123 \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Perú\ncurl -X GET https://pe.products.bettercommerce.cl/api/sincronizar-productos/123 \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Respuesta esperada:**\n```json\n{\n  \"message\": \"Sincronización de productos por canal completada\",\n  \"data\": {\n    \"success\": true,\n    \"products\": {\n      \"total\": 150,\n      \"success\": true\n    }\n  }\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "🔧 Variantes - Listar con paginación",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/variants?page=1&limit=20&channel=123",
+              "host": ["{{base_url}}"],
+              "path": ["api", "variants"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Número de página",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Elementos por página",
+                  "disabled": false
+                },
+                {
+                  "key": "channel",
+                  "value": "123",
+                  "description": "ID del canal",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "**cURL para listar variantes con paginación:**\n\n```bash\n# Localhost\ncurl -X GET \"http://localhost:3333/api/variants?page=1&limit=20&channel=123\" \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# IP Local\ncurl -X GET \"http://127.0.0.1:3333/api/variants?page=1&limit=20&channel=123\" \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Producción\ncurl -X GET \"https://products.bettercommerce.cl/api/variants?page=1&limit=20&channel=123\" \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Colombia\ncurl -X GET \"https://co.products.bettercommerce.cl/api/variants?page=1&limit=20&channel=123\" \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Perú\ncurl -X GET \"https://pe.products.bettercommerce.cl/api/variants?page=1&limit=20&channel=123\" \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Respuesta esperada:**\n```json\n[\n  {\n    \"id\": 1,\n    \"product_id\": 1,\n    \"sku\": \"LAP-001-16GB\",\n    \"normal_price\": 1299.99,\n    \"stock\": 50\n  }\n]\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "📝 Variantes - Formatear por IDs (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variantIds\": [1, 2, 3, 4, 5],\n  \"channel_id\": 123\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/variants/formatted-by-ids",
+              "host": ["{{base_url}}"],
+              "path": ["api", "variants", "formatted-by-ids"]
+            },
+            "description": "**cURL para obtener variantes formateadas por IDs:**\n\n```bash\n# Localhost\ncurl -X POST http://localhost:3333/api/variants/formatted-by-ids \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"variantIds\": [1, 2, 3, 4, 5],\n    \"channel_id\": 123\n  }'\n\n# IP Local\ncurl -X POST http://127.0.0.1:3333/api/variants/formatted-by-ids \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"variantIds\": [1, 2, 3, 4, 5],\n    \"channel_id\": 123\n  }'\n\n# Producción\ncurl -X POST https://products.bettercommerce.cl/api/variants/formatted-by-ids \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"variantIds\": [1, 2, 3, 4, 5],\n    \"channel_id\": 123\n  }'\n\n# Colombia\ncurl -X POST https://co.products.bettercommerce.cl/api/variants/formatted-by-ids \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"variantIds\": [1, 2, 3, 4, 5],\n    \"channel_id\": 123\n  }'\n\n# Perú\ncurl -X POST https://pe.products.bettercommerce.cl/api/variants/formatted-by-ids \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"variantIds\": [1, 2, 3, 4, 5],\n    \"channel_id\": 123\n  }'\n```\n\n**Respuesta esperada:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Variantes formateadas por IDs obtenidas exitosamente\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"sku\": \"LAP-001-16GB\",\n      \"price\": 1199.99,\n      \"inventory_level\": 50\n    }\n  ]\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "🏷️ Marcas - Sincronizar desde BigCommerce",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sincronizar-marcas",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sincronizar-marcas"]
+            },
+            "description": "**cURL para sincronizar marcas desde BigCommerce:**\n\n```bash\n# Localhost\ncurl -X GET http://localhost:3333/api/sincronizar-marcas \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# IP Local\ncurl -X GET http://127.0.0.1:3333/api/sincronizar-marcas \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Producción\ncurl -X GET https://products.bettercommerce.cl/api/sincronizar-marcas \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Colombia\ncurl -X GET https://co.products.bettercommerce.cl/api/sincronizar-marcas \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Perú\ncurl -X GET https://pe.products.bettercommerce.cl/api/sincronizar-marcas \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Respuesta esperada:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Marcas sincronizadas exitosamente\",\n  \"totalProcessed\": 45,\n  \"successCount\": 45,\n  \"errorCount\": 0\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "📁 Categorías - Sincronizar desde BigCommerce",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sincronizar-categorias",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sincronizar-categorias"]
+            },
+            "description": "**cURL para sincronizar categorías desde BigCommerce:**\n\n```bash\n# Localhost\ncurl -X GET http://localhost:3333/api/sincronizar-categorias \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# IP Local\ncurl -X GET http://127.0.0.1:3333/api/sincronizar-categorias \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Producción\ncurl -X GET https://products.bettercommerce.cl/api/sincronizar-categorias \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Colombia\ncurl -X GET https://co.products.bettercommerce.cl/api/sincronizar-categorias \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n\n# Perú\ncurl -X GET https://pe.products.bettercommerce.cl/api/sincronizar-categorias \\\n  -H \"Accept: application/json\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Respuesta esperada:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Categorías sincronizadas exitosamente\",\n  \"totalProcessed\": 23,\n  \"successCount\": 23,\n  \"errorCount\": 0\n}\n```"
+          },
+          "response": []
+        }
+      ],
+      "description": "Ejemplos completos de cURL para todas las rutas de la API en todos los entornos"
+    }
+  ]
+}
