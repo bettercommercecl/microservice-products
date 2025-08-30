@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
-import Channel from './Channel.js'
+import Channel from './channel.js'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 
 export default class ChannelProduct extends BaseModel {
@@ -25,4 +25,4 @@ export default class ChannelProduct extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
-} 
+}

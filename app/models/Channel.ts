@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
 import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
 import type { HasMany } from '@adonisjs/lucid/types/relations'
-import ChannelProduct from './ChannelProduct.js'
+import ChannelProduct from './channel_product.js'
 
 export default class Channel extends BaseModel {
   public static table = 'channels'
@@ -22,4 +22,4 @@ export default class Channel extends BaseModel {
     foreignKey: 'channel_id',
   })
   declare products: HasMany<typeof ChannelProduct>
-} 
+}
