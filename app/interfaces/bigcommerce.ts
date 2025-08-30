@@ -13,4 +13,4 @@ export interface SyncResult {
   failed: number
   errors: Array<{ id: number; error: string }>
   duration: number
-} 
+}
