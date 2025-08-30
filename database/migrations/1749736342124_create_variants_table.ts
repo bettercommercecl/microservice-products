@@ -6,7 +6,13 @@ export default class extends BaseSchema {
   async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
-      table.integer('product_id').unsigned().references('id').inTable('products').onDelete('CASCADE').nullable()
+      table
+        .integer('product_id')
+        .unsigned()
+        .references('id')
+        .inTable('products')
+        .onDelete('CASCADE')
+        .nullable()
       table.string('title', 255).notNullable()
       table.string('sku', 255).notNullable()
       table.float('normal_price').notNullable()
@@ -37,4 +43,4 @@ export default class extends BaseSchema {
   async down() {
     this.schema.dropTable(this.tableName)
   }
-} 
+}

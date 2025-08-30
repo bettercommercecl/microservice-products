@@ -6,7 +6,12 @@ export default class extends BaseSchema {
   async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
-      table.integer('product_id').unsigned().references('id').inTable('products').onDelete('CASCADE')
+      table
+        .integer('product_id')
+        .unsigned()
+        .references('id')
+        .inTable('products')
+        .onDelete('CASCADE')
       table.integer('option_id').notNullable()
       table.string('label').notNullable()
       table.json('options').nullable()
@@ -22,4 +27,4 @@ export default class extends BaseSchema {
   async down() {
     this.schema.dropTable(this.tableName)
   }
-} 
+}
