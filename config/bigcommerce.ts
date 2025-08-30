@@ -5,4 +5,4 @@ const bigcommerceConfig = {
   apiUrl: 'https://api.bigcommerce.com',
 }
 
-export default bigcommerceConfig 
+export default bigcommerceConfig
