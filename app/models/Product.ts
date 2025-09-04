@@ -105,8 +105,20 @@ export default class Product extends BaseModel {
   @column()
   declare reserve: string | null
 
-  @column()
-  declare reviews: {} | null
+  @column({
+    serializeAs: 'reviews',
+    serialize: (value: string) => {
+      try {
+        return value ? JSON.parse(value) : []
+      } catch {
+        return []
+      }
+    },
+    prepare: (value: any) => {
+      return JSON.stringify(value)
+    },
+  })
+  declare reviews: any | null | string
 
   @column()
   declare sameday: boolean

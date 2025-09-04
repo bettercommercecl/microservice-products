@@ -25,8 +25,6 @@ export default class FormatOptionsService {
    * @returns Array plano de opciones listas para guardar
    */
   async formatOptions(products: FormattedProductWithModelVariants[]): Promise<FormattedOption[]> {
-    this.logger.info(`🔧 Formateando opciones para ${products.length} productos...`)
-
     if (products.length === 0) {
       return []
     }
@@ -36,17 +34,13 @@ export default class FormatOptionsService {
       // 📊 Obtener IDs de productos únicos para evitar duplicados
       const uniqueProductIds = [...new Set(products.map((p) => p.product_id))]
 
-      this.logger.info(
-        `🚀 Obteniendo opciones para ${uniqueProductIds.length} productos únicos en paralelo...`
-      )
-
       // 🔥 Procesar todos los productos en paralelo (máximo rendimiento)
       const productPromises = uniqueProductIds.map(async (productId) => {
         try {
           const productOptions = await this.formatOptionsByProduct(productId)
           return productOptions
         } catch (error) {
-          this.logger.warn(`📭 Sin opciones para producto ${productId}`)
+          this.logger.warn('⚠️ Sin opciones para producto', { product_id: productId })
           return []
         }
       })
@@ -55,13 +49,11 @@ export default class FormatOptionsService {
       const allResults = await Promise.all(productPromises)
       const allOptions = allResults.flat()
 
-      this.logger.info(
-        `✅ Opciones formateadas: ${allOptions.length} registros para ${uniqueProductIds.length} productos únicos`
-      )
-
       return allOptions
     } catch (error) {
-      this.logger.warn(`⚠️ Error en procesamiento paralelo, usando método individual:`, error)
+      this.logger.warn('⚠️ Error en procesamiento paralelo, usando método individual', {
+        error: error.message,
+      })
 
       // 🔄 FALLBACK: Método individual si falla el procesamiento paralelo
       return this.formatOptionsIndividual(products)
@@ -72,8 +64,6 @@ export default class FormatOptionsService {
   private async formatOptionsIndividual(
     products: FormattedProductWithModelVariants[]
   ): Promise<FormattedOption[]> {
-    this.logger.info(`🔄 Usando procesamiento individual para ${products.length} productos...`)
-
     // 🚀 Procesar en lotes paralelos más pequeños
     const BATCH_SIZE = 50
     const batches = []
@@ -88,7 +78,7 @@ export default class FormatOptionsService {
           try {
             return await this.formatOptionsByProduct(product.product_id)
           } catch (error) {
-            this.logger.warn(`📭 Sin opciones para producto ${product.product_id}`)
+            this.logger.warn('⚠️ Sin opciones para producto', { product_id: product.product_id })
             return []
           }
         })
@@ -135,9 +125,10 @@ export default class FormatOptionsService {
 
       return productOptions
     } catch (error) {
-      this.logger.warn(
-        `📭 Error obteniendo opciones para producto ${productId} - usando valores por defecto`
-      )
+      this.logger.warn('⚠️ Error obteniendo opciones para producto', {
+        product_id: productId,
+        error: error.message,
+      })
       return []
     }
   }

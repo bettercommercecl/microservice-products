@@ -21,7 +21,10 @@ export default class Brand extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // ✅ HELPERS ADICIONALES
+  /**
+   * 📦 Obtiene todos los productos de esta marca
+   * @returns Promise<Product[]> - Lista de productos ordenados por nombre
+   */
   async getProducts() {
     try {
       return await Product.query().where('brand_id', this.id).orderBy('name', 'asc')
@@ -31,6 +34,10 @@ export default class Brand extends BaseModel {
     }
   }
 
+  /**
+   * 🔢 Cuenta el total de productos de esta marca
+   * @returns Promise<number> - Número total de productos
+   */
   async getProductsCount(): Promise<number> {
     try {
       return await Product.query()
@@ -44,6 +51,10 @@ export default class Brand extends BaseModel {
     }
   }
 
+  /**
+   * 👁️ Obtiene solo los productos visibles de esta marca
+   * @returns Promise<Product[]> - Lista de productos visibles ordenados
+   */
   async getVisibleProducts() {
     try {
       return await Product.query()
@@ -56,6 +67,10 @@ export default class Brand extends BaseModel {
     }
   }
 
+  /**
+   * ⭐ Obtiene solo los productos destacados de esta marca
+   * @returns Promise<Product[]> - Lista de productos destacados ordenados
+   */
   async getFeaturedProducts() {
     try {
       return await Product.query()
@@ -69,15 +84,27 @@ export default class Brand extends BaseModel {
   }
 
   // ✅ MÉTODOS ESTÁTICOS ADICIONALES
+  /**
+   * 🏷️ Obtiene todas las marcas que tienen productos asignados
+   * @returns Promise<Brand[]> - Lista de marcas con productos
+   */
   static async getBrandsWithProducts() {
     try {
-      return await Brand.query().whereHas('products').orderBy('name', 'asc')
+      return await Brand.query()
+        .whereHas('products', (query) => {
+          query.where('id', '>', 0)
+        })
+        .orderBy('name', 'asc')
     } catch (error) {
       console.error('❌ Error obteniendo marcas con productos:', error)
       throw error
     }
   }
 
+  /**
+   * 👁️ Obtiene marcas que tienen productos visibles
+   * @returns Promise<Brand[]> - Lista de marcas con productos visibles
+   */
   static async getBrandsWithVisibleProducts() {
     try {
       return await Brand.query()
@@ -91,6 +118,11 @@ export default class Brand extends BaseModel {
     }
   }
 
+  /**
+   * 🔍 Busca una marca por nombre (búsqueda parcial)
+   * @param name - Nombre o parte del nombre de la marca
+   * @returns Promise<Brand | null> - Marca encontrada o null
+   */
   static async getBrandByName(name: string) {
     try {
       return await Brand.query().where('name', 'ilike', `%${name}%`).first()

@@ -14,9 +14,7 @@ export default class BrandService {
    * Obtiene todas las marcas
    */
   async getAllBrands() {
-    this.logger.info('🏷️ Obteniendo todas las marcas de la base de datos...')
     const brands = await Brand.all()
-    this.logger.info(`✅ Marcas obtenidas exitosamente: ${brands.length} marcas`)
     return brands
   }
 
@@ -24,9 +22,7 @@ export default class BrandService {
    * Obtiene una marca por ID
    */
   async getBrandById(id: number) {
-    this.logger.info(`🔍 Obteniendo marca por ID: ${id}`)
     const brand = await Brand.findOrFail(id)
-    this.logger.info(`✅ Marca obtenida exitosamente: ${brand.name}`)
     return brand
   }
 
@@ -34,9 +30,7 @@ export default class BrandService {
    * Crea una nueva marca
    */
   async createBrand(data: { id: number; name: string }) {
-    this.logger.info(`➕ Creando nueva marca: ${data.name}`)
     const brand = await Brand.create(data)
-    this.logger.info(`✅ Marca creada exitosamente: ${brand.name} (ID: ${brand.id})`)
     return brand
   }
 
@@ -44,11 +38,9 @@ export default class BrandService {
    * Actualiza una marca existente
    */
   async updateBrand(id: number, data: { name?: string }) {
-    this.logger.info(`🔄 Actualizando marca ID: ${id}`)
     const brand = await Brand.findOrFail(id)
     brand.merge(data)
     await brand.save()
-    this.logger.info(`✅ Marca actualizada exitosamente: ${brand.name}`)
     return brand
   }
 
@@ -56,10 +48,8 @@ export default class BrandService {
    * Elimina una marca
    */
   async deleteBrand(id: number) {
-    this.logger.info(`🗑️ Eliminando marca ID: ${id}`)
     const brand = await Brand.findOrFail(id)
     await brand.delete()
-    this.logger.info(`✅ Marca eliminada exitosamente: ${brand.name}`)
     return { success: true, message: 'Marca eliminada exitosamente' }
   }
 
@@ -68,8 +58,6 @@ export default class BrandService {
    */
   async syncBrands() {
     try {
-      this.logger.info('🔄 Iniciando sincronización de marcas desde BigCommerce...')
-
       // 🔍 Validar conexión con BigCommerce
       const brands = await this.bigCommerceService.getBrands()
 
@@ -77,10 +65,7 @@ export default class BrandService {
         throw new Error('Respuesta inválida de BigCommerce: no se recibieron marcas')
       }
 
-      this.logger.info(`📊 Marcas obtenidas de BigCommerce: ${brands.length} marcas`)
-
       if (brands.length === 0) {
-        this.logger.warn('⚠️ No se encontraron marcas en BigCommerce')
         return {
           success: true,
           message: 'No hay marcas para sincronizar',
@@ -122,10 +107,8 @@ export default class BrandService {
 
           if (existingBrand.$isNew) {
             results.created++
-            this.logger.info(`✅ Marca creada: ${brandData.name} (ID: ${brandData.id})`)
           } else {
             results.updated++
-            this.logger.info(`🔄 Marca actualizada: ${brandData.name} (ID: ${brandData.id})`)
           }
 
           results.processed.push(existingBrand)
@@ -136,11 +119,23 @@ export default class BrandService {
           // 🔍 Clasificar tipo de error
           if (error instanceof Error) {
             if (error.message.includes('column') || error.message.includes('constraint')) {
-              this.logger.error(`❌ Error de base de datos para marca ${brandData.name}:`, error)
+              this.logger.error('❌ Error de base de datos para marca', {
+                brand_name: brandData.name,
+                brand_id: brandData.id,
+                error: error.message,
+              })
             } else if (error.message.includes('timeout') || error.message.includes('network')) {
-              this.logger.error(`🌐 Error de conexión para marca ${brandData.name}:`, error)
+              this.logger.error('🌐 Error de conexión para marca', {
+                brand_name: brandData.name,
+                brand_id: brandData.id,
+                error: error.message,
+              })
             } else {
-              this.logger.warn(`⚠️ Error al procesar marca ${brandData.name}:`, error)
+              this.logger.warn('⚠️ Error al procesar marca', {
+                brand_name: brandData.name,
+                brand_id: brandData.id,
+                error: error.message,
+              })
             }
           }
         }
@@ -150,9 +145,14 @@ export default class BrandService {
       const totalProcessed = results.created + results.updated + results.errors.length
       const hasErrors = results.errors.length > 0
 
-      this.logger.info(
-        `📊 Sincronización completada: ${results.created} creadas, ${results.updated} actualizadas, ${results.errors.length} errores`
-      )
+      if (hasErrors) {
+        this.logger.warn('⚠️ Errores en sincronización de marcas', {
+          created: results.created,
+          updated: results.updated,
+          errors: results.errors.length,
+          total: brands.length,
+        })
+      }
 
       return {
         success: !hasErrors,
@@ -170,7 +170,9 @@ export default class BrandService {
         errors: hasErrors ? results.errors : [],
       }
     } catch (error) {
-      this.logger.error('❌ Error crítico en sincronización de marcas:', error)
+      this.logger.error('❌ Error crítico en sincronización de marcas', {
+        error: error.message,
+      })
 
       // 🔍 Clasificar error crítico
       let errorMessage = 'Error desconocido en sincronización'

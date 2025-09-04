@@ -111,9 +111,9 @@ export default class FormatProductsService {
 
       return dateReserve || ''
     } catch (error) {
-      this.logger.warn(
-        `📭 Error identificando si el producto es de reserva - usando valores por defecto`
-      )
+      this.logger.warn('⚠️ Error identificando si el producto es de reserva', {
+        error: error.message,
+      })
       return ''
     }
   }
@@ -128,7 +128,6 @@ export default class FormatProductsService {
   ): Promise<Array<{ available_to_sell: number; safety_stock: number }>> {
     try {
       if (!product.id) {
-        this.logger.warn(`⚠️ Producto ${product.id} - primera variante sin SKU`)
         throw new Error(`Producto ${product.id} sin SKU para inventario`)
       }
 
@@ -137,15 +136,9 @@ export default class FormatProductsService {
 
       // Verificar que se encontró inventario
       if (!inventoryLevel || inventoryLevel.length === 0) {
-        this.logger.warn(
-          `📭 Sin inventario para producto ${product.id} - usando valores por defecto`
-        )
         throw new Error(`Sin inventario para SKU ${product.id} del producto ${product.id}`)
       }
 
-      this.logger.debug(
-        `📦 Inventario encontrado para SKU ${product.id}: ${inventoryLevel.length} registros`
-      )
       // Unificar y sumar los campos de inventario de todos los registros
       const resultInventory = inventoryLevel.reduce(
         (acc, item) => ({
@@ -157,9 +150,10 @@ export default class FormatProductsService {
 
       return [resultInventory]
     } catch (error) {
-      this.logger.warn(
-        `📭 Error obteniendo inventario para producto ${product.id} - usando valores por defecto`
-      )
+      this.logger.warn('⚠️ Error obteniendo inventario para producto', {
+        product_id: product.id,
+        error: error.message,
+      })
       return [{ ...FormatProductsService.DEFAULT_INVENTORY }]
     }
   }
@@ -194,7 +188,6 @@ export default class FormatProductsService {
 
       // Si no hay metafield o está vacío, devolver valores por defecto
       if (!timerMetafield || typeof timerMetafield !== 'object') {
-        this.logger.debug(`⏰ No hay timer metafield para producto ${productId} (${this.country})`)
         return { ...FormatProductsService.DEFAULT_TIMER_METAFIELDS }
       }
 
@@ -205,19 +198,17 @@ export default class FormatProductsService {
         ? DateTime.fromJSDate(new Date(timerMetafield.timer_datetime))
         : null
 
-      this.logger.debug(
-        `⏰ Timer metafield para producto ${productId} (${this.country}): status=${timerStatus}, price=${timerPrice}`
-      )
-
       return {
         timer_status: timerStatus,
         timer_price: timerPrice,
         timer_datetime: timerDatetime,
       }
     } catch (error) {
-      this.logger.warn(
-        `📭 Error obteniendo timer metafields para producto ${productId} - usando valores por defecto`
-      )
+      this.logger.warn('⚠️ Error obteniendo timer metafields para producto', {
+        product_id: productId,
+        country: this.country,
+        error: error.message,
+      })
       return { ...FormatProductsService.DEFAULT_TIMER_METAFIELDS }
     }
   }
@@ -246,9 +237,6 @@ export default class FormatProductsService {
       } else {
         // Verificar que el producto tenga variantes antes de consultar precios
         if (!product.variants || product.variants.length === 0) {
-          this.logger.warn(
-            `📭 Producto ${product.id} sin variantes para consultar precios - usando valores por defecto`
-          )
           throw new Error(`Producto ${product.id} sin variantes`)
         }
 
@@ -256,9 +244,6 @@ export default class FormatProductsService {
 
         // Validar que PriceService devolvió datos válidos
         if (!prices || !prices.price || !prices.calculatedPrice) {
-          this.logger.warn(
-            `📭 PriceService sin datos válidos para producto ${product.id} - usando valores por defecto`
-          )
           throw new Error(`PriceService sin datos para producto ${product.id}`)
         }
 
@@ -280,9 +265,10 @@ export default class FormatProductsService {
         }
       }
     } catch (error) {
-      this.logger.warn(
-        `📭 Sin datos de precios para producto ${product.id} - usando valores por defecto`
-      )
+      this.logger.warn('⚠️ Sin datos de precios para producto', {
+        product_id: product.id,
+        error: error.message,
+      })
       return { ...FormatProductsService.DEFAULT_PRICES }
     }
   }
@@ -290,11 +276,17 @@ export default class FormatProductsService {
   private async getReviewsByProduct(productId: number) {
     try {
       const reviews = await this.bigcommerceService.getReviewsByProduct(productId)
-      return reviews?.reviews ? JSON.parse(reviews.reviews as any) : null
+      return reviews?.product_id ? reviews : null
     } catch (error) {
-      this.logger.warn(
-        `📭 Error obteniendo reviews para producto ${productId} - usando valores por defecto`
-      )
+      // Solo logear errores críticos, no warnings masivos
+      if (error.message.includes('404') || error.message.includes('not found')) {
+        return null
+      }
+
+      this.logger.error('❌ Error crítico obteniendo reviews', {
+        product_id: productId,
+        error: error.message,
+      })
       return null
     }
   }
@@ -436,9 +428,10 @@ export default class FormatProductsService {
         percentDiscount || FormatProductsService.DEFAULT_PERCENT_DISCOUNT
       )
     } catch (error) {
-      this.logger.warn(
-        `📭 Error procesando datos del producto ${product.id} - usando valores por defecto`
-      )
+      this.logger.warn('⚠️ Error procesando datos del producto', {
+        product_id: product.id,
+        error: error.message,
+      })
       // Los valores por defecto ya están asignados arriba
     }
 
@@ -489,7 +482,7 @@ export default class FormatProductsService {
       quantity: this.country === 'CL' ? quantity : inventoryLevel[0]?.available_to_sell,
       ...prices,
       reserve,
-      reviews,
+      reviews: reviews ? JSON.stringify(reviews) : null,
       sameday: specialCategories.sameday,
       despacho24horas: specialCategories.despacho24horas,
       pickup_in_store: specialCategories.pickupInStore,

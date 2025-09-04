@@ -50,7 +50,7 @@ export default class extends BaseSchema {
       table.jsonb('options').nullable().defaultTo('[]')
       table.json('related_products').nullable().defaultTo('[]')
       table.text('option_label').nullable()
-      table.text('keywords').nullable()
+      table.text('keywords').notNullable().defaultTo('')
       table.boolean('is_visible').defaultTo(false)
 
       table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(this.now())

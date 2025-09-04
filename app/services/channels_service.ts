@@ -5,54 +5,6 @@ import { channels as channelsConfig } from '../utils/channels/channels.js'
 import db from '@adonisjs/lucid/services/db'
 import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
 
-// ✅ INTERFACES PARA TIPADO FUERTE
-interface BigCommerceProduct {
-  id: number
-  product_id: number
-  categories: number[]
-  name: string
-  description: string
-  brand_id: number
-  price: number
-  sale_price: number
-  inventory_level: number
-  quantity: number
-  weight: number
-  width: number
-  depth: number
-  height: number
-  sort_order: number
-  is_featured: boolean
-  is_visible: boolean
-  meta_keywords?: string[]
-  meta_description?: string
-  custom_url?: {
-    url: string
-  }
-  images: Array<{
-    is_thumbnail: boolean
-    url_standard: string
-    url_zoom: string
-    description: string
-    sort_order: number
-  }>
-  variants: Array<{
-    id: number
-    sku: string
-    price: number
-    sale_price: number | null
-    calculated_price: number
-    inventory_level: number
-    calculated_weight: number
-    width: number
-    depth: number
-    height: number
-    image_url: string
-    option_values: any[]
-    value_id: number
-  }>
-}
-
 export default class ChannelsService {
   private readonly logger = Logger.child({ service: 'ChannelsService' })
 
@@ -60,8 +12,6 @@ export default class ChannelsService {
    * Inicializa los canales desde la configuración
    */
   async initializeChannels(): Promise<void> {
-    this.logger.info('🚀 Inicializando canales desde configuración...')
-
     try {
       const results = {
         created: 0,
@@ -71,8 +21,6 @@ export default class ChannelsService {
 
       // 🚀 Iterar sobre cada marca (UF, FC, AF, etc.)
       for (const [brandName, countries] of Object.entries(channelsConfig)) {
-        this.logger.info(`📦 Procesando marca: ${brandName}`)
-
         // 🚀 Iterar sobre cada país (CL, CO, PE)
         for (const [countryCode, config] of Object.entries(countries as Record<string, any>)) {
           try {
@@ -90,32 +38,32 @@ export default class ChannelsService {
 
             if (channel.$isNew) {
               results.created++
-              this.logger.info(`✅ Canal creado: ${channelName} (ID: ${channelId})`)
             } else {
               results.updated++
-              this.logger.info(`🔄 Canal actualizado: ${channelName} (ID: ${channelId})`)
             }
           } catch (error) {
             const errorMsg = `Error procesando ${brandName}_${countryCode}: ${error.message}`
             results.errors.push(errorMsg)
-            this.logger.error(`❌ ${errorMsg}`)
+            this.logger.error('❌ Error procesando canal', {
+              brand: brandName,
+              country: countryCode,
+              error: error.message,
+            })
           }
         }
       }
 
-      // ✅ Logging del resultado final
-      this.logger.info(`✅ Inicialización de canales completada`)
-      this.logger.info(
-        `📊 Resultados: ${results.created} creados, ${results.updated} actualizados, ${results.errors.length} errores`
-      )
-
       if (results.errors.length > 0) {
-        this.logger.warn(
-          `⚠️ Se encontraron ${results.errors.length} errores durante la inicialización`
-        )
+        this.logger.warn('⚠️ Errores durante inicialización de canales', {
+          errors_count: results.errors.length,
+          created: results.created,
+          updated: results.updated,
+        })
       }
     } catch (error) {
-      this.logger.error('❌ Error en inicialización de canales:', error)
+      this.logger.error('❌ Error en inicialización de canales', {
+        error: error.message,
+      })
       throw error
     }
   }
@@ -124,14 +72,17 @@ export default class ChannelsService {
    * 🔗 Sincroniza las relaciones producto-canal
    * Responsabilidad: Gestionar asociaciones entre productos y canales
    */
-  async syncChannelByProduct(products: FormattedProductWithModelVariants[], channel_id: number) {
-    const trx = await db.transaction()
-    try {
-      this.logger.info(`🔗 Sincronizando productos para canal ${channel_id}...`)
+  async syncChannelByProduct(
+    products: FormattedProductWithModelVariants[],
+    channel_id: number,
+    trx?: any
+  ) {
+    const useExternalTransaction = !!trx
+    const transaction = trx || (await db.transaction())
 
+    try {
       // Limpiar SOLO los registros del canal actual
-      await ChannelProduct.query({ client: trx }).where('channel_id', channel_id).delete()
-      this.logger.info(`🧹 Limpiados registros existentes del canal ${channel_id}`)
+      await ChannelProduct.query({ client: transaction }).where('channel_id', channel_id).delete()
 
       // Preparar datos de canales
       const productsList = products.map((product) => ({
@@ -140,12 +91,12 @@ export default class ChannelsService {
       }))
 
       // Guardar nuevas relaciones
-      await ChannelProduct.createMany(productsList, { client: trx })
-      await trx.commit()
+      await ChannelProduct.createMany(productsList, { client: transaction })
 
-      this.logger.info(
-        `✅ Sincronización de canal completada: ${productsList.length} productos asociados`
-      )
+      // Solo hacer commit si es nuestra propia transacción
+      if (!useExternalTransaction) {
+        await transaction.commit()
+      }
 
       return {
         success: true,
@@ -158,8 +109,16 @@ export default class ChannelsService {
         },
       }
     } catch (error) {
-      await trx.rollback()
-      this.logger.error(`❌ Error al sincronizar canal ${channel_id}:`, error)
+      // Solo hacer rollback si es nuestra propia transacción
+      if (!useExternalTransaction) {
+        await transaction.rollback()
+      }
+
+      this.logger.error('❌ Error al sincronizar canal', {
+        channel_id,
+        products_count: products.length,
+        error: error.message,
+      })
       return {
         success: false,
         message: 'Error al sincronizar canales',
@@ -184,7 +143,9 @@ export default class ChannelsService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener estadísticas de canales:', error)
+      this.logger.error('❌ Error al obtener estadísticas de canales', {
+        error: error.message,
+      })
       throw error
     }
   }
@@ -193,15 +154,13 @@ export default class ChannelsService {
    * Ejecuta todas las tareas de inicialización
    */
   async initialize(): Promise<void> {
-    this.logger.info('🚀 Iniciando servicios de arranque...')
-
     try {
       // Inicializar canales
       await this.initializeChannels()
-
-      this.logger.info('✅ Servicios de arranque completados exitosamente')
     } catch (error) {
-      this.logger.error('❌ Error en servicios de arranque:', error)
+      this.logger.error('❌ Error en servicios de arranque', {
+        error: error.message,
+      })
       throw error
     }
   }

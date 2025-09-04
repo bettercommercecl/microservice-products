@@ -42,7 +42,7 @@ export interface FormattedVariantForModel {
   options: any[] | string | null
   related_products: number[] | string | null
   option_label: string | null
-  keywords: string | null
+  keywords: string
 
   // Control de visibilidad
   is_visible: boolean

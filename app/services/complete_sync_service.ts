@@ -18,6 +18,8 @@ import FiltersProduct from '#models/filters_product'
 import ChannelProduct from '#models/channel_product'
 import pLimit from 'p-limit'
 import ChannelsService from './channels_service.js'
+import db from '@adonisjs/lucid/services/db'
+import type { QueryClientContract, TransactionClientContract } from '@adonisjs/lucid/types/database'
 
 export default class CompleteSyncService {
   private readonly logger = Logger.child({ service: 'CompleteSyncService' })
@@ -53,36 +55,15 @@ export default class CompleteSyncService {
       timestamp: string
       channelId: number
       channelName: string
-      statistics: {
-        before: {
-          products: number
-          variants: number
-          categories: number
-          options: number
-          filters: number
-        }
-        after: {
-          products: number
-          variants: number
-          categories: number
-          options: number
-          filters: number
-        }
-        changes: {
-          productsAdded: number
-          productsRemoved: number
-          variantsAdded: number
-          variantsRemoved: number
-          categoriesAdded: number
-          categoriesRemoved: number
-          optionsAdded: number
-          optionsRemoved: number
-          filtersAdded: number
-          filtersRemoved: number
-        }
+      processed: {
+        products: number
+        variants: number
+        batches: number
+        totalTime: string
       }
     }
   }> {
+    const startTime = Date.now() // ⏱️ Iniciar cronómetro
     const { CHANNEL, API_URL } = this.currentChannelConfig
     // 🎯 Obtener el país configurado
     const configuredCountry = env.get('COUNTRY_CODE')
@@ -90,20 +71,15 @@ export default class CompleteSyncService {
     this.logger.info(`🔄 Iniciando sincronización completa para: ${API_URL}`)
 
     // ============================================================================
-    // PASO 0: CAPTURAR ESTADO INICIAL (SNAPSHOT) ANTES DE LA SINCRONIZACIÓN
+    // PASO 0: INICIO DE SINCRONIZACIÓN
     // ============================================================================
-    this.logger.info(`📸 Capturando estado inicial del canal ${CHANNEL}...`)
-    const initialState = await this.captureInitialState(CHANNEL)
-    const beforeStats = await this.getChannelStatistics(CHANNEL)
+    this.logger.info(`🚀 Iniciando sincronización para canal ${CHANNEL}...`)
 
-    this.logger.info(`📸 Estado inicial capturado:`)
-    this.logger.info(`  - Productos: ${beforeStats.products}`)
-    this.logger.info(`  - Variantes: ${beforeStats.variants}`)
-    this.logger.info(`  - Categorías: ${beforeStats.categories}`)
-    this.logger.info(`  - Opciones: ${beforeStats.options}`)
-    this.logger.info(`  - Filtros: ${beforeStats.filters}`)
-
+    // ============================================================================
+    // PROCESAMIENTO SIN TRANSACCIÓN GLOBAL (CADA LOTE TIENE SU PROPIA TRANSACCIÓN)
+    // ============================================================================
     try {
+      this.logger.info(`🛡️ Iniciando sincronización...`)
       // 1. Obtener actualizar o crear inventario
       const inventoryResult = await this.inventoryService.syncSafeStock()
       if (inventoryResult && 'status' in inventoryResult && inventoryResult.status === 'Error') {
@@ -115,116 +91,138 @@ export default class CompleteSyncService {
       this.logger.info(`📦 Obtenidos ${bigcommerceProducts.length} productos de Bigcommerce`)
 
       // ============================================================================
-      // PASO 3: PROCESAR PRODUCTOS POR LOTES PARA EVITAR SOBRECARGA DE API
+      // PASO 3: PROCESAR PRODUCTOS POR LOTES COMPLETOS (OPTIMIZADO)
       // ============================================================================
-      const BATCH_SIZE = 50 // Procesar 50 productos a la vez
+      const BATCH_SIZE = 200 // Tamaño de lote optimizado
       const allFormattedVariants: FormattedProductWithModelVariants[] = []
 
+      // 📦 Crear lotes
+      const batches = []
       for (let i = 0; i < bigcommerceProducts.length; i += BATCH_SIZE) {
-        const batch = bigcommerceProducts.slice(i, i + BATCH_SIZE)
-        this.logger.info(
-          `🔄 Procesando lote ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(bigcommerceProducts.length / BATCH_SIZE)} (${batch.length} productos)`
-        )
-
-        // Formatear productos del lote
-        const formattedProducts = await this.formatProductsService.formatProducts(
-          batch,
-          this.currentChannelConfig
-        )
-
-        // Formatear variantes del lote
-        const formattedVariants = await this.formatVariantsService.formatVariants(
-          formattedProducts,
-          this.currentChannelConfig
-        )
-
-        // Agregar al resultado total
-        allFormattedVariants.push(...formattedVariants)
-
-        this.logger.info(
-          `✅ Lote ${Math.floor(i / BATCH_SIZE) + 1} completado: ${formattedVariants.length} productos formateados`
-        )
+        batches.push(bigcommerceProducts.slice(i, i + BATCH_SIZE))
       }
 
-      this.logger.info(`✅ Total productos formateados: ${allFormattedVariants.length}`)
+      this.logger.info(`📦 Procesando ${batches.length} lotes completos de productos...`)
+
+      // 🔄 Procesar cada lote completamente (secuencial para mejor control)
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex]
+
+        // Crear una nueva transacción para cada lote
+        await db.transaction(async (batchTrx) => {
+          try {
+            this.logger.info(
+              `🔄 Procesando lote ${batchIndex + 1}/${batches.length} (${batch.length} productos)`
+            )
+
+            // ========================================
+            // SUB-PASO 3.1: FORMATEAR PRODUCTOS Y VARIANTES
+            // ========================================
+            const formattedProducts = await this.formatProductsService.formatProducts(
+              batch,
+              this.currentChannelConfig
+            )
+
+            const formattedVariants = await this.formatVariantsService.formatVariants(
+              formattedProducts,
+              this.currentChannelConfig
+            )
+
+            // ========================================
+            // SUB-PASO 3.2: GUARDAR PRODUCTOS DEL LOTE
+            // ========================================
+            const productsToSave = formattedVariants.map(({ variants, ...product }) => product)
+            await Product.updateOrCreateMany('id', productsToSave, { client: batchTrx })
+
+            // ========================================
+            // SUB-PASO 3.3: SINCRONIZAR CATEGORÍAS DEL LOTE (PARA KEYWORDS)
+            // ========================================
+            await this.syncProductCategories(formattedVariants, batchTrx)
+
+            // ========================================
+            // SUB-PASO 3.4: GUARDAR VARIANTES CON KEYWORDS GENERADAS
+            // ========================================
+            const allVariants = formattedVariants.flatMap((product) => product.variants)
+            await Variant.updateOrCreateMany('sku', allVariants, { client: batchTrx })
+
+            // ========================================
+            // SUB-PASO 3.5: GUARDAR RELACIÓN CANAL-PRODUCTO DEL LOTE
+            // ========================================
+            await this.channelsService.syncChannelByProduct(
+              formattedVariants,
+              this.currentChannelConfig.CHANNEL,
+              batchTrx
+            )
+
+            // ========================================
+            // SUB-PASO 3.6: SINCRONIZAR OPCIONES DEL LOTE
+            // ========================================
+            await this.syncOptions(formattedVariants, batchTrx)
+
+            // ========================================
+            // SUB-PASO 3.7: COMMIT AUTOMÁTICO DEL LOTE
+            // ========================================
+            this.logger.info(`🔄 Commit automático del lote ${batchIndex + 1}...`)
+            // El commit se hace automáticamente al salir del bloque transaction
+
+            // Acumular para estadísticas finales
+            allFormattedVariants.push(...formattedVariants)
+
+            this.logger.info(
+              `✅ Lote ${batchIndex + 1} completado: ${formattedVariants.length} productos procesados completamente`
+            )
+          } catch (error) {
+            this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, error)
+            throw error // Re-lanzar para rollback automático de la transacción del lote
+          }
+        })
+      }
+
+      this.logger.info(`✅ Total productos procesados: ${allFormattedVariants.length}`)
 
       // ============================================================================
-      // PASO 4: GUARDAR TODOS LOS PRODUCTOS Y VARIANTES
-      // ============================================================================
-      this.logger.info(`💾 Guardando productos y variantes...`)
-      await this.saveProductsAndVariants(allFormattedVariants)
-      // ============================================================================
-      // PASO 5: GUARDAR RELACION DE PRODUCTOS POR CANAL
-      // ============================================================================
-      this.logger.info(`💾 Guardando relación de productos por canal...`)
-      await this.channelsService.syncChannelByProduct(
-        allFormattedVariants,
-        this.currentChannelConfig.CHANNEL
-      )
-
-      // ============================================================================
-      // PASO 6: SINCRONIZAR OPCIONES DE PRODUCTOS
-      // ============================================================================
-      this.logger.info(`💾 Guardando opciones de productos...`)
-      await this.syncOptions(allFormattedVariants)
-
-      // ============================================================================
-      // PASO 7: SINCRONIZAR RELACIONES PRODUCTO-CATEGORÍA
-      // ============================================================================
-      this.logger.info(`🔗 Sincronizando relaciones producto-categoría...`)
-      await this.syncProductCategories(allFormattedVariants)
-
-      // ============================================================================
-      // PASO 8: SINCRONIZAR FILTROS DE PRODUCTOS
+      // PASO 4: SINCRONIZAR FILTROS DE PRODUCTOS (CON TRANSACCIÓN)
       // ============================================================================
       this.logger.info(`🔍 Sincronizando filtros de productos...`)
-      await this.syncFilters()
+      await db.transaction(async (filtersTrx) => {
+        await this.syncFilters(filtersTrx)
+      })
+      this.logger.info(`✅ Filtros sincronizados exitosamente`)
 
       // ============================================================================
-      // PASO 9: LIMPIEZA DE RELACIONES HUÉRFANAS (EN BACKGROUND)
+      // PASO 5: LOGS FINALES
       // ============================================================================
-      this.logger.info(`🧹 Iniciando limpieza de relaciones huérfanas...`)
-      // Ejecutar en background para no bloquear la respuesta
-      setImmediate(() => this.cleanupOrphanedRelations(CHANNEL, initialState))
+      this.logger.info(`✅ Sincronización completada exitosamente`)
 
       // ============================================================================
-      // PASO 10: CAPTURAR ESTADÍSTICAS FINALES Y CALCULAR CAMBIOS
+      // PASO 6: PREPARAR RESPUESTA FINAL (ULTRA OPTIMIZADO)
       // ============================================================================
-      this.logger.info(`📊 Capturando estadísticas finales...`)
-      const afterStats = await this.getChannelStatistics(CHANNEL)
-      const changes = this.calculateChanges(beforeStats, afterStats)
 
-      this.logger.info(`📊 Estadísticas finales:`)
-      this.logger.info(
-        `  - Productos: ${afterStats.products} (${changes.productsAdded > 0 ? '+' : ''}${changes.productsAdded})`
-      )
-      this.logger.info(
-        `  - Variantes: ${afterStats.variants} (${changes.variantsAdded > 0 ? '+' : ''}${changes.variantsAdded})`
-      )
-      this.logger.info(
-        `  - Categorías: ${afterStats.categories} (${changes.categoriesAdded > 0 ? '+' : ''}${changes.categoriesAdded})`
-      )
-      this.logger.info(
-        `  - Opciones: ${afterStats.options} (${changes.optionsAdded > 0 ? '+' : ''}${changes.optionsAdded})`
-      )
-      this.logger.info(
-        `  - Filtros: ${afterStats.filters} (${changes.filtersAdded > 0 ? '+' : ''}${changes.filtersAdded})`
-      )
-
-      return {
+      // 📊 Preparar respuesta simplificada con totales procesados
+      const totalTime = Date.now() - startTime
+      const finalResponse = {
         success: true,
         message: `Sincronización completada exitosamente para canal ${CHANNEL}`,
         data: {
           timestamp: new Date().toISOString(),
           channelId: CHANNEL,
           channelName: String(this.currentChannelConfig.CHANNEL || 'Unknown'),
-          statistics: {
-            before: beforeStats,
-            after: afterStats,
-            changes,
+          processed: {
+            products: allFormattedVariants.length,
+            variants: allFormattedVariants.reduce(
+              (total, product) => total + product.variants.length,
+              0
+            ),
+            batches: batches.length,
+            totalTime: `${totalTime}ms`,
           },
         },
       }
+
+      // 🎉 Log final con tiempo total
+      this.logger.info(`🎉 Sincronización completada en ${totalTime}ms - Enviando respuesta...`)
+
+      return finalResponse
     } catch (error) {
       this.logger.error(`❌ Error en sincronización de productos:`, error)
       throw error
@@ -243,15 +241,6 @@ export default class CompleteSyncService {
       // ============================================================================
       this.logger.info(`📋 Obteniendo todos los productos por canal con paginación...`)
 
-      // 🔍 DEBUG: Verificar qué devuelve getProductsByChannel directamente
-      this.logger.info(`🔍 DEBUG - Llamando a getProductsByChannel...`)
-      const directResponse = await this.bigcommerceService.getProductsByChannel(channelId)
-      this.logger.info(
-        `🔍 DEBUG - Respuesta directa de getProductsByChannel: ${directResponse.data?.length || 0} productos`
-      )
-      this.logger.info(`🔍 DEBUG - Metadata de paginación:`, directResponse.meta)
-
-      this.logger.info(`🔍 DEBUG - Llamando a getAllProductIdsByChannel...`)
       const productIds = await this.getAllProductIdsByChannel(channelId)
       const totalProducts = productIds.length
 
@@ -305,13 +294,6 @@ export default class CompleteSyncService {
       // Esperar a que todas las promesas se resuelvan
       const batchResults = await Promise.all(batchPromises)
 
-      // 🔍 DEBUG: Verificar resultados de batches
-      this.logger.info(`🔍 DEBUG - Total batches procesados: ${batchResults.length}`)
-      this.logger.info(
-        `🔍 DEBUG - Productos por batch:`,
-        batchResults.map((batch, index) => `Batch ${index + 1}: ${batch.length} productos`)
-      )
-
       // ============================================================================
       // PASO 4: CONCATENAR RESULTADOS Y LIMPIAR
       // ============================================================================
@@ -357,9 +339,7 @@ export default class CompleteSyncService {
     let allIds: number[] = []
 
     // 1. Primera petición para saber cuántas páginas hay
-    this.logger.info(`🔍 DEBUG - Primera petición a getProductsByChannel con limit=${limit}`)
     const firstResponse = await this.bigcommerceService.getProductsByChannel(channelId, 1, limit)
-    this.logger.info(`🔍 DEBUG - Primera respuesta: ${firstResponse.data?.length || 0} productos`)
 
     if (!firstResponse.data || !Array.isArray(firstResponse.data)) {
       this.logger.warn(`⚠️ No se encontraron datos en la primera página para canal ${channelId}`)
@@ -381,14 +361,13 @@ export default class CompleteSyncService {
       return allIds.filter(Boolean)
     }
 
-    // 3. Lanzar el resto de páginas en paralelo (con límite de concurrencia)
-    const limitConcurrency = pLimit(15)
+    // 3. Lanzar el resto de páginas en paralelo (con límite de concurrencia optimizado)
+    const limitConcurrency = pLimit(25) // Aumentado para máximo rendimiento
     const pagePromises = []
 
     for (let page = 2; page <= totalPages; page++) {
       pagePromises.push(
         limitConcurrency(async () => {
-          this.logger.debug(`📄 Procesando página ${page}/${totalPages}`)
           const response = await this.bigcommerceService.getProductsByChannel(
             channelId,
             page,
@@ -415,59 +394,13 @@ export default class CompleteSyncService {
   }
 
   /**
-   * 💾 Guarda productos y variantes de forma eficiente usando updateOrCreateMany
-   * @param productsWithVariants - Lista de productos con variantes formateadas
-   */
-  private async saveProductsAndVariants(
-    productsWithVariants: FormattedProductWithModelVariants[]
-  ): Promise<void> {
-    this.logger.info(`💾 Iniciando guardado de ${productsWithVariants.length} productos...`)
-
-    try {
-      // ============================================================================
-      // PASO 1: EXTRAER Y PREPARAR PRODUCTOS (SIN VARIANTES)
-      // ============================================================================
-      const productsToSave = productsWithVariants.map(({ variants, ...product }) => product)
-
-      // ============================================================================
-      // PASO 2: EXTRAER TODAS LAS VARIANTES DE TODOS LOS PRODUCTOS
-      // ============================================================================
-      const allVariants = productsWithVariants.flatMap((product) => product.variants)
-
-      this.logger.info(`📦 Productos a guardar: ${productsToSave.length}`)
-      this.logger.info(`🏷️ Variantes a guardar: ${allVariants.length}`)
-
-      // ============================================================================
-      // PASO 3: GUARDAR PRODUCTOS USANDO updateOrCreateMany
-      // ============================================================================
-      this.logger.info(`💾 Guardando productos...`)
-      //console.log('productsToSave', productsToSave)
-      await Product.updateOrCreateMany('product_id', productsToSave)
-      this.logger.info(`✅ Productos guardados exitosamente`)
-
-      // ============================================================================
-      // PASO 4: GUARDAR VARIANTES USANDO updateOrCreateMany
-      // ============================================================================
-      this.logger.info(`💾 Guardando variantes...`)
-      //console.log('allVariants', allVariants)
-      await Variant.updateOrCreateMany('sku', allVariants)
-      this.logger.info(`✅ Variantes guardadas exitosamente`)
-
-      this.logger.info(
-        `🎉 Sincronización completada: ${productsToSave.length} productos y ${allVariants.length} variantes`
-      )
-    } catch (error) {
-      this.logger.error(`❌ Error al guardar productos y variantes:`, error)
-      throw error
-    }
-  }
-
-  /**
    * 🔧 Sincroniza opciones de productos por lotes
    * @param productsWithVariants - Lista de productos con variantes formateadas
+   * @param trx - Transacción de base de datos (opcional)
    */
   private async syncOptions(
-    productsWithVariants: FormattedProductWithModelVariants[]
+    productsWithVariants: FormattedProductWithModelVariants[],
+    trx?: QueryClientContract
   ): Promise<void> {
     this.logger.info(
       `🔧 Iniciando sincronización de opciones para ${productsWithVariants.length} productos...`
@@ -475,7 +408,7 @@ export default class CompleteSyncService {
 
     try {
       // 🚀 OPTIMIZACIÓN EXTREMA: Procesar todo en paralelo
-      const BATCH_SIZE = 200 // Lotes más grandes para mejor rendimiento
+      const BATCH_SIZE = 500 // Lotes más grandes para mejor rendimiento
       const batches = []
 
       // 📦 Crear lotes
@@ -485,27 +418,36 @@ export default class CompleteSyncService {
 
       this.logger.info(`📦 Procesando ${batches.length} lotes de opciones en paralelo...`)
 
-      // 🚀 Procesar todos los lotes en paralelo
+      // 🚀 Procesar todos los lotes en paralelo con pLimit para control de concurrencia
+      const limit = pLimit(12) // Aumentado para mejor rendimiento
       const batchResults = await Promise.all(
-        batches.map(async (batch, batchIndex) => {
-          try {
-            // 🔧 Formatear opciones del lote
-            const batchOptions = await this.formatOptionsService.formatOptions(batch)
+        batches.map((batch, batchIndex) =>
+          limit(async () => {
+            try {
+              // 🔧 Formatear opciones del lote
+              const batchOptions = await this.formatOptionsService.formatOptions(batch)
 
-            if (batchOptions.length === 0) {
-              return { processed: 0, batch: batchIndex + 1 }
+              if (batchOptions.length === 0) {
+                return { processed: 0, batch: batchIndex + 1 }
+              }
+
+              // 💾 Guardar lote inmediatamente con transacción
+              await Option.updateOrCreateMany(
+                ['option_id', 'product_id'],
+                batchOptions,
+                trx ? { client: trx } : undefined
+              )
+
+              this.logger.info(
+                `✅ Lote ${batchIndex + 1}: ${batchOptions.length} opciones guardadas`
+              )
+              return { processed: batchOptions.length, batch: batchIndex + 1 }
+            } catch (error) {
+              this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, error)
+              return { processed: 0, batch: batchIndex + 1, error: error.message }
             }
-
-            // 💾 Guardar lote inmediatamente
-            await Option.updateOrCreateMany(['option_id', 'product_id'], batchOptions)
-
-            this.logger.info(`✅ Lote ${batchIndex + 1}: ${batchOptions.length} opciones guardadas`)
-            return { processed: batchOptions.length, batch: batchIndex + 1 }
-          } catch (error) {
-            this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, error)
-            return { processed: 0, batch: batchIndex + 1, error: error.message }
-          }
-        })
+          })
+        )
       )
 
       // 📊 Consolidar resultados
@@ -527,14 +469,40 @@ export default class CompleteSyncService {
 
   /**
    * 🔗 Sincroniza relaciones producto-categoría
+   * @param products - Lista de productos con variantes formateadas
+   * @param trx - Transacción de base de datos (obligatorio)
    */
   private async syncProductCategories(
-    products: FormattedProductWithModelVariants[]
+    products: FormattedProductWithModelVariants[],
+    trx: TransactionClientContract
   ): Promise<void> {
     this.logger.info(`🔗 Iniciando sincronización de relaciones producto-categoría...`)
 
     try {
-      const result = await this.categoryService.syncCategoriesByProduct(products)
+      // Generar el lote de relaciones que se van a guardar desde los datos formateados
+      const productIds = products.map((p) => p.product_id)
+      const newRelationsToSave: { product_id: number; category_id: number }[] = []
+
+      for (const product of products) {
+        if (product.categories && Array.isArray(product.categories)) {
+          for (const categoryId of product.categories) {
+            newRelationsToSave.push({
+              product_id: product.product_id,
+              category_id: categoryId,
+            })
+          }
+        }
+      }
+
+      this.logger.info(
+        `📊 Lote de relaciones a guardar: ${newRelationsToSave.length} para ${productIds.length} productos`
+      )
+
+      // Limpiar relaciones existentes que NO están en el lote nuevo
+      await this.cleanupOrphanedCategoriesBeforeSave(productIds, newRelationsToSave, trx)
+
+      // Sincronizar nuevas relaciones
+      const result = await this.categoryService.syncCategoriesByProduct(products, trx)
 
       if (result && result.success) {
         this.logger.info(`✅ Relaciones producto-categoría sincronizadas exitosamente`)
@@ -557,12 +525,13 @@ export default class CompleteSyncService {
 
   /**
    * 🔍 Sincroniza filtros de productos
+   * @param trx - Transacción de base de datos (opcional)
    */
-  private async syncFilters(): Promise<void> {
+  private async syncFilters(trx?: QueryClientContract): Promise<void> {
     this.logger.info(`🔍 Iniciando sincronización de filtros...`)
 
     try {
-      const result = await this.filtersService.syncFiltersProducts()
+      const result = await this.filtersService.syncFiltersProducts(trx)
 
       if (result.success) {
         this.logger.info(`✅ Filtros sincronizados exitosamente`)
@@ -580,360 +549,6 @@ export default class CompleteSyncService {
     } catch (error) {
       this.logger.error(`❌ Error al sincronizar filtros:`, error)
       throw error
-    }
-  }
-
-  /**
-   * 📸 Captura el estado inicial del canal antes de la sincronización
-   * @param channelId - ID del canal
-   * @returns Estado inicial con todas las relaciones existentes
-   */
-  private async captureInitialState(channelId: number): Promise<{
-    productIds: number[]
-    categories: { product_id: number; category_id: number }[]
-    options: { product_id: number; option_id: number }[]
-    filters: { product_id: number; category_id: number }[]
-  }> {
-    try {
-      this.logger.info(`📸 Capturando estado inicial del canal ${channelId}...`)
-
-      // Obtener todas las relaciones existentes en paralelo
-      const [channelProducts, categories, options, filters] = await Promise.all([
-        this.getChannelProducts(channelId),
-        this.getProductCategoriesByChannel(channelId),
-        this.getProductOptionsByChannel(channelId),
-        this.getProductFiltersByChannel(channelId),
-      ])
-
-      const productIds = channelProducts.map((cp) => cp.product_id)
-
-      this.logger.info(`📸 Estado inicial capturado:`)
-      this.logger.info(`  - Productos: ${productIds.length}`)
-      this.logger.info(`  - Categorías: ${categories.length}`)
-      this.logger.info(`  - Opciones: ${options.length}`)
-      this.logger.info(`  - Filtros: ${filters.length}`)
-
-      return {
-        productIds,
-        categories,
-        options,
-        filters,
-      }
-    } catch (error) {
-      this.logger.error(`❌ Error capturando estado inicial:`, error)
-      return {
-        productIds: [],
-        categories: [],
-        options: [],
-        filters: [],
-      }
-    }
-  }
-
-  /**
-   * 🧹 Limpia relaciones huérfanas después de la sincronización
-   * @param channelId - ID del canal sincronizado
-   * @param initialState - Estado inicial capturado antes de la sincronización
-   */
-  private async cleanupOrphanedRelations(
-    channelId: number,
-    initialState: {
-      productIds: number[]
-      categories: { product_id: number; category_id: number }[]
-      options: { product_id: number; option_id: number }[]
-      filters: { product_id: number; category_id: number }[]
-    }
-  ): Promise<void> {
-    try {
-      this.logger.info(`🧹 Iniciando limpieza de relaciones huérfanas para canal ${channelId}...`)
-
-      // 1. Obtener productos actuales del canal (después de la sincronización)
-      const currentChannelProducts = await this.getChannelProducts(channelId)
-      const currentProductIds = currentChannelProducts.map((cp) => cp.product_id)
-
-      this.logger.info(`📊 Comparación de estados:`)
-      this.logger.info(`  - Productos iniciales: ${initialState.productIds.length}`)
-      this.logger.info(`  - Productos actuales: ${currentProductIds.length}`)
-
-      // 2. Identificar productos que ya no están en el canal
-      const removedProductIds = initialState.productIds.filter(
-        (id) => !currentProductIds.includes(id)
-      )
-
-      this.logger.info(`🗑️ Productos removidos del canal: ${removedProductIds.length}`)
-
-      // 3. Obtener relaciones actuales del canal
-      const [currentCategories, currentOptions, currentFilters] = await Promise.all([
-        this.getProductCategoriesByChannel(channelId),
-        this.getProductOptionsByChannel(channelId),
-        this.getProductFiltersByChannel(channelId),
-      ])
-
-      // 4. Identificar relaciones huérfanas por tipo
-      const orphanedCategories = this.findOrphanedRelations(
-        initialState.categories,
-        currentCategories,
-        'categorías'
-      )
-      const orphanedOptions = this.findOrphanedRelations(
-        initialState.options,
-        currentOptions,
-        'opciones'
-      )
-      const orphanedFilters = this.findOrphanedRelations(
-        initialState.filters,
-        currentFilters,
-        'filtros'
-      )
-
-      this.logger.info(`📊 Relaciones huérfanas identificadas:`)
-      this.logger.info(`  - Categorías: ${orphanedCategories.length}`)
-      this.logger.info(`  - Opciones: ${orphanedOptions.length}`)
-      this.logger.info(`  - Filtros: ${orphanedFilters.length}`)
-
-      // 5. Limpiar relaciones huérfanas en paralelo
-      await Promise.all([
-        this.cleanupSpecificOrphanedCategories(orphanedCategories),
-        this.cleanupSpecificOrphanedOptions(orphanedOptions),
-        this.cleanupSpecificOrphanedFilters(orphanedFilters),
-        this.cleanupOrphanedChannelProducts(channelId, removedProductIds),
-      ])
-
-      this.logger.info(`✅ Limpieza de relaciones huérfanas completada`)
-    } catch (error) {
-      this.logger.error(`❌ Error en limpieza de relaciones huérfanas:`, error)
-      // No lanzar error para no afectar la sincronización principal
-    }
-  }
-
-  /**
-   * 🔍 Identifica relaciones huérfanas comparando estado inicial vs actual
-   * @param initialRelations - Relaciones que existían antes
-   * @param currentRelations - Relaciones que existen ahora
-   * @param relationType - Tipo de relación para logging
-   * @returns Relaciones que estaban antes pero ya no están
-   */
-  private findOrphanedRelations<T extends { product_id: number }>(
-    initialRelations: T[],
-    currentRelations: T[],
-    relationType: string
-  ): T[] {
-    // Crear un Set de relaciones actuales para búsqueda rápida
-    const currentSet = new Set(
-      currentRelations.map((rel) => `${rel.product_id}-${Object.values(rel).slice(1).join('-')}`)
-    )
-
-    // Encontrar relaciones que estaban antes pero ya no están
-    const orphaned = initialRelations.filter((rel) => {
-      const key = `${rel.product_id}-${Object.values(rel).slice(1).join('-')}`
-      return !currentSet.has(key)
-    })
-
-    this.logger.info(`🔍 ${relationType}: ${orphaned.length} relaciones huérfanas identificadas`)
-
-    return orphaned
-  }
-
-  /**
-   * 🗑️ Limpia categorías específicas huérfanas
-   */
-  private async cleanupSpecificOrphanedCategories(
-    orphanedCategories: { product_id: number; category_id: number }[]
-  ): Promise<void> {
-    if (orphanedCategories.length === 0) {
-      this.logger.info(`ℹ️ No hay categorías huérfanas que limpiar`)
-      return
-    }
-
-    try {
-      this.logger.info(
-        `🗑️ Limpiando ${orphanedCategories.length} categorías huérfanas específicas...`
-      )
-
-      // Procesar en lotes para evitar consultas muy grandes
-      const BATCH_SIZE = 1000
-      for (let i = 0; i < orphanedCategories.length; i += BATCH_SIZE) {
-        const batch = orphanedCategories.slice(i, i + BATCH_SIZE)
-
-        const result = await CategoryProduct.query()
-          .whereIn(
-            ['product_id', 'category_id'],
-            batch.map((rel) => [rel.product_id, rel.category_id])
-          )
-          .delete()
-
-        const deletedCount = Array.isArray(result) ? result.length : result
-        this.logger.info(
-          `✅ Lote ${Math.floor(i / BATCH_SIZE) + 1}: ${deletedCount} categorías eliminadas`
-        )
-      }
-
-      this.logger.info(`✅ Categorías huérfanas limpiadas exitosamente`)
-    } catch (error) {
-      this.logger.error(`❌ Error limpiando categorías huérfanas específicas:`, error)
-    }
-  }
-
-  /**
-   * 🗑️ Limpia opciones específicas huérfanas
-   */
-  private async cleanupSpecificOrphanedOptions(
-    orphanedOptions: { product_id: number; option_id: number }[]
-  ): Promise<void> {
-    if (orphanedOptions.length === 0) {
-      this.logger.info(`ℹ️ No hay opciones huérfanas que limpiar`)
-      return
-    }
-
-    try {
-      this.logger.info(`🗑️ Limpiando ${orphanedOptions.length} opciones huérfanas específicas...`)
-
-      // Procesar en lotes para evitar consultas muy grandes
-      const BATCH_SIZE = 1000
-      for (let i = 0; i < orphanedOptions.length; i += BATCH_SIZE) {
-        const batch = orphanedOptions.slice(i, i + BATCH_SIZE)
-
-        const result = await Option.query()
-          .whereIn(
-            ['product_id', 'option_id'],
-            batch.map((rel) => [rel.product_id, rel.option_id])
-          )
-          .delete()
-
-        const deletedCount = Array.isArray(result) ? result.length : result
-        this.logger.info(
-          `✅ Lote ${Math.floor(i / BATCH_SIZE) + 1}: ${deletedCount} opciones eliminadas`
-        )
-      }
-
-      this.logger.info(`✅ Opciones huérfanas limpiadas exitosamente`)
-    } catch (error) {
-      this.logger.error(`❌ Error limpiando opciones huérfanas específicas:`, error)
-    }
-  }
-
-  /**
-   * 🗑️ Limpia filtros específicos huérfanas
-   */
-  private async cleanupSpecificOrphanedFilters(
-    orphanedFilters: { product_id: number; category_id: number }[]
-  ): Promise<void> {
-    if (orphanedFilters.length === 0) {
-      this.logger.info(`ℹ️ No hay filtros huérfanas que limpiar`)
-      return
-    }
-
-    try {
-      this.logger.info(`🗑️ Limpiando ${orphanedFilters.length} filtros huérfanas específicas...`)
-
-      // Procesar en lotes para evitar consultas muy grandes
-      const BATCH_SIZE = 1000
-      for (let i = 0; i < orphanedFilters.length; i += BATCH_SIZE) {
-        const batch = orphanedFilters.slice(i, i + BATCH_SIZE)
-
-        const result = await FiltersProduct.query()
-          .whereIn(
-            ['product_id', 'category_id'],
-            batch.map((rel) => [rel.product_id, rel.category_id])
-          )
-          .delete()
-
-        const deletedCount = Array.isArray(result) ? result.length : result
-        this.logger.info(
-          `✅ Lote ${Math.floor(i / BATCH_SIZE) + 1}: ${deletedCount} filtros eliminados`
-        )
-      }
-
-      this.logger.info(`✅ Filtros huérfanas limpiados exitosamente`)
-    } catch (error) {
-      this.logger.error(`❌ Error limpiando filtros huérfanas específicas:`, error)
-    }
-  }
-
-  /**
-   * 🗑️ Limpia relaciones canal-producto huérfanas
-   */
-  private async cleanupOrphanedChannelProducts(
-    channelId: number,
-    currentProductIds: number[]
-  ): Promise<void> {
-    try {
-      this.logger.info(`🗑️ Limpiando relaciones canal-producto huérfanas...`)
-
-      const result = await ChannelProduct.query()
-        .where('channel_id', channelId)
-        .whereNotIn('product_id', currentProductIds)
-        .delete()
-
-      const deletedCount = Array.isArray(result) ? result.length : result
-      if (deletedCount > 0) {
-        this.logger.info(`✅ Eliminadas ${deletedCount} relaciones canal-producto huérfanas`)
-      }
-    } catch (error) {
-      this.logger.error(`❌ Error limpiando relaciones canal-producto huérfanas:`, error)
-    }
-  }
-
-  /**
-   * 📊 Obtiene productos del canal desde la base de datos
-   */
-  private async getChannelProducts(channelId: number): Promise<{ product_id: number }[]> {
-    try {
-      return await ChannelProduct.query().where('channel_id', channelId).select('product_id')
-    } catch (error) {
-      this.logger.error(`❌ Error obteniendo productos del canal:`, error)
-      return []
-    }
-  }
-
-  /**
-   * 📊 Obtiene categorías de productos por canal
-   */
-  private async getProductCategoriesByChannel(
-    channelId: number
-  ): Promise<{ product_id: number; category_id: number }[]> {
-    try {
-      return await CategoryProduct.query()
-        .join('channel_product', 'category_products.product_id', '=', 'channel_product.product_id')
-        .where('channel_product.channel_id', channelId)
-        .select('category_products.product_id', 'category_products.category_id')
-    } catch (error) {
-      this.logger.error(`❌ Error obteniendo categorías del canal:`, error)
-      return []
-    }
-  }
-
-  /**
-   * 📊 Obtiene opciones de productos por canal
-   */
-  private async getProductOptionsByChannel(
-    channelId: number
-  ): Promise<{ product_id: number; option_id: number }[]> {
-    try {
-      return await Option.query()
-        .join('channel_product', 'options.product_id', '=', 'channel_product.product_id')
-        .where('channel_product.channel_id', channelId)
-        .select('options.product_id', 'options.option_id')
-    } catch (error) {
-      this.logger.error(`❌ Error obteniendo opciones del canal:`, error)
-      return []
-    }
-  }
-
-  /**
-   * 📊 Obtiene filtros de productos por canal
-   */
-  private async getProductFiltersByChannel(
-    channelId: number
-  ): Promise<{ product_id: number; category_id: number }[]> {
-    try {
-      return await FiltersProduct.query()
-        .join('channel_product', 'filters_products.product_id', '=', 'channel_product.product_id')
-        .where('channel_product.channel_id', channelId)
-        .select('filters_products.product_id', 'filters_products.category_id')
-    } catch (error) {
-      this.logger.error(`❌ Error obteniendo filtros del canal:`, error)
-      return []
     }
   }
 
@@ -980,13 +595,11 @@ export default class CompleteSyncService {
    */
   private async getChannelProductsCount(channelId: number): Promise<number> {
     try {
-      this.logger.debug(`🔍 Contando productos para canal ${channelId}...`)
       const result = await ChannelProduct.query()
         .where('channel_id', channelId)
         .count('* as total')
         .first()
       const count = Number(result?.$extras.total || 0)
-      this.logger.debug(`📊 Productos encontrados: ${count}`)
       return count
     } catch (error) {
       this.logger.error(`❌ Error contando productos del canal:`, error)
@@ -999,14 +612,12 @@ export default class CompleteSyncService {
    */
   private async getChannelVariantsCount(channelId: number): Promise<number> {
     try {
-      this.logger.debug(`🔍 Contando variantes para canal ${channelId}...`)
       const result = await Variant.query()
         .join('channel_product', 'variants.product_id', '=', 'channel_product.product_id')
         .where('channel_product.channel_id', channelId)
         .count('* as total')
         .first()
       const count = Number(result?.$extras.total || 0)
-      this.logger.debug(`📊 Variantes encontradas: ${count}`)
       return count
     } catch (error) {
       this.logger.error(`❌ Error contando variantes del canal:`, error)
@@ -1019,14 +630,12 @@ export default class CompleteSyncService {
    */
   private async getChannelCategoriesCount(channelId: number): Promise<number> {
     try {
-      this.logger.debug(`🔍 Contando categorías para canal ${channelId}...`)
       const result = await CategoryProduct.query()
         .join('channel_product', 'category_products.product_id', '=', 'channel_product.product_id')
         .where('channel_product.channel_id', channelId)
         .count('* as total')
         .first()
       const count = Number(result?.$extras.total || 0)
-      this.logger.debug(`📊 Categorías encontradas: ${count}`)
       return count
     } catch (error) {
       this.logger.error(`❌ Error contando categorías del canal:`, error)
@@ -1039,14 +648,12 @@ export default class CompleteSyncService {
    */
   private async getChannelOptionsCount(channelId: number): Promise<number> {
     try {
-      this.logger.debug(`🔍 Contando opciones para canal ${channelId}...`)
       const result = await Option.query()
         .join('channel_product', 'options.product_id', '=', 'channel_product.product_id')
         .where('channel_product.channel_id', channelId)
         .count('* as total')
         .first()
       const count = Number(result?.$extras.total || 0)
-      this.logger.debug(`📊 Opciones encontradas: ${count}`)
       return count
     } catch (error) {
       this.logger.error(`❌ Error contando opciones del canal:`, error)
@@ -1059,14 +666,12 @@ export default class CompleteSyncService {
    */
   private async getChannelFiltersCount(channelId: number): Promise<number> {
     try {
-      this.logger.debug(`🔍 Contando filtros para canal ${channelId}...`)
       const result = await FiltersProduct.query()
         .join('channel_product', 'filters_products.product_id', '=', 'channel_product.product_id')
         .where('channel_product.channel_id', channelId)
         .count('* as total')
         .first()
       const count = Number(result?.$extras.total || 0)
-      this.logger.debug(`📊 Filtros encontrados: ${count}`)
       return count
     } catch (error) {
       this.logger.error(`❌ Error contando filtros del canal:`, error)
@@ -1115,6 +720,113 @@ export default class CompleteSyncService {
       optionsRemoved: Math.max(0, before.options - after.options),
       filtersAdded: Math.max(0, after.filters - before.filters),
       filtersRemoved: Math.max(0, before.filters - after.filters),
+    }
+  }
+
+  // ============================================================================
+  // MÉTODOS DE LIMPIEZA RÁPIDA (OPTIMIZADOS)
+  // ============================================================================
+
+  // ============================================================================
+  // MÉTODOS DE LIMPIEZA ANTES DE GUARDAR
+  // ============================================================================
+
+  /**
+   * 🏷️ Limpieza de categorías huérfanas ANTES de guardar el lote nuevo
+   * Elimina las relaciones existentes que NO están en el lote que se va a guardar
+   * @param productIds - IDs de productos que se van a sincronizar
+   * @param newRelationsToSave - Lote de relaciones que se van a guardar
+   * @param trx - Transacción de base de datos (opcional)
+   * @returns Número de categorías eliminadas
+   */
+  private async cleanupOrphanedCategoriesBeforeSave(
+    productIds: number[],
+    newRelationsToSave: { product_id: number; category_id: number }[],
+    trx: TransactionClientContract
+  ): Promise<number> {
+    try {
+      this.logger.info(`🔍 Limpieza de categorías huérfanas antes de guardar...`)
+
+      if (newRelationsToSave.length === 0) {
+        this.logger.info(
+          `✅ No hay relaciones nuevas para guardar, eliminando todas las existentes`
+        )
+        // Si no hay relaciones nuevas, eliminar todas las existentes para estos productos
+        const deleted = await CategoryProduct.query({ client: trx })
+          .whereIn('product_id', productIds)
+          .delete()
+        const totalDeleted = Array.isArray(deleted) ? deleted.length : deleted
+        this.logger.info(`✅ Categorías eliminadas: ${totalDeleted}`)
+        return totalDeleted
+      }
+
+      // Crear un Set de las relaciones que se van a guardar para búsqueda rápida
+      const newRelationsSet = new Set(
+        newRelationsToSave.map((rel) => `${rel.product_id}-${rel.category_id}`)
+      )
+
+      this.logger.info(`📊 Relaciones que se van a guardar: ${newRelationsToSave.length}`)
+
+      // Obtener todas las relaciones existentes para estos productos
+      const existingRelations = await CategoryProduct.query({ client: trx })
+        .whereIn('product_id', productIds)
+        .select('product_id', 'category_id')
+
+      this.logger.info(`📊 Relaciones existentes en BD: ${existingRelations.length}`)
+
+      // Identificar relaciones que existen en BD pero NO están en el lote nuevo
+      const orphanedRelations = existingRelations.filter((rel) => {
+        const key = `${rel.product_id}-${rel.category_id}`
+        return !newRelationsSet.has(key)
+      })
+
+      if (orphanedRelations.length === 0) {
+        this.logger.info(`✅ No hay categorías huérfanas para eliminar`)
+        return 0
+      }
+
+      this.logger.info(`🗑️ Categorías huérfanas detectadas: ${orphanedRelations.length}`)
+
+      // Eliminar relaciones huérfanas con pLimit para máximo rendimiento
+      const limit = pLimit(20) // Aumentado para mejor rendimiento
+      const batchSize = 1000 // Lotes más grandes
+      const batches: { product_id: number; category_id: number }[][] = []
+
+      for (let i = 0; i < orphanedRelations.length; i += batchSize) {
+        batches.push(orphanedRelations.slice(i, i + batchSize))
+      }
+
+      this.logger.info(`📦 Procesando ${batches.length} lotes de categorías huérfanas...`)
+
+      const batchPromises = batches.map((batch) =>
+        limit(async () => {
+          let deleted = 0
+          for (const relation of batch) {
+            try {
+              const result = await CategoryProduct.query({ client: trx })
+                .where('product_id', relation.product_id)
+                .where('category_id', relation.category_id)
+                .delete()
+              deleted += Array.isArray(result) ? result.length : result
+            } catch (error) {
+              this.logger.error(
+                `❌ Error eliminando categoría huérfana ${relation.product_id}-${relation.category_id}:`,
+                error
+              )
+            }
+          }
+          return deleted
+        })
+      )
+
+      const results = await Promise.all(batchPromises)
+      const totalDeleted = results.reduce((sum, count) => sum + count, 0)
+
+      this.logger.info(`✅ Categorías huérfanas eliminadas: ${totalDeleted}`)
+      return totalDeleted
+    } catch (error) {
+      this.logger.error('❌ Error en limpieza de categorías antes de guardar:', error)
+      return 0
     }
   }
 }

@@ -61,7 +61,10 @@ export default class Category extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // ✅ HELPERS ADICIONALES
+  /**
+   * 📦 Obtiene todos los productos de esta categoría
+   * @returns Promise<CategoryProduct[]> - Lista de productos con preload
+   */
   async getProducts() {
     try {
       return await CategoryProduct.query()
@@ -74,6 +77,10 @@ export default class Category extends BaseModel {
     }
   }
 
+  /**
+   * 🔢 Cuenta el total de productos en esta categoría
+   * @returns Promise<number> - Número total de productos
+   */
   async getProductsCount(): Promise<number> {
     try {
       return await CategoryProduct.query()
@@ -87,6 +94,10 @@ export default class Category extends BaseModel {
     }
   }
 
+  /**
+   * 👆 Obtiene la categoría padre de esta categoría
+   * @returns Promise<Category | null> - Categoría padre o null si es raíz
+   */
   async getParentCategory() {
     try {
       if (!this.parent_id) return null
@@ -97,6 +108,10 @@ export default class Category extends BaseModel {
     }
   }
 
+  /**
+   * 👶 Obtiene todas las categorías hijas de esta categoría
+   * @returns Promise<Category[]> - Lista de categorías hijas ordenadas
+   */
   async getChildCategories() {
     try {
       return await Category.query().where('parent_id', this.category_id).orderBy('order', 'asc')
@@ -106,6 +121,10 @@ export default class Category extends BaseModel {
     }
   }
 
+  /**
+   * 🛤️ Obtiene la ruta completa desde la raíz hasta esta categoría
+   * @returns Promise<string[]> - Array con los nombres de categorías en orden jerárquico
+   */
   async getFullPath(): Promise<string[]> {
     try {
       const path: string[] = [this.title]
@@ -123,6 +142,10 @@ export default class Category extends BaseModel {
     }
   }
 
+  /**
+   * 🍃 Verifica si esta categoría es una hoja (sin categorías hijas)
+   * @returns Promise<boolean> - true si es hoja, false si tiene hijos
+   */
   async isLeaf(): Promise<boolean> {
     try {
       const children = await this.getChildCategories()
@@ -133,6 +156,10 @@ export default class Category extends BaseModel {
     }
   }
 
+  /**
+   * 📏 Calcula la profundidad de esta categoría en el árbol jerárquico
+   * @returns Promise<number> - Nivel de profundidad (0 = raíz)
+   */
   async getDepth(): Promise<number> {
     try {
       const path = await this.getFullPath()
@@ -143,7 +170,10 @@ export default class Category extends BaseModel {
     }
   }
 
-  // ✅ MÉTODOS ESTÁTICOS ADICIONALES
+  /**
+   * 🌳 Obtiene todas las categorías raíz (sin padre)
+   * @returns Promise<Category[]> - Lista de categorías raíz ordenadas
+   */
   static async getRootCategories() {
     try {
       return await Category.query().whereNull('parent_id').orderBy('order', 'asc')
@@ -153,6 +183,10 @@ export default class Category extends BaseModel {
     }
   }
 
+  /**
+   * 🌲 Construye el árbol completo de categorías con sus hijos anidados
+   * @returns Promise<any[]> - Árbol de categorías con estructura jerárquica
+   */
   static async getCategoryTree() {
     try {
       const rootCategories = await Category.getRootCategories()
@@ -175,6 +209,11 @@ export default class Category extends BaseModel {
     }
   }
 
+  /**
+   * 👶 Obtiene todas las categorías hijas de un padre específico
+   * @param parentId - ID de la categoría padre
+   * @returns Promise<Category[]> - Lista de categorías hijas ordenadas
+   */
   static async getCategoriesByParentId(parentId: number) {
     try {
       return await Category.query().where('parent_id', parentId).orderBy('order', 'asc')

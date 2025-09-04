@@ -1,6 +1,5 @@
 import Logger from '@adonisjs/core/services/logger'
 
-// ✅ INTERFACES PARA TIPADO FUERTE
 interface ProductImage {
   is_thumbnail: boolean
   url_standard: string

@@ -53,10 +53,6 @@ export default class BigCommerceService {
    */
   async getBrands(ids: number[] = []) {
     try {
-      this.logger.info(
-        `🏷️ Obteniendo marcas de BigCommerce${ids.length > 0 ? ` (${ids.length} IDs específicos)` : ''}`
-      )
-
       const urlEndpoint =
         ids.length > 0
           ? `${this.baseUrl}/v3/catalog/brands?id:in=${ids.join(',')}`
@@ -67,12 +63,12 @@ export default class BigCommerceService {
         timeout: 15000,
       })
 
-      this.logger.info(
-        `✅ Marcas obtenidas exitosamente: ${response.data.data?.length || 0} marcas`
-      )
       return response.data.data
     } catch (error) {
-      this.logger.error('❌ Error al obtener marcas de BigCommerce:', error)
+      this.logger.error('❌ Error al obtener marcas de BigCommerce', {
+        ids_count: ids.length,
+        error: error.message,
+      })
       throw new Error(
         `Error fetching brands from BigCommerce: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
@@ -84,16 +80,12 @@ export default class BigCommerceService {
    */
   async getCategories() {
     try {
-      this.logger.info('📂 Iniciando obtención de categorías de BigCommerce...')
-
       const allCategories = []
       let currentPage = 1
       let totalPages = 1
 
       // Realiza solicitudes secuenciales hasta que se recuperen todas las páginas
       while (currentPage <= totalPages) {
-        this.logger.info(`📄 Obteniendo página ${currentPage} de categorías...`)
-
         const results = await axios.get(`${this.baseUrl}/v3/catalog/trees/categories`, {
           headers: this.headers,
           params: {
@@ -109,16 +101,14 @@ export default class BigCommerceService {
         // Actualiza el número total de páginas
         totalPages = meta.pagination.total_pages
 
-        this.logger.info(`✅ Página ${currentPage} obtenida: ${data.length} categorías`)
         currentPage++
       }
 
-      this.logger.info(
-        `🎉 Categorías obtenidas exitosamente: ${allCategories.length} categorías totales`
-      )
       return allCategories
     } catch (error) {
-      this.logger.error('❌ Error al obtener las categorías de BigCommerce:', error)
+      this.logger.error('❌ Error al obtener las categorías de BigCommerce', {
+        error: error.message,
+      })
       throw new Error(
         `Error al obtener las categorías: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
@@ -130,19 +120,16 @@ export default class BigCommerceService {
    */
   async getProducts() {
     try {
-      this.logger.info('📦 Obteniendo productos de BigCommerce...')
-
       const response = await axios.get(`${this.baseUrl}/v3/catalog/products`, {
         headers: this.headers,
         timeout: 15000,
       })
 
-      this.logger.info(
-        `✅ Productos obtenidos exitosamente: ${response.data.data?.length || 0} productos`
-      )
       return response.data.data
     } catch (error) {
-      this.logger.error('❌ Error al obtener productos de BigCommerce:', error)
+      this.logger.error('❌ Error al obtener productos de BigCommerce', {
+        error: error.message,
+      })
       throw new Error(
         `Error fetching products from BigCommerce: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
@@ -160,6 +147,10 @@ export default class BigCommerceService {
       })
       return response.data.data
     } catch (error) {
+      this.logger.error('❌ Error al obtener producto de BigCommerce', {
+        product_id: id,
+        error: error.message,
+      })
       throw new Error(
         `Error fetching product from BigCommerce: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
@@ -177,6 +168,10 @@ export default class BigCommerceService {
       })
       return response.data.data
     } catch (error) {
+      this.logger.error('❌ Error al obtener opciones de variantes', {
+        product_id: productId,
+        error: error.message,
+      })
       throw new Error(
         `Error fetching product variant options from BigCommerce: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
@@ -197,6 +192,10 @@ export default class BigCommerceService {
       )
       return response.data.data
     } catch (error) {
+      this.logger.error('❌ Error al obtener variantes de producto', {
+        product_id: productId,
+        error: error.message,
+      })
       throw new Error(
         `Error fetching product variants from BigCommerce: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
@@ -224,6 +223,12 @@ export default class BigCommerceService {
       })
       return response.data
     } catch (error) {
+      this.logger.error('❌ Error al obtener productos por canal', {
+        channel_id: channel,
+        page,
+        limit,
+        error: error.message,
+      })
       return { status: error.response.status, message: error.response.statusText }
     }
   }
@@ -247,7 +252,6 @@ export default class BigCommerceService {
       const url = `${baseUrl}?${visibilityParam}${commonParams}`
 
       try {
-        this.logger.debug(`🔍 Obteniendo página ${page} de productos (offset: ${offset})`)
         const { data } = await axios.get(url, { headers: this.headers, timeout: 30000 })
 
         if (!data.data || data.data.length === 0) {
@@ -255,7 +259,6 @@ export default class BigCommerceService {
         }
 
         allProducts = allProducts.concat(data.data)
-        this.logger.debug(`📦 Página ${page}: ${data.data.length} productos obtenidos`)
 
         // Si obtenemos menos productos que el límite, es la última página
         if (data.data.length < limit) {
@@ -264,14 +267,15 @@ export default class BigCommerceService {
 
         page++
       } catch (error) {
-        this.logger.error(`❌ Error obteniendo página ${page}:`, error)
+        this.logger.error('❌ Error obteniendo página de productos', {
+          page,
+          offset,
+          error: error.message,
+        })
         throw error
       }
     }
 
-    this.logger.info(
-      `✅ Total productos obtenidos: ${allProducts.length} de ${products.length} IDs solicitados`
-    )
     return { data: allProducts, meta: { total: allProducts.length } }
   }
 
@@ -315,8 +319,6 @@ export default class BigCommerceService {
    */
   async getMetafieldsByProduct(product: number, key: string) {
     try {
-      this.logger.info(`🔍 Obteniendo metafield ${key} para producto ${product}`)
-
       const results = await axios.get(
         `${this.baseUrl}/v3/catalog/products/${product}/metafields?key=${key}`,
         {
@@ -333,10 +335,13 @@ export default class BigCommerceService {
         data = data[0].value
       }
 
-      this.logger.info(`✅ Metafield ${key} obtenido exitosamente para producto ${product}`)
       return data
     } catch (error) {
-      this.logger.error(`❌ Error obteniendo metafield ${key} para producto ${product}:`, error)
+      this.logger.error('❌ Error obteniendo metafield', {
+        product_id: product,
+        key,
+        error: error.message,
+      })
       return []
     }
   }
@@ -349,7 +354,7 @@ export default class BigCommerceService {
   async getReviewsByProduct(product: number) {
     try {
       const results = await axios.get(
-        `${env.get('BIGCOMMERCE_API_URL')}${env.get('BIGCOMMERCE_API_STORE_ID')}/v3/catalog/products/${product}/reviews?status=1`,
+        `${this.baseUrl}/v3/catalog/products/${product}/reviews?status=1`,
         {
           headers: {
             'X-Auth-Token': env.get('BIGCOMMERCE_API_TOKEN'),
@@ -396,7 +401,10 @@ export default class BigCommerceService {
 
       return reviews
     } catch (error) {
-      console.error(`❌ Error obteniendo reviews para producto ${product}:`, error)
+      this.logger.error('❌ Error obteniendo reviews para producto', {
+        product_id: product,
+        error: error.message,
+      })
       return {
         product_id: product,
         quantity: 0,

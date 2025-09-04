@@ -2,6 +2,7 @@ import Logger from '@adonisjs/core/services/logger'
 import CategoryProduct from '#models/category_product'
 import FiltersProduct from '#models/filters_product'
 import env from '#start/env'
+import pLimit from 'p-limit'
 
 export default class FiltersService {
   private readonly logger = Logger.child({ service: 'FiltersService' })
@@ -10,7 +11,7 @@ export default class FiltersService {
    * 🔍 Sincroniza las relaciones producto-categoría hija de TODAS las categorías "Filtros" en filters_products
    * Responsabilidad: Gestionar filtros de productos y sus categorías específicas
    */
-  async syncFiltersProducts() {
+  async syncFiltersProducts(trx?: any) {
     try {
       this.logger.info('🔍 Iniciando sincronización de filtros de productos...')
       const startTime = Date.now()
@@ -42,8 +43,8 @@ export default class FiltersService {
         }
       }
 
-      // 🚀 OPTIMIZACIÓN EXTREMA: Procesamiento en lotes paralelos
-      const BATCH_SIZE = 5000 // Lotes más grandes para mejor rendimiento
+      // 🚀 OPTIMIZACIÓN: Procesamiento en lotes paralelos optimizados
+      const BATCH_SIZE = 1000 // Lotes optimizados para mejor rendimiento
       const batches = []
 
       // 📦 Crear lotes
@@ -53,24 +54,32 @@ export default class FiltersService {
 
       this.logger.info(`📦 Procesando ${batches.length} lotes de filtros en paralelo...`)
 
-      // 🚀 Procesar todos los lotes en paralelo
+      // 🚀 Procesar lotes con límite de concurrencia para mejor rendimiento
+      const limitConcurrency = pLimit(5) // Máximo 5 lotes en paralelo
       const batchResults = await Promise.all(
-        batches.map(async (batch, batchIndex) => {
-          try {
-            const dataToSave = batch.map((rel) => ({
-              product_id: rel.product_id,
-              category_id: rel.category_id,
-            }))
+        batches.map((batch, batchIndex) =>
+          limitConcurrency(async () => {
+            try {
+              const dataToSave = batch.map((rel) => ({
+                product_id: rel.product_id,
+                category_id: rel.category_id,
+              }))
 
-            await FiltersProduct.updateOrCreateMany(['product_id', 'category_id'], dataToSave)
+              await FiltersProduct.updateOrCreateMany(['product_id', 'category_id'], dataToSave, {
+                client: trx,
+              })
 
-            this.logger.info(`✅ Lote ${batchIndex + 1}: ${batch.length} relaciones procesadas`)
-            return { processed: batch.length, batch: batchIndex + 1 }
-          } catch (error) {
-            this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, error)
-            return { processed: 0, batch: batchIndex + 1, error: error.message }
-          }
-        })
+              this.logger.info(`✅ Lote ${batchIndex + 1}: ${batch.length} relaciones procesadas`)
+              return { processed: batch.length, batch: batchIndex + 1 }
+            } catch (error) {
+              this.logger.error('❌ Error en lote de filtros', {
+                batch: batchIndex + 1,
+                error: error.message,
+              })
+              return { processed: 0, batch: batchIndex + 1, error: error.message }
+            }
+          })
+        )
       )
 
       // 📊 Consolidar resultados
@@ -84,7 +93,10 @@ export default class FiltersService {
       )
 
       if (errors.length > 0) {
-        this.logger.warn(`⚠️ ${errors.length} lotes tuvieron errores`)
+        this.logger.warn('⚠️ Lotes con errores en sincronización de filtros', {
+          errors_count: errors.length,
+          total_processed: totalProcessed,
+        })
       }
 
       return {
@@ -108,7 +120,9 @@ export default class FiltersService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al sincronizar filtros de productos:', error)
+      this.logger.error('❌ Error al sincronizar filtros de productos', {
+        error: error.message,
+      })
       return {
         success: false,
         message: 'Error al sincronizar filtros de productos',
@@ -141,7 +155,9 @@ export default class FiltersService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener estadísticas de filtros:', error)
+      this.logger.error('❌ Error al obtener estadísticas de filtros', {
+        error: error.message,
+      })
       throw error
     }
   }
@@ -166,7 +182,10 @@ export default class FiltersService {
         },
       }
     } catch (error) {
-      this.logger.error(`❌ Error al obtener filtros del producto ${productId}:`, error)
+      this.logger.error('❌ Error al obtener filtros del producto', {
+        product_id: productId,
+        error: error.message,
+      })
       throw error
     }
   }
@@ -191,7 +210,10 @@ export default class FiltersService {
         },
       }
     } catch (error) {
-      this.logger.error(`❌ Error al obtener productos del filtro ${categoryId}:`, error)
+      this.logger.error('❌ Error al obtener productos del filtro', {
+        category_id: categoryId,
+        error: error.message,
+      })
       throw error
     }
   }

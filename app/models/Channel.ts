@@ -24,6 +24,10 @@ export default class Channel extends BaseModel {
   declare products: HasMany<typeof ChannelProduct>
 
   // ✅ HELPERS ADICIONALES
+  /**
+   * 📦 Obtiene todos los productos de este canal
+   * @returns Promise<ChannelProduct[]> - Lista de productos con preload
+   */
   async getProducts() {
     try {
       return await ChannelProduct.query()
@@ -36,6 +40,10 @@ export default class Channel extends BaseModel {
     }
   }
 
+  /**
+   * 🔢 Cuenta el total de productos en este canal
+   * @returns Promise<number> - Número total de productos
+   */
   async getProductsCount(): Promise<number> {
     try {
       return await ChannelProduct.query()
@@ -49,6 +57,11 @@ export default class Channel extends BaseModel {
     }
   }
 
+  /**
+   * ➕ Asigna un producto a este canal
+   * @param productId - ID del producto a asignar
+   * @returns Promise<ChannelProduct> - Relación creada o actualizada
+   */
   async addProduct(productId: number) {
     try {
       return await ChannelProduct.updateOrCreate(
@@ -61,6 +74,11 @@ export default class Channel extends BaseModel {
     }
   }
 
+  /**
+   * ➖ Remueve un producto de este canal
+   * @param productId - ID del producto a remover
+   * @returns Promise<number> - Número de registros eliminados
+   */
   async removeProduct(productId: number) {
     try {
       return await ChannelProduct.query()
@@ -74,6 +92,10 @@ export default class Channel extends BaseModel {
   }
 
   // ✅ MÉTODOS ESTÁTICOS ADICIONALES
+  /**
+   * 📺 Obtiene todos los canales que tienen productos asignados
+   * @returns Promise<Channel[]> - Lista de canales con productos
+   */
   static async getChannelsWithProducts() {
     try {
       return await Channel.query()
@@ -87,6 +109,11 @@ export default class Channel extends BaseModel {
     }
   }
 
+  /**
+   * 🔍 Busca un canal por nombre (búsqueda parcial)
+   * @param name - Nombre o parte del nombre del canal
+   * @returns Promise<Channel | null> - Canal encontrado o null
+   */
   static async getChannelByName(name: string) {
     try {
       return await Channel.query().where('name', 'ilike', `%${name}%`).first()

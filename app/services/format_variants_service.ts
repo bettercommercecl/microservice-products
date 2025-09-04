@@ -118,7 +118,6 @@ export default class FormatVariantsService {
   ): Promise<Array<{ available_to_sell: number; safety_stock: number }>> {
     try {
       if (!variant.id) {
-        this.logger.warn(`⚠️ Variante sin ID para inventario`)
         throw new Error(`Variante sin ID para inventario`)
       }
 
@@ -127,19 +126,16 @@ export default class FormatVariantsService {
 
       // Verificar que se encontró inventario
       if (!variantInventoryLevel || variantInventoryLevel.length === 0) {
-        this.logger.warn(
-          `📭 Sin inventario para variante ${variant.id} (SKU: ${variant.sku}) - usando valores por defecto`
-        )
         throw new Error(`Sin inventario para SKU ${variant.sku} de la variante ${variant.id}`)
       }
 
-      this.logger.debug(`📦 Inventario encontrado para SKU ${variant.sku}`)
-
       return variantInventoryLevel
     } catch (error) {
-      this.logger.warn(
-        `📭 Error obteniendo inventario para variante ${variant.id} - usando valores por defecto`
-      )
+      this.logger.warn('⚠️ Error obteniendo inventario para variante', {
+        variant_id: variant.id,
+        sku: variant.sku,
+        error: error.message,
+      })
       return [{ ...FormatVariantsService.DEFAULT_INVENTORY }]
     }
   }
@@ -179,9 +175,6 @@ export default class FormatVariantsService {
 
         // Validar que PriceService devolvió datos válidos
         if (!prices || !prices.price || !prices.calculatedPrice) {
-          this.logger.warn(
-            `📭 PriceService sin datos válidos para variante ${variant.id} - usando valores por defecto`
-          )
           throw new Error(`PriceService sin datos para variante ${variant.id}`)
         }
 
@@ -203,9 +196,11 @@ export default class FormatVariantsService {
         }
       }
     } catch (error) {
-      this.logger.warn(
-        `📭 Sin datos de precios para variante ${variant.id} - usando valores por defecto`
-      )
+      this.logger.warn('⚠️ Sin datos de precios para variante', {
+        variant_id: variant.id,
+        sku: variant.sku,
+        error: error.message,
+      })
       return { ...FormatVariantsService.DEFAULT_PRICES }
     }
   }
@@ -233,9 +228,11 @@ export default class FormatVariantsService {
         percentDiscount || FormatVariantsService.DEFAULT_PERCENT_DISCOUNT
       )
     } catch (error) {
-      this.logger.warn(
-        `📭 Error procesando datos de la variante ${variant.id} - usando valores por defecto`
-      )
+      this.logger.warn('⚠️ Error procesando datos de la variante', {
+        variant_id: variant.id,
+        sku: variant.sku,
+        error: error.message,
+      })
       // Los valores por defecto ya están asignados arriba
     }
 
@@ -267,9 +264,26 @@ export default class FormatVariantsService {
       ])
 
       // 2. PROCESAR CATEGORÍAS DEL PRODUCTO
-      const categoryIds = Array.isArray(product.categories)
-        ? product.categories.map((cat: any) => cat.category_id || cat)
-        : []
+      let categoryIds: number[] = []
+      if (product.categories) {
+        try {
+          // Parsear si viene como string JSON
+          const categories =
+            typeof product.categories === 'string'
+              ? JSON.parse(product.categories)
+              : product.categories
+
+          categoryIds = Array.isArray(categories)
+            ? categories.map((cat: any) => cat.category_id || cat)
+            : []
+        } catch (error) {
+          this.logger.warn('⚠️ Error parseando categorías del producto', {
+            product_id: product.product_id,
+            categories: product.categories,
+            error: error.message,
+          })
+        }
+      }
 
       let categoryTitles: string[] = []
       if (categoryIds.length > 0) {
@@ -301,14 +315,12 @@ export default class FormatVariantsService {
 
       // 4. COMBINAR TODOS LOS KEYWORDS
       const keywords = [...categoryTitles, ...tags, ...campaigns].filter(Boolean).join(', ')
-
-      this.logger.debug(`🏷️ Keywords generados para producto ${product.product_id}: ${keywords}`)
-
       return keywords
     } catch (error) {
-      this.logger.warn(
-        `📭 Error generando keywords para producto ${product.product_id} - usando valores por defecto`
-      )
+      this.logger.warn('⚠️ Error generando keywords para producto', {
+        product_id: product.product_id,
+        error: error.message,
+      })
       return ''
     }
   }

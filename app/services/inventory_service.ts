@@ -19,8 +19,6 @@ export default class InventoryService {
    */
   async getInventoryByVariantId(variant_id: number) {
     try {
-      this.logger.info(`📦 Obteniendo inventario para variante ${variant_id}...`)
-
       const locationId = env.get(`INVENTORY_LOCATION_ID_${env.get('COUNTRY_CODE')}`)
       const url = `${env.get('URL_MICROSERVICE_INVENTORY')}/inventory/${variant_id}/${locationId}`
       const response = await axios.get(url, {
@@ -30,12 +28,12 @@ export default class InventoryService {
         timeout: 15000,
       })
 
-      this.logger.info(
-        `✅ Inventario obtenido para variante ${variant_id}: ${response.data?.availableToSell || 0} unidades disponibles`
-      )
       return response.data
     } catch (error) {
-      this.logger.error(`❌ Error al obtener inventario para variante ${variant_id}:`, error)
+      this.logger.error('❌ Error obteniendo inventario por variante', {
+        variant_id,
+        error: error.message,
+      })
       throw error
     }
   }
@@ -45,10 +43,6 @@ export default class InventoryService {
    */
   async updateInventory(product_id: number, quantity: number) {
     try {
-      this.logger.info(
-        `🔄 Actualizando inventario para producto ${product_id} con cantidad ${quantity}...`
-      )
-
       const locationId = env.get(`INVENTORY_LOCATION_ID_${env.get('COUNTRY_CODE')}`)
       const url = `${env.get('URL_MICROSERVICE_INVENTORY')}/inventory/${product_id}/${locationId}/${quantity}`
       const response = await axios.patch(url, {
@@ -58,12 +52,13 @@ export default class InventoryService {
         timeout: 15000,
       })
 
-      this.logger.info(
-        `✅ Inventario actualizado para producto ${product_id}: ${quantity} unidades`
-      )
       return response.data
     } catch (error) {
-      this.logger.error(`❌ Error al actualizar inventario para producto ${product_id}:`, error)
+      this.logger.error('❌ Error actualizando inventario', {
+        product_id,
+        quantity,
+        error: error.message,
+      })
       throw error
     }
   }
@@ -100,15 +95,7 @@ export default class InventoryService {
 
         const deduplicatedInventory = Object.values(uniqueInventory)
 
-        this.logger.info(
-          `🔄 Registros originales: ${formattedInventory.length}, únicos: ${deduplicatedInventory.length}`
-        )
-
         const result = await CatalogSafeStock.updateOrCreateMany('sku', deduplicatedInventory)
-
-        this.logger.info(
-          `✅ Stock de seguridad sincronizado: ${deduplicatedInventory.length} registros únicos`
-        )
 
         return {
           success: true,
@@ -132,7 +119,9 @@ export default class InventoryService {
         data: null,
       }
     } catch (error) {
-      this.logger.error('❌ Error crítico al sincronizar stock de seguridad:', error)
+      this.logger.error('❌ Error crítico al sincronizar stock de seguridad', {
+        error: error.message,
+      })
       return {
         status: 'Error',
         message: 'Error al sincronizar el stock de seguridad',
@@ -159,7 +148,9 @@ export default class InventoryService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener estadísticas de stock:', error)
+      this.logger.error('❌ Error obteniendo estadísticas de stock', {
+        error: error.message,
+      })
       throw error
     }
   }
