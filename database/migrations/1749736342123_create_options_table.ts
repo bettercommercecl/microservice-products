@@ -14,13 +14,13 @@ export default class extends BaseSchema {
         .onDelete('CASCADE')
       table.integer('option_id').notNullable()
       table.string('label').notNullable()
-      table.json('options').nullable()
+      table.json('options').nullable().defaultTo([])
 
       table.timestamp('created_at')
       table.timestamp('updated_at')
 
       // Índices
-      table.index(['product_id', 'option_id'])
+      table.unique(['product_id', 'option_id'])
     })
   }
 

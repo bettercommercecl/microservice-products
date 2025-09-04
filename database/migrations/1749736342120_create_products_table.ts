@@ -5,38 +5,62 @@ export default class extends BaseSchema {
 
   async up() {
     this.schema.createTable(this.tableName, (table) => {
-      table.increments('id')
-      table.string('image').notNullable()
-      table.json('images').nullable()
-      table.string('hover').nullable()
-      table.string('title').notNullable()
+      // Identificadores y información básica (según modelo actual)
+      table.integer('id').primary()
+      table.integer('product_id').notNullable().unique()
+      table.string('image').notNullable().defaultTo('')
+      table.json('images').nullable().defaultTo('[]')
+      table.string('hover').nullable().defaultTo('')
+      table.string('title').notNullable() // name -> title
       table.string('page_title').notNullable()
       table.text('description').notNullable()
+      table.string('type').notNullable()
+
+      // Relaciones
       table.integer('brand_id').unsigned().references('id').inTable('brands').onDelete('SET NULL')
-      table.integer('stock').notNullable().defaultTo(0)
-      table.integer('warning_stock').notNullable().defaultTo(0)
-      table.decimal('discount_price', 10, 2).nullable()
-      table.decimal('normal_price', 10, 2).notNullable()
-      table.decimal('cash_price', 10, 2).notNullable()
+      table.json('categories').notNullable() // Array de IDs de categorías
+
+      // Control de inventario (nombres del modelo actual)
+      table.integer('stock').notNullable().defaultTo(0) // inventory_level -> stock
+      table.integer('warning_stock').notNullable().defaultTo(0) // inventory_warning_level -> warning_stock
+
+      // Estructura de precios (nombres del modelo actual)
+      table.integer('normal_price').notNullable() // price -> normal_price
+      table.integer('discount_price').notNullable() // sale_price -> discount_price
+      table.integer('cash_price').notNullable()
       table.string('percent').nullable()
       table.string('url').notNullable().unique()
-      table.string('type').notNullable()
+
+      // Cantidades y costos
       table.integer('quantity').notNullable().defaultTo(0)
-      table.decimal('armed_cost', 10, 2).notNullable()
+      table.integer('armed_cost').nullable()
       table.decimal('weight', 10, 2).notNullable()
       table.integer('sort_order').notNullable().defaultTo(0)
-      table.string('reserve').nullable()
-      table.json('reviews').nullable()
+
+      // Campos especiales del negocio
+      table.string('reserve').nullable().defaultTo('')
+      table.json('reviews').nullable().defaultTo('[]')
       table.boolean('sameday').defaultTo(false)
       table.boolean('free_shipping').defaultTo(false)
       table.boolean('despacho24horas').defaultTo(false)
-      table.boolean('featured').defaultTo(false)
+      table.boolean('featured').defaultTo(false) // is_featured -> featured
       table.boolean('pickup_in_store').defaultTo(false)
       table.boolean('is_visible').defaultTo(true)
       table.boolean('turbo').defaultTo(false)
-      table.text('meta_description').notNullable()
-      table.json('meta_keywords').notNullable()
-      table.json('sizes').nullable()
+
+      // SEO y metadatos
+      table.text('meta_description').nullable().defaultTo('')
+      table.json('meta_keywords').nullable().defaultTo('[]')
+      table.json('sizes').nullable().defaultTo('[]')
+
+      // Campos adicionales del modelo
+      table.json('related_products').nullable().defaultTo('[]')
+      table.integer('total_sold').notNullable().defaultTo(0)
+
+      // Timer fields
+      table.boolean('timer_status').nullable().defaultTo(false) // boolean -> string
+      table.integer('timer_price').nullable().defaultTo(0)
+      table.timestamp('timer_datetime').nullable().defaultTo(null)
 
       table.timestamp('created_at')
       table.timestamp('updated_at')

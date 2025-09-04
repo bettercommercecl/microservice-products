@@ -5,12 +5,14 @@ export default class extends BaseSchema {
 
   public async up() {
     this.schema.createTable(this.tableName, (table) => {
-      table.increments('id')
+      table.increments('id').primary()
       table.integer('product_id').unsigned().notNullable()
       table.integer('category_id').unsigned().notNullable()
       table.timestamps(true)
       table.foreign('product_id').references('products.id')
       table.foreign('category_id').references('categories.category_id')
+      // ✅ Constraint único para updateOrCreateMany
+      table.unique(['product_id', 'category_id'])
     })
   }
 
