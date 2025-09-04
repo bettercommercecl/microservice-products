@@ -1,6 +1,5 @@
 import axios from 'axios'
 import env from '#start/env'
-import { PARENT } from '../constants/brands.js'
 import Logger from '@adonisjs/core/services/logger'
 
 interface ProductVariant {
@@ -232,24 +231,48 @@ export default class BigCommerceService {
   /**
    * Obtiene productos detallados por IDs
    */
-  async getAllProductsRefactoring(products: number[], visible = 1, channel: number) {
-    // Aseguramos que channel es uno de los índices válidos de PARENT
-    let parentId: any = PARENT[channel as keyof typeof PARENT]
-
-    if (parentId === undefined) {
-      return { error: 'Canal no válido' }
-    }
+  async getAllProductsRefactoring(products: number[], visible = 1, parentCategory: number | null) {
     const baseUrl = this.baseUrl + '/v3/catalog/products'
     const visibilityParam = visible === 1 ? 'is_visible=1&' : ''
-    const categoriesParam = parentId === 0 ? '' : `&categories:in=${parentId}`
-    const commonParams = `id:in=${products}&availability=available&sort=id&direction=desc&include=images,variants&${categoriesParam}`
-    const url = `${baseUrl}?${visibilityParam}${commonParams}`
-    try {
-      const { data } = await axios.get(url, { headers: this.headers, timeout: 30000 })
-      return data
-    } catch (error) {
-      throw error
+    const categoriesParam =
+      parentCategory === null || parentCategory === 0 ? '' : `&categories:in=${parentCategory}`
+
+    let allProducts: any[] = []
+    let page = 1
+    const limit = 250 // Máximo permitido por Bigcommerce
+
+    while (true) {
+      const offset = (page - 1) * limit
+      const commonParams = `id:in=${products}&availability=available&sort=id&direction=desc&include=images,variants&limit=${limit}&page=${page}${categoriesParam}`
+      const url = `${baseUrl}?${visibilityParam}${commonParams}`
+
+      try {
+        this.logger.debug(`🔍 Obteniendo página ${page} de productos (offset: ${offset})`)
+        const { data } = await axios.get(url, { headers: this.headers, timeout: 30000 })
+
+        if (!data.data || data.data.length === 0) {
+          break // No hay más productos
+        }
+
+        allProducts = allProducts.concat(data.data)
+        this.logger.debug(`📦 Página ${page}: ${data.data.length} productos obtenidos`)
+
+        // Si obtenemos menos productos que el límite, es la última página
+        if (data.data.length < limit) {
+          break
+        }
+
+        page++
+      } catch (error) {
+        this.logger.error(`❌ Error obteniendo página ${page}:`, error)
+        throw error
+      }
     }
+
+    this.logger.info(
+      `✅ Total productos obtenidos: ${allProducts.length} de ${products.length} IDs solicitados`
+    )
+    return { data: allProducts, meta: { total: allProducts.length } }
   }
 
   /**
@@ -280,6 +303,105 @@ export default class BigCommerceService {
         message: 'Error al intentar obtener el stock de seguridad de bigcommerce',
         code: error.message,
         title: error.response?.data?.title,
+      }
+    }
+  }
+
+  /**
+   * 🔍 Obtener metafields de un producto por clave específica
+   * @param product - ID del producto
+   * @param key - Clave del metafield a buscar
+   * @returns Valor del metafield o array vacío si no existe
+   */
+  async getMetafieldsByProduct(product: number, key: string) {
+    try {
+      this.logger.info(`🔍 Obteniendo metafield ${key} para producto ${product}`)
+
+      const results = await axios.get(
+        `${this.baseUrl}/v3/catalog/products/${product}/metafields?key=${key}`,
+        {
+          headers: {
+            'X-Auth-Token': env.get('BIGCOMMERCE_API_TOKEN'),
+            'Content-Type': 'application/json',
+            'host': 'api.bigcommerce.com',
+          },
+        }
+      )
+
+      let data = results.data.data
+      if (data.length > 0) {
+        data = data[0].value
+      }
+
+      this.logger.info(`✅ Metafield ${key} obtenido exitosamente para producto ${product}`)
+      return data
+    } catch (error) {
+      this.logger.error(`❌ Error obteniendo metafield ${key} para producto ${product}:`, error)
+      return []
+    }
+  }
+
+  /**
+   * ⭐ Obtener reviews de un producto
+   * @param product - ID del producto
+   * @returns Objeto con reviews, cantidad y rating promedio
+   */
+  async getReviewsByProduct(product: number) {
+    try {
+      const results = await axios.get(
+        `${env.get('BIGCOMMERCE_API_URL')}${env.get('BIGCOMMERCE_API_STORE_ID')}/v3/catalog/products/${product}/reviews?status=1`,
+        {
+          headers: {
+            'X-Auth-Token': env.get('BIGCOMMERCE_API_TOKEN'),
+            'Content-Type': 'application/json',
+            'host': 'api.bigcommerce.com',
+          },
+        }
+      )
+
+      let data = results.data.data
+      let arrayReviews: any[] = []
+      let totalRating = 0
+
+      // TODO: Implementar consulta a ImagesReview cuando esté disponible
+      // const images = await ImagesReview.query().where('product_id', product).exec()
+
+      await Promise.all(
+        data.map(async function (elem: any, _index: number) {
+          // TODO: Implementar lógica de imágenes cuando ImagesReview esté disponible
+          // let imagesUrl = (images.find(image => image.title === elem.title && image.name === elem.name) || {}).images_url
+          // let imagesArray = imagesUrl ? imagesUrl.split(',') : []
+          let imagesArray: string[] = [] // Temporal hasta implementar ImagesReview
+
+          let returnReviews = {
+            id: elem.id,
+            name: elem.name,
+            title: elem.title,
+            text: elem.text,
+            rating: elem.rating,
+            date: elem.date_reviewed,
+            images_url: imagesArray,
+          }
+          totalRating = totalRating + elem.rating
+          arrayReviews.push(returnReviews)
+        })
+      )
+
+      let reviews = {
+        product_id: product,
+        quantity: arrayReviews.length,
+        rating: arrayReviews.length > 0 ? totalRating / arrayReviews.length : 0,
+        reviews: arrayReviews,
+      }
+
+      return reviews
+    } catch (error) {
+      console.error(`❌ Error obteniendo reviews para producto ${product}:`, error)
+      return {
+        product_id: product,
+        quantity: 0,
+        rating: 0,
+        reviews: [],
       }
     }
   }
