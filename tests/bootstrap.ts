@@ -32,7 +32,18 @@ export const runnerHooks: Required<Pick<Config, 'setup' | 'teardown'>> = {
  * Learn more - https://japa.dev/docs/test-suites#lifecycle-hooks
  */
 export const configureSuite: Config['configureSuite'] = (suite) => {
-  if (['browser', 'functional', 'e2e'].includes(suite.name)) {
+  if (['browser', 'e2e'].includes(suite.name)) {
     return suite.setup(() => testUtils.httpServer().start())
+  }
+
+  if (suite.name === 'unit') {
+    return suite.setup(() => testUtils.db().migrate())
+  }
+
+  if (suite.name === 'functional') {
+    return suite.setup(async () => {
+      await testUtils.db().migrate()
+      return testUtils.httpServer().start()
+    })
   }
 }

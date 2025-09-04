@@ -1,5 +1,5 @@
 import vine from '@vinejs/vine'
-import { PARENT } from '../constants/brands.js'
+import { PARENT } from '#utils/channels/brands'
 
 // 🏷️ Obtener los channel_ids válidos de las marcas
 const validChannelIds = Object.keys(PARENT)

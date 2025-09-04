@@ -34,6 +34,10 @@ new Ignitor(APP_ROOT, { importer: IMPORTER })
     app.booting(async () => {
       await import('#start/env')
     })
+    app.ready(async () => {
+      // ✅ Servidor listo - la inicialización de datos se hace via API
+      console.log('🚀 Servidor HTTP iniciado correctamente')
+    })
     app.listen('SIGTERM', () => app.terminate())
     app.listenIf(app.managedByPm2, 'SIGINT', () => app.terminate())
   })
