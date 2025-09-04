@@ -1,5 +1,5 @@
 import { HttpContext } from '@adonisjs/core/http'
-import CategoryService from '#services/category_service'
+import CategoryService from '#services/categories_service'
 import Logger from '@adonisjs/core/services/logger'
 
 export default class CategoriesController {
