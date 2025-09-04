@@ -9,7 +9,7 @@ test.group('Channel Name Validation', (group) => {
   })
 
   // 🧪 TEST 1: Nombres válidos en mayúsculas
-  test('✅ Debe aceptar nombres válidos en mayúsculas', async ({ client, assert }) => {
+  test('✅ Debe aceptar nombres válidos en mayúsculas', async ({ client }) => {
     // 📝 ARRANGE: Crear canal de prueba
     await Channel.create({
       id: 1,
@@ -33,7 +33,7 @@ test.group('Channel Name Validation', (group) => {
   // 🧪 TEST 2: Nombres válidos en minúsculas (deben convertirse a mayúsculas)
   test('✅ Debe aceptar nombres válidos en minúsculas y convertirlos', async ({
     client,
-    assert,
+    // assert,
   }) => {
     // 📝 ARRANGE: Crear canal de prueba
     await Channel.create({
@@ -60,7 +60,7 @@ test.group('Channel Name Validation', (group) => {
   })
 
   // 🧪 TEST 3: Nombres mixtos (mayúsculas y minúsculas)
-  test('✅ Debe aceptar nombres mixtos y normalizarlos', async ({ client, assert }) => {
+  test('✅ Debe aceptar nombres mixtos y normalizarlos', async ({ client }) => {
     // 📝 ARRANGE: Crear canal de prueba
     await Channel.create({
       id: 1443267,

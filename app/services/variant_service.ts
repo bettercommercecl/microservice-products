@@ -68,18 +68,18 @@ export default class VariantService {
             }
 
             // Parsear reviews manualmente ya que preload no aplica serialización
-            let parsedReviews = null
-            if (product?.reviews) {
-              try {
-                parsedReviews =
-                  typeof product.reviews === 'string'
-                    ? JSON.parse(product.reviews)
-                    : product.reviews
-              } catch (error) {
-                this.logger.warn(`❌ Error parseando reviews para producto ${product.id}:`, error)
-                parsedReviews = null
-              }
-            }
+            // let parsedReviews = null
+            // if (product?.reviews) {
+            //   try {
+            //     parsedReviews =
+            //       typeof product.reviews === 'string'
+            //         ? JSON.parse(product.reviews)
+            //         : product.reviews
+            //   } catch (error) {
+            //     this.logger.warn(`❌ Error parseando reviews para producto ${product.id}:`, error)
+            //     parsedReviews = null
+            //   }
+            // }
 
             return {
               id: variant.id,
@@ -204,13 +204,14 @@ export default class VariantService {
         const filters = filtersMap.get(variant.product_id) || []
 
         // 📦 Parsear campos JSON si existen
-        const { categories, related_products, ...variantWithoutCategories } = variantData
+        const { categories, ...variantWithoutCategories } = variantData
         const processedVariant = {
           ...variantWithoutCategories,
           filters,
           // Parsear campos que pueden venir como JSON strings
           images: this.parseJsonField(variantData.images),
           options: this.parseJsonField(variantData.options),
+          related_products: this.parseJsonField(variantData.related_products),
         }
 
         return processedVariant
