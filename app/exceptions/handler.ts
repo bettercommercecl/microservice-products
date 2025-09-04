@@ -128,6 +128,9 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 
     // ⚡ Error interno del servidor (fallback)
     logger.error('⚡ Error interno no manejado:', error)
+    if (error instanceof Error) {
+      logger.error('📋 Stack trace completo:', error.stack)
+    }
     return response.internalServerError({
       success: false,
       message: this.debug
@@ -138,6 +141,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       data: null,
       meta: {
         timestamp: new Date().toISOString(),
+        debug: this.debug && error instanceof Error ? error.stack : undefined,
       },
     })
   }
