@@ -16,7 +16,6 @@ export default class extends BaseSchema {
         .nullable()
       table.string('title', 255).notNullable()
       table.string('sku', 255).notNullable().unique()
-
       // Estructura de precios (nombres del modelo actual)
       table.integer('normal_price').notNullable()
       table.integer('discount_price').notNullable()
@@ -30,6 +29,7 @@ export default class extends BaseSchema {
       // Imágenes
       table.string('image', 255).notNullable()
       table.json('images').notNullable().defaultTo('[]') // Array de strings
+      table.string('hover', 255).nullable()
 
       // Gestión de categorización del producto
       table.json('categories').nullable().defaultTo('[]') // Array de IDs de categorías
@@ -40,10 +40,10 @@ export default class extends BaseSchema {
       table.integer('armed_quantity').notNullable().defaultTo(0)
 
       // Dimensiones y peso
-      table.decimal('weight', 10, 2).notNullable()
-      table.decimal('height', 10, 2).nullable()
-      table.decimal('depth', 10, 2).nullable()
-      table.decimal('width', 10, 2).nullable()
+      table.float('weight').notNullable()
+      table.float('height').nullable()
+      table.float('width').nullable()
+      table.float('depth').nullable()
 
       // Información adicional
       table.string('type', 255).nullable()

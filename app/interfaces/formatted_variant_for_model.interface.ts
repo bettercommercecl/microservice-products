@@ -21,6 +21,7 @@ export interface FormattedVariantForModel {
 
   // Imágenes y recursos visuales
   image: string
+  hover: string | null
   images: string | null
 
   // Categorización y organización

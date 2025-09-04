@@ -367,6 +367,12 @@ export default class FormatVariantsService {
       variant.image_url
     )
 
+    // Obtener imagen hover para la variante
+    const hoverImage = this.imageProcessingService.getHoverImageByVariation(
+      product.images ? JSON.parse(product.images) : [],
+      variant.sku
+    )
+
     // Generar keywords basados en las categorías del producto
     const keywords = await this.generateKeywords(product, config)
 
@@ -384,6 +390,7 @@ export default class FormatVariantsService {
       warning_stock: inventoryLevel[0]?.safety_stock || 0,
       image: variant.image_url || product.image,
       images: JSON.stringify(images),
+      hover: hoverImage || null,
       categories: product.categories,
       quantity: variant.inventory_level,
       armed_cost: 0,

@@ -34,7 +34,7 @@ export default class VariantController {
     this.logger.info(`✅ Variantes obtenidas exitosamente: ${variants.data?.length || 0} variantes`)
 
     // ✅ Solo respuesta de éxito - errores van al handler global
-    return response.ok({ variants })
+    return response.ok(variants)
   }
 
   /**
@@ -63,6 +63,6 @@ export default class VariantController {
     this.logger.info(`✅ Variantes formateadas exitosamente: ${formatted.length} variantes`)
 
     // ✅ Solo respuesta de éxito - errores van al handler global
-    return response.ok({ formatted })
+    return response.ok(formatted)
   }
 }

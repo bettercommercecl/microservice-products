@@ -107,7 +107,7 @@ export default class VariantService {
               weight: product?.weight,
               sort_order: product?.sort_order,
               reserve: product?.reserve,
-              reviews: parsedReviews,
+              reviews: null, //parsedReviews,
               sameday: product?.sameday,
               free_shipping: product?.free_shipping,
               despacho24horas: product?.despacho24horas,
@@ -160,13 +160,16 @@ export default class VariantService {
     }
   }
 
-  // Nuevo: variantes paginadas
+  // Nuevo: variantes paginadas optimizadas
   public async getAllVariantsPaginated(page = 1, limit = 200, channelId?: number) {
     try {
+      let paginated: any
+      let productIds: number[] = []
+
       if (channelId) {
         // Buscar los product_id que están en el canal
         const channelProducts = await ChannelProduct.query().where('channel_id', channelId)
-        const productIds = channelProducts.map((cp) => cp.product_id)
+        productIds = channelProducts.map((cp) => cp.product_id)
 
         if (productIds.length === 0) {
           // Si no hay productos en el canal, retorna paginación vacía
@@ -176,42 +179,44 @@ export default class VariantService {
           }
         }
 
-        const paginated = await Variant.query()
-          .whereIn('product_id', productIds)
-          .paginate(page, limit)
-
-        // Agregar filters a cada variante
-        const variantsWithFilters = await Promise.all(
-          paginated.all().map(async (variant) => {
-            const filtersResult = await FiltersProduct.query().where(
-              'product_id',
-              variant.product_id
-            )
-            const filters = filtersResult.map((fp) => fp.category_id)
-            const variantData = variant.toJSON()
-            return { ...variantData, filters }
-          })
-        )
-
-        return { data: variantsWithFilters, meta: paginated.getMeta() }
+        paginated = await Variant.query().whereIn('product_id', productIds).paginate(page, limit)
       } else {
-        const paginated = await Variant.query().paginate(page, limit)
-
-        const variantsWithFilters = await Promise.all(
-          paginated.all().map(async (variant) => {
-            const filtersResult = await FiltersProduct.query().where(
-              'product_id',
-              variant.product_id
-            )
-            const filters = filtersResult.map((fp) => fp.category_id)
-
-            const variantData = variant.toJSON()
-            return { ...variantData, filters }
-          })
-        )
-
-        return { data: variantsWithFilters, meta: paginated.getMeta() }
+        paginated = await Variant.query().paginate(page, limit)
+        // Obtener todos los product_ids de las variantes paginadas
+        productIds = paginated.all().map((variant: any) => variant.product_id)
       }
+
+      // 🚀 OPTIMIZACIÓN: Obtener todos los filtros en una sola query
+      const filtersMap = new Map<number, number[]>()
+      if (productIds.length > 0) {
+        const allFilters = await FiltersProduct.query().whereIn('product_id', productIds)
+        allFilters.forEach((filter) => {
+          if (!filtersMap.has(filter.product_id)) {
+            filtersMap.set(filter.product_id, [])
+          }
+          filtersMap.get(filter.product_id)!.push(filter.category_id)
+        })
+      }
+
+      // 🚀 OPTIMIZACIÓN: Procesar variantes con filtros ya cargados
+      const variantsWithFilters = paginated.all().map((variant: any) => {
+        const variantData = variant.toJSON()
+        const filters = filtersMap.get(variant.product_id) || []
+
+        // 📦 Parsear campos JSON si existen
+        const { categories, related_products, ...variantWithoutCategories } = variantData
+        const processedVariant = {
+          ...variantWithoutCategories,
+          filters,
+          // Parsear campos que pueden venir como JSON strings
+          images: this.parseJsonField(variantData.images),
+          options: this.parseJsonField(variantData.options),
+        }
+
+        return processedVariant
+      })
+
+      return { data: variantsWithFilters, meta: paginated.getMeta() }
     } catch (error) {
       this.logger.error('❌ Error obteniendo variantes paginadas', {
         page,
@@ -221,5 +226,20 @@ export default class VariantService {
       })
       throw error
     }
+  }
+
+  /**
+   * 🔧 Helper para parsear campos JSON de forma segura
+   */
+  private parseJsonField(field: any): any {
+    if (!field) return field
+    if (typeof field === 'string') {
+      try {
+        return JSON.parse(field)
+      } catch {
+        return field
+      }
+    }
+    return field
   }
 }

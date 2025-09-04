@@ -42,6 +42,9 @@ export default class Variant extends BaseModel {
   declare image: string
 
   @column()
+  declare hover: string | null
+
+  @column()
   declare images: string | null
   // Gestión de categorización del producto
   @column({
