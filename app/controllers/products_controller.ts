@@ -29,7 +29,7 @@ export default class ProductsController {
     this.logger.info(`✅ Productos obtenidos exitosamente: ${products.data?.length || 0} productos`)
 
     // ✅ Respuesta estándar usando Adonis 6 nativo
-    return response.ok({ products })
+    return response.ok(products)
   }
 
   /**
@@ -55,7 +55,7 @@ export default class ProductsController {
     this.logger.info(`✅ Producto obtenido exitosamente: ID ${productId}`)
 
     // ✅ Solo respuesta de éxito - errores van al handler global
-    return response.ok({ product })
+    return response.ok(product)
   }
 
   /**
