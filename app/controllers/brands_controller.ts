@@ -11,29 +11,79 @@ export default class BrandsController {
   }
 
   /**
+   * Obtiene todas las marcas
+   */
+  public async index({ response }: HttpContext) {
+    this.logger.info('🔍 GET /brands - Obteniendo todas las marcas...')
+
+    try {
+      const brands = await this.brandService.getAllBrands()
+
+      this.logger.info(`✅ Marcas obtenidas exitosamente: ${brands.length} marcas`)
+
+      return response.ok({
+        success: true,
+        data: brands,
+        meta: {
+          timestamp: new Date().toISOString(),
+          total: brands.length,
+        },
+      })
+    } catch (error) {
+      this.logger.error('❌ Error obteniendo marcas:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Obtiene una marca por ID
+   */
+  public async show({ params, response }: HttpContext) {
+    const { id } = params
+    this.logger.info(`🔍 GET /brands/${id} - Obteniendo marca por ID...`)
+
+    try {
+      const brand = await this.brandService.getBrandById(Number(id))
+
+      this.logger.info(`✅ Marca obtenida exitosamente: ID ${id}`)
+
+      return response.ok({
+        success: true,
+        data: brand,
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      })
+    } catch (error) {
+      this.logger.error(`❌ Error obteniendo marca ${id}:`, error)
+      throw error
+    }
+  }
+
+  /**
    * Sincroniza las marcas desde BigCommerce
    */
   public async sync({ response }: HttpContext) {
     this.logger.info('🔄 POST /brands/sync - Iniciando sincronización de marcas...')
 
-    const result = await this.brandService.syncBrands()
+    try {
+      const result = await this.brandService.syncBrands()
 
-    // Si hay errores en los resultados, lanzar error para que lo capture el handler
-    if (!result.success) {
-      this.logger.error('❌ Error en sincronización de marcas:', result.message)
-      throw new Error(`Error en sincronización: ${result.message}`)
+      this.logger.info('✅ Sincronización de marcas completada exitosamente')
+
+      return response.ok({
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        meta: {
+          timestamp: new Date().toISOString(),
+          ...result.meta,
+        },
+        errors: result.errors,
+      })
+    } catch (error) {
+      this.logger.error('❌ Error en sincronización de marcas:', error)
+      throw error
     }
-
-    this.logger.info('✅ Sincronización de marcas completada exitosamente')
-
-    // ✅ Respuesta estándar usando Adonis 6 nativo
-    return response.ok({
-      success: true,
-      message: result.message,
-      data: result.data,
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    })
   }
 }
