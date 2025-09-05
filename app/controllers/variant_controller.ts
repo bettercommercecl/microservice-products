@@ -23,7 +23,7 @@ export default class VariantController {
       data: request.qs(),
     })
 
-    const { page, limit, channel_id: channelId } = validatedData
+    const { page, limit, channel: channelId } = validatedData
 
     this.logger.info(
       `🔍 GET /variants - Obteniendo variantes paginadas: página ${page}, límite ${limit}${channelId ? `, canal ${channelId}` : ''}`

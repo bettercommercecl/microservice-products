@@ -18,7 +18,7 @@ export const variantsPaginatedSchema = vine.object({
     .positive()
     .transform((value: any) => Number(value)),
 
-  channel_id: vine
+  channel: vine
     .number()
     .positive()
     .in(validChannelIds)

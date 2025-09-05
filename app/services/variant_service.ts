@@ -165,7 +165,6 @@ export default class VariantService {
     try {
       let paginated: any
       let productIds: number[] = []
-
       if (channelId) {
         // Buscar los product_id que están en el canal
         const channelProducts = await ChannelProduct.query().where('channel_id', channelId)
