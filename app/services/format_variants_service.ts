@@ -376,11 +376,14 @@ export default class FormatVariantsService {
     // Generar keywords basados en las categorías del producto
     const keywords = await this.generateKeywords(product, config)
 
+    // 🎨 Generar título mejorado con opciones de Color y Size
+    const enhancedTitle = this.generateEnhancedTitle(product.title, variant.option_values)
+
     return {
       // Campos del modelo Variant.ts
       id: variant.id,
       product_id: product.product_id,
-      title: product.title,
+      title: enhancedTitle,
       sku: variant.sku,
       normal_price: prices.normal_price,
       discount_price: prices.discount_price,
@@ -406,5 +409,40 @@ export default class FormatVariantsService {
       keywords: keywords,
       is_visible: hasZeroPrices ? false : product.is_visible,
     }
+  }
+
+  /**
+   * 🎨 Genera un título mejorado concatenando las opciones de Color y Size
+   * @param baseTitle - Título base del producto
+   * @param optionValues - Array de opciones de la variante
+   * @returns Título mejorado con opciones de Color y Size
+   */
+  private generateEnhancedTitle(baseTitle: string, optionValues: any[]): string {
+    if (!optionValues || optionValues.length === 0) {
+      return baseTitle
+    }
+
+    const colorOption = optionValues.find((option) => option.option_display_name === 'Color')
+    const sizeOption = optionValues.find((option) => option.option_display_name === 'Size')
+
+    let enhancedTitle = baseTitle
+    const options = []
+
+    // Agregar Color si existe
+    if (colorOption && colorOption.label) {
+      options.push(`Color: ${colorOption.label}`)
+    }
+
+    // Agregar Size si existe
+    if (sizeOption && sizeOption.label) {
+      options.push(`Size: ${sizeOption.label}`)
+    }
+
+    // Concatenar opciones al título base
+    if (options.length > 0) {
+      enhancedTitle += ` - ${options.join(' - ')}`
+    }
+
+    return enhancedTitle
   }
 }
