@@ -200,8 +200,8 @@ export default class CategoryService {
         `📦 Procesando ${batches.length} lotes de máximo ${BATCH_SIZE} relaciones cada uno`
       )
 
-      // 🚀 Procesar lotes con límite de concurrencia para mejor rendimiento
-      const limitConcurrency = pLimit(8) // Máximo 8 lotes en paralelo
+      // 🚀 Procesar lotes con límite de concurrencia reducido para mayor estabilidad
+      const limitConcurrency = pLimit(3) // Máximo 3 lotes en paralelo para evitar timeouts
       const batchResults = await Promise.all(
         batches.map((batch, batchIndex) =>
           limitConcurrency(async () => {
@@ -212,8 +212,14 @@ export default class CategoryService {
               this.logger.info(`✅ Lote ${batchIndex + 1}: ${batch.length} relaciones guardadas`)
               return { processed: batch.length, batch: batchIndex + 1 }
             } catch (error) {
-              this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, error)
-              return { processed: 0, batch: batchIndex + 1, error: error.message }
+              this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, {
+                error: error.message,
+                batch_size: batch.length,
+                batch_index: batchIndex + 1,
+                error_type: error.constructor.name,
+              })
+              // 🚨 Re-lanzar el error para que la transacción haga rollback
+              throw error
             }
           })
         )

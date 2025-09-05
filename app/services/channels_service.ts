@@ -81,16 +81,13 @@ export default class ChannelsService {
     const transaction = trx || (await db.transaction())
 
     try {
-      // Limpiar SOLO los registros del canal actual
-      await ChannelProduct.query({ client: transaction }).where('channel_id', channel_id).delete()
-
       // Preparar datos de canales
       const productsList = products.map((product) => ({
         product_id: product.id,
         channel_id: channel_id,
       }))
 
-      // Guardar nuevas relaciones
+      // Guardar nuevas relaciones (sin eliminar existentes)
       await ChannelProduct.createMany(productsList, { client: transaction })
 
       // Solo hacer commit si es nuestra propia transacción
@@ -122,6 +119,52 @@ export default class ChannelsService {
       return {
         success: false,
         message: 'Error al sincronizar canales',
+        error: error instanceof Error ? error.message : 'Error desconocido',
+      }
+    }
+  }
+
+  /**
+   * 🧹 Limpia todos los productos de un canal
+   * Responsabilidad: Eliminar todas las relaciones producto-canal de un canal específico
+   */
+  async clearChannelProducts(channel_id: number, trx?: any) {
+    const useExternalTransaction = !!trx
+    const transaction = trx || (await db.transaction())
+
+    try {
+      // Limpiar SOLO los registros del canal actual
+      const deletedCount = await ChannelProduct.query({ client: transaction })
+        .where('channel_id', channel_id)
+        .delete()
+
+      // Solo hacer commit si es nuestra propia transacción
+      if (!useExternalTransaction) {
+        await transaction.commit()
+      }
+
+      return {
+        success: true,
+        message: 'Productos del canal eliminados correctamente',
+        deleted_count: deletedCount,
+        meta: {
+          channel_id,
+          timestamp: new Date().toISOString(),
+        },
+      }
+    } catch (error) {
+      // Solo hacer rollback si es nuestra propia transacción
+      if (!useExternalTransaction) {
+        await transaction.rollback()
+      }
+
+      this.logger.error('❌ Error al limpiar productos del canal', {
+        channel_id,
+        error: error.message,
+      })
+      return {
+        success: false,
+        message: 'Error al limpiar productos del canal',
         error: error instanceof Error ? error.message : 'Error desconocido',
       }
     }

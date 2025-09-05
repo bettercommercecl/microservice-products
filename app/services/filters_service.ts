@@ -54,8 +54,8 @@ export default class FiltersService {
 
       this.logger.info(`📦 Procesando ${batches.length} lotes de filtros en paralelo...`)
 
-      // 🚀 Procesar lotes con límite de concurrencia para mejor rendimiento
-      const limitConcurrency = pLimit(5) // Máximo 5 lotes en paralelo
+      // 🚀 Procesar lotes con límite de concurrencia reducido para mayor estabilidad
+      const limitConcurrency = pLimit(3) // Máximo 3 lotes en paralelo para evitar timeouts
       const batchResults = await Promise.all(
         batches.map((batch, batchIndex) =>
           limitConcurrency(async () => {
@@ -75,8 +75,11 @@ export default class FiltersService {
               this.logger.error('❌ Error en lote de filtros', {
                 batch: batchIndex + 1,
                 error: error.message,
+                batch_size: batch.length,
+                error_type: error.constructor.name,
               })
-              return { processed: 0, batch: batchIndex + 1, error: error.message }
+              // 🚨 Re-lanzar el error para que la transacción haga rollback
+              throw error
             }
           })
         )
@@ -84,7 +87,6 @@ export default class FiltersService {
 
       // 📊 Consolidar resultados
       const totalProcessed = batchResults.reduce((sum, result) => sum + result.processed, 0)
-      const errors = batchResults.filter((result) => result.error)
 
       const totalTime = Date.now() - startTime
 
@@ -92,24 +94,13 @@ export default class FiltersService {
         `🎉 Sincronización completada: ${totalProcessed} relaciones procesadas en ${totalTime}ms`
       )
 
-      if (errors.length > 0) {
-        this.logger.warn('⚠️ Lotes con errores en sincronización de filtros', {
-          errors_count: errors.length,
-          total_processed: totalProcessed,
-        })
-      }
-
       return {
-        success: errors.length === 0,
-        message:
-          errors.length === 0
-            ? `${totalProcessed} relaciones sincronizadas exitosamente`
-            : `${totalProcessed} relaciones procesadas con ${errors.length} errores`,
+        success: true,
+        message: `${totalProcessed} relaciones sincronizadas exitosamente`,
         data: {
           processed: totalProcessed,
           total_relations: relations.length,
           batches: batches.length,
-          errors: errors,
         },
         meta: {
           performance: {

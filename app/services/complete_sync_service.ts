@@ -14,6 +14,7 @@ import Product from '#models/product'
 import Variant from '#models/variant'
 import Option from '#models/option'
 import CategoryProduct from '#models/category_product'
+import ChannelProduct from '#models/channel_product'
 import pLimit from 'p-limit'
 import ChannelsService from './channels_service.js'
 import db from '@adonisjs/lucid/services/db'
@@ -102,6 +103,17 @@ export default class CompleteSyncService {
 
       this.logger.info(`📦 Procesando ${batches.length} lotes completos de productos...`)
 
+      // 🧹 LIMPIAR CANAL UNA SOLA VEZ AL INICIO
+      this.logger.info(
+        `🧹 Limpiando productos existentes del canal ${this.currentChannelConfig.CHANNEL}...`
+      )
+      await db.transaction(async (cleanupTrx) => {
+        await ChannelProduct.query({ client: cleanupTrx })
+          .where('channel_id', this.currentChannelConfig.CHANNEL)
+          .delete()
+      })
+      this.logger.info(`✅ Canal limpiado exitosamente`)
+
       // 🔄 Procesar cada lote completamente (secuencial para mejor control)
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
         const batch = batches[batchIndex]
@@ -138,10 +150,59 @@ export default class CompleteSyncService {
             await this.syncProductCategories(formattedVariants, batchTrx)
 
             // ========================================
-            // SUB-PASO 3.4: GUARDAR VARIANTES CON KEYWORDS GENERADAS
+            // SUB-PASO 3.4: GUARDAR VARIANTES CON KEYWORDS GENERADAS (EN LOTES MÁS PEQUEÑOS)
             // ========================================
             const allVariants = formattedVariants.flatMap((product) => product.variants)
-            await Variant.updateOrCreateMany('sku', allVariants, { client: batchTrx })
+
+            // 🔧 Dividir variantes en lotes más pequeños para evitar timeouts
+            const VARIANT_BATCH_SIZE = 100
+            const variantBatches = []
+            for (let i = 0; i < allVariants.length; i += VARIANT_BATCH_SIZE) {
+              variantBatches.push(allVariants.slice(i, i + VARIANT_BATCH_SIZE))
+            }
+
+            this.logger.info(
+              `📦 Procesando ${variantBatches.length} sub-lotes de variantes en paralelo...`
+            )
+
+            // 🚀 Procesar sub-lotes de variantes en paralelo con límite de concurrencia
+            const limitConcurrency = pLimit(3) // Máximo 3 sub-lotes en paralelo
+            const variantBatchResults = await Promise.all(
+              variantBatches.map((variantBatch, variantBatchIndex) =>
+                limitConcurrency(async () => {
+                  try {
+                    await Variant.updateOrCreateMany('sku', variantBatch, { client: batchTrx })
+                    this.logger.debug(
+                      `✅ Sub-lote de variantes ${variantBatchIndex + 1}/${variantBatches.length} procesado`
+                    )
+                    return {
+                      success: true,
+                      processed: variantBatch.length,
+                      batch: variantBatchIndex + 1,
+                    }
+                  } catch (variantError) {
+                    this.logger.error(
+                      `❌ Error en sub-lote de variantes ${variantBatchIndex + 1}:`,
+                      {
+                        error: variantError.message,
+                        batch_size: variantBatch.length,
+                        skus: variantBatch.map((v) => v.sku).slice(0, 5), // Solo primeros 5 SKUs para log
+                      }
+                    )
+                    throw variantError // Re-lanzar para que la transacción haga rollback
+                  }
+                })
+              )
+            )
+
+            // 📊 Consolidar resultados de sub-lotes
+            const totalVariantsProcessed = variantBatchResults.reduce(
+              (sum, result) => sum + result.processed,
+              0
+            )
+            this.logger.info(
+              `✅ Variantes procesadas: ${totalVariantsProcessed} en ${variantBatches.length} sub-lotes`
+            )
 
             // ========================================
             // SUB-PASO 3.5: GUARDAR RELACIÓN CANAL-PRODUCTO DEL LOTE
@@ -170,8 +231,37 @@ export default class CompleteSyncService {
               `✅ Lote ${batchIndex + 1} completado: ${formattedVariants.length} productos procesados completamente`
             )
           } catch (error) {
-            this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, error)
-            throw error // Re-lanzar para rollback automático de la transacción del lote
+            // 🚨 Manejo robusto de errores con rollback automático
+            const errorDetails = {
+              error: error.message,
+              stack: error.stack,
+              batch_size: batch.length,
+              batch_index: batchIndex + 1,
+              error_type: error.constructor.name,
+            }
+
+            // 🔍 Detectar errores específicos de PostgreSQL
+            if (error.message && error.message.includes('current transaction is aborted')) {
+              this.logger.error(
+                `🚨 Error de transacción PostgreSQL abortada en lote ${batchIndex + 1}:`,
+                {
+                  ...errorDetails,
+                  solution:
+                    'La transacción fue abortada por un error anterior. Se ejecutará rollback automático.',
+                }
+              )
+            } else if (error.message && error.message.includes('timeout')) {
+              this.logger.error(`⏰ Timeout en lote ${batchIndex + 1}:`, {
+                ...errorDetails,
+                solution: 'Reducir tamaño de lote o aumentar timeout de base de datos',
+              })
+            } else {
+              this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, errorDetails)
+            }
+
+            // 🔄 El rollback se ejecuta automáticamente al salir del catch
+            // debido a que la transacción no se commitea
+            throw error
           }
         })
       }
