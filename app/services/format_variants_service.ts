@@ -358,7 +358,7 @@ export default class FormatVariantsService {
       variant.width,
       variant.depth,
       variant.height,
-      variant.weight,
+      variant.weight !== null ? variant.weight : product.weight || 0,
       this.country
     )
     const images = this.imageProcessingService.getImagesByVariation(
