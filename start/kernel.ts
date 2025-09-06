@@ -26,6 +26,7 @@ server.use([
   () => import('#middleware/container_bindings_middleware'),
   () => import('#middleware/force_json_response_middleware'),
   () => import('@adonisjs/cors/cors_middleware'),
+  () => import('#middleware/read_committed_middleware'),
   () => import('#middleware/error_catcher_middleware'),
 ])
 
@@ -44,4 +45,5 @@ router.use([
  */
 export const middleware = router.named({
   auth: () => import('#middleware/auth_middleware'),
+  readCommitted: () => import('#middleware/read_committed_middleware'),
 })

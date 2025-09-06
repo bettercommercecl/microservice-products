@@ -103,16 +103,8 @@ export default class CompleteSyncService {
 
       this.logger.info(`📦 Procesando ${batches.length} lotes completos de productos...`)
 
-      // 🧹 LIMPIAR CANAL UNA SOLA VEZ AL INICIO
-      this.logger.info(
-        `🧹 Limpiando productos existentes del canal ${this.currentChannelConfig.CHANNEL}...`
-      )
-      await db.transaction(async (cleanupTrx) => {
-        await ChannelProduct.query({ client: cleanupTrx })
-          .where('channel_id', this.currentChannelConfig.CHANNEL)
-          .delete()
-      })
-      this.logger.info(`✅ Canal limpiado exitosamente`)
+      // ✅ PROCESAMIENTO PROGRESIVO SIN LIMPIEZA INICIAL
+      // La limpieza se hará al final para evitar datos vacíos durante la sincronización
 
       // 🔄 Procesar cada lote completamente (secuencial para mejor control)
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
@@ -267,6 +259,27 @@ export default class CompleteSyncService {
       }
 
       this.logger.info(`✅ Total productos procesados: ${allFormattedVariants.length}`)
+
+      // ============================================================================
+      // PASO 3.5: LIMPIEZA FINAL - ELIMINAR PRODUCTOS OBSOLETOS DEL CANAL
+      // ============================================================================
+      this.logger.info(
+        `🧹 Iniciando limpieza final del canal ${this.currentChannelConfig.CHANNEL}...`
+      )
+
+      const allProductIds = bigcommerceProducts.map((p) => p.id)
+      await db.transaction(async (cleanupTrx) => {
+        this.logger.info(`🔍 Eliminando productos obsoletos del canal...`)
+
+        const deletedCount = await ChannelProduct.query({ client: cleanupTrx })
+          .where('channel_id', this.currentChannelConfig.CHANNEL)
+          .whereNotIn('product_id', allProductIds)
+          .delete()
+
+        this.logger.info(
+          `✅ Limpieza final completada: ${deletedCount} productos obsoletos eliminados`
+        )
+      })
 
       // ============================================================================
       // PASO 4: SINCRONIZAR FILTROS DE PRODUCTOS (CON TRANSACCIÓN)
