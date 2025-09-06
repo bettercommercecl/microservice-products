@@ -178,7 +178,10 @@ export default class VariantService {
           }
         }
 
-        paginated = await Variant.query().whereIn('product_id', productIds).paginate(page, limit)
+        paginated = await Variant.query()
+          .whereIn('product_id', productIds)
+          .where('is_visible', '=', true)
+          .paginate(page, limit)
       } else {
         paginated = await Variant.query().paginate(page, limit)
         // Obtener todos los product_ids de las variantes paginadas
