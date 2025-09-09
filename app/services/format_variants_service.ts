@@ -166,7 +166,7 @@ export default class FormatVariantsService {
 
         return {
           normal_price: variant.price,
-          discount_price: variant.sale_price,
+          discount_price: variant.sale_price || variant.calculated_price,
           cash_price: percentDiscount,
           discount_rate: discount,
         }

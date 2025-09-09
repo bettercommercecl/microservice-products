@@ -87,8 +87,10 @@ export default class ChannelsService {
         channel_id: channel_id,
       }))
 
-      // Guardar nuevas relaciones (sin eliminar existentes)
-      await ChannelProduct.createMany(productsList, { client: transaction })
+      // Guardar nuevas relaciones (sin eliminar existentes) - usar updateOrCreateMany para evitar duplicados
+      await ChannelProduct.updateOrCreateMany(['channel_id', 'product_id'], productsList, {
+        client: transaction,
+      })
 
       // Solo hacer commit si es nuestra propia transacción
       if (!useExternalTransaction) {

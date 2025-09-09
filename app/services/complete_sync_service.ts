@@ -197,13 +197,19 @@ export default class CompleteSyncService {
             )
 
             // ========================================
-            // SUB-PASO 3.5: GUARDAR RELACIÓN CANAL-PRODUCTO DEL LOTE
+            // SUB-PASO 3.5: GUARDAR RELACIÓN CANAL-PRODUCTO DEL LOTE (EN TRANSACCIÓN SEPARADA)
             // ========================================
-            await this.channelsService.syncChannelByProduct(
-              formattedVariants,
-              this.currentChannelConfig.CHANNEL,
-              batchTrx
-            )
+            try {
+              await db.transaction(async (channelTrx) => {
+                await this.channelsService.syncChannelByProduct(
+                  formattedVariants,
+                  this.currentChannelConfig.CHANNEL,
+                  channelTrx
+                )
+              })
+            } catch (channelError) {
+              this.logger.error(`❌ Error al sincronizar canal:`, channelError)
+            }
 
             // ========================================
             // SUB-PASO 3.6: SINCRONIZAR OPCIONES DEL LOTE
@@ -545,6 +551,7 @@ export default class CompleteSyncService {
               return { processed: batchOptions.length, batch: batchIndex + 1 }
             } catch (error) {
               this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, error)
+              console.log(error)
               return { processed: 0, batch: batchIndex + 1, error: error.message }
             }
           })
