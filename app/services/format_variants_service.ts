@@ -404,7 +404,7 @@ export default class FormatVariantsService {
       width: variant.width,
       type: 'variant',
       options: variant.option_values.length ? JSON.stringify(variant.option_values) : null,
-      related_products: product.related_products ? JSON.stringify(product.related_products) : null,
+      related_products: product.related_products ? product.related_products : null,
       option_label: variant.option_values?.[0]?.label || null,
       keywords: keywords,
       is_visible: hasZeroPrices ? false : product.is_visible,
