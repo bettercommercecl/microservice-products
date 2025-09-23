@@ -1085,7 +1085,7 @@ export const channels = {
   },
   SF: {
     CL: {
-      CHANNEL: 1598942,
+      CHANNEL: 1573014,
       API_URL:
         env.get('NODE_ENV') === 'production'
           ? 'https://api.snowforce.cl'
