@@ -209,6 +209,8 @@ export default class VariantService {
         const { categories, ...variantWithoutCategories } = variantData
         const processedVariant = {
           ...variantWithoutCategories,
+          // 🔧 Asegurar que product_id se preserve (puede perderse en toJSON)
+          product_id: variant.product_id || variantData.product_id,
           filters,
           // Parsear campos que pueden venir como JSON strings
           images: this.parseJsonField(variantData.images),
@@ -258,11 +260,21 @@ export default class VariantService {
     try {
       const { selectedMap, variantsWithoutSize } = variants.reduce(
         (acc, variant) => {
-          if (this.hasSizeOptions(variant.options)) {
-            //  Agrupar por product_id y mantener solo la de menor ID
+          const hasSize = this.hasSizeOptions(variant.options)
+
+          if (hasSize) {
+            // 🎯 Agrupar por product_id y mantener solo la de menor ID
             const productId = variant.product_id
-            if (!acc.selectedMap[productId] || variant.id < acc.selectedMap[productId].id) {
-              acc.selectedMap[productId] = variant
+
+            // 🔧 Manejar casos donde product_id es undefined
+            if (productId === undefined || productId === null) {
+              // Si no tiene product_id, mantenerla directamente
+              acc.variantsWithoutSize.push(variant)
+            } else {
+              // Agrupar por product_id normalmente
+              if (!acc.selectedMap[productId] || variant.id < acc.selectedMap[productId].id) {
+                acc.selectedMap[productId] = variant
+              }
             }
           } else {
             // 📦 Variantes sin Size se mantienen todas
@@ -283,14 +295,7 @@ export default class VariantService {
       const finalResult = [...selectedVariantsArray, ...variantsWithoutSize]
 
       this.logger.info(
-        `🔍 Filtrado completado: ${variants.length} → ${finalResult.length} variantes`,
-        {
-          original: variants.length,
-          withSize: selectedVariantsArray.length + variantsWithoutSize.length,
-          selected: selectedVariantsArray.length,
-          withoutSize: variantsWithoutSize.length,
-          final: finalResult.length,
-        }
+        `🔍 Filtrado completado: ${variants.length} → ${finalResult.length} variantes`
       )
 
       return finalResult
