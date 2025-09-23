@@ -219,7 +219,10 @@ export default class VariantService {
         return processedVariant
       })
 
-      return { data: variantsWithFilters, meta: paginated.getMeta() }
+      // 🔍 FILTRADO: Agrupar variantes con Size+Color y quedarse con la de menor ID
+      const filteredVariants = this.filterVariantsBySizeAndColor(variantsWithFilters)
+
+      return { data: filteredVariants, meta: paginated.getMeta() }
     } catch (error) {
       this.logger.error('❌ Error obteniendo variantes paginadas', {
         page,
@@ -244,5 +247,70 @@ export default class VariantService {
       }
     }
     return field
+  }
+
+  /**
+   *  Filtra variantes que tengan Size+Color O Solo Size, agrupando por product_id y quedándose con la de menor ID
+   * @param variants - Array de variantes a filtrar
+   * @returns Array filtrado de variantes
+   */
+  private filterVariantsBySizeAndColor(variants: any[]): any[] {
+    try {
+      const { selectedMap, variantsWithoutSize } = variants.reduce(
+        (acc, variant) => {
+          if (this.hasSizeOptions(variant.options)) {
+            //  Agrupar por product_id y mantener solo la de menor ID
+            const productId = variant.product_id
+            if (!acc.selectedMap[productId] || variant.id < acc.selectedMap[productId].id) {
+              acc.selectedMap[productId] = variant
+            }
+          } else {
+            // 📦 Variantes sin Size se mantienen todas
+            acc.variantsWithoutSize.push(variant)
+          }
+          return acc
+        },
+        {
+          selectedMap: {} as Record<number, any>,
+          variantsWithoutSize: [] as any[],
+        }
+      )
+
+      // Convertir el mapa a array de variantes seleccionadas
+      const selectedVariantsArray = Object.values(selectedMap)
+
+      // Combinar resultados finales
+      const finalResult = [...selectedVariantsArray, ...variantsWithoutSize]
+
+      this.logger.info(
+        `🔍 Filtrado completado: ${variants.length} → ${finalResult.length} variantes`,
+        {
+          original: variants.length,
+          withSize: selectedVariantsArray.length + variantsWithoutSize.length,
+          selected: selectedVariantsArray.length,
+          withoutSize: variantsWithoutSize.length,
+          final: finalResult.length,
+        }
+      )
+
+      return finalResult
+    } catch (error) {
+      this.logger.error('❌ Error filtrando variantes por Size+Color:', error)
+      // En caso de error, devolver las variantes originales
+      return variants
+    }
+  }
+
+  /**
+   * 🔍 Verifica si una variante tiene opciones de Size (con o sin Color)
+   * @param options - Array de opciones de la variante
+   * @returns true si tiene Size, false en caso contrario
+   */
+  private hasSizeOptions(options: any[]): boolean {
+    if (!options || !Array.isArray(options) || options.length === 0) {
+      return false
+    }
+
+    return options.some((option) => option.option_display_name === 'Size')
   }
 }
