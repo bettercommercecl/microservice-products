@@ -95,7 +95,7 @@ export default class InventoryService {
 
         const deduplicatedInventory = Object.values(uniqueInventory)
 
-        const result = await CatalogSafeStock.updateOrCreateMany('sku', deduplicatedInventory)
+        const result = await CatalogSafeStock.updateOrCreateMany('variant_id', deduplicatedInventory)
 
         return {
           success: true,
