@@ -1,5 +1,6 @@
-const fs = require('fs')
-const path = require('path')
+import fs from 'fs'
+import path from 'path'
+import { config } from 'dotenv'
 
 function loadEnvFile() {
   // ✅ Detectar si estamos en build/ o en el directorio raíz
@@ -8,16 +9,13 @@ function loadEnvFile() {
 
   let envPath = path.join(basePath, '.env') // Por defecto .env (Ploi)
 
-
-
-
   // ✅ Si existe .env, usarlo (Ploi)
   if (fs.existsSync(path.join(basePath, '.env'))) {
     console.log('☁️  Modo Ploi: usando .env')
   }
 
   // ✅ Cargar variables de entorno usando dotenv
-  require('dotenv').config({ path: envPath })
+  config({ path: envPath })
 
   return process.env
 }
@@ -27,7 +25,7 @@ function generateConfig() {
   const env = loadEnvFile()
   const countryCode = env.COUNTRY_CODE || 'CL'
   const appName = `microservicio.productos.${countryCode.toLocaleLowerCase()}`
-
+  const isProduction = env.NODE_ENV === 'production' // ⬅️ Agregué esta línea que faltaba
 
   console.log(`🚀 Configurando PM2 para: ${appName}`)
   console.log(`🔍 Debug - NODE_ENV: "${env.NODE_ENV}", isProduction: ${isProduction}`)
@@ -63,5 +61,5 @@ function generateConfig() {
   }
 }
 
-// ✅ Exportar configuración generada dinámicamente
-module.exports = generateConfig()
+// ✅ Exportar configuración generada dinámicamente (ES modules)
+export default generateConfig()
