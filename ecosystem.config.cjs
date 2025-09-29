@@ -35,7 +35,7 @@ function generateConfig() {
       {
         name: appName,
         script: 'server.js',
-        cwd: './build',
+        cwd: './build/bin',
         instances: countryCode === 'CL' ? 3 : 1,
         exec_mode: 'cluster',
         env: {
