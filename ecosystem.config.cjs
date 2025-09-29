@@ -1,6 +1,5 @@
-import fs from 'fs'
-import path from 'path'
-import { config } from 'dotenv'
+const fs = require('fs')
+const path = require('path')
 
 function loadEnvFile() {
   // ✅ Detectar si estamos en build/ o en el directorio raíz
@@ -15,7 +14,7 @@ function loadEnvFile() {
   }
 
   // ✅ Cargar variables de entorno usando dotenv
-  config({ path: envPath })
+  require('dotenv').config({ path: envPath })
 
   return process.env
 }
@@ -25,7 +24,7 @@ function generateConfig() {
   const env = loadEnvFile()
   const countryCode = env.COUNTRY_CODE || 'CL'
   const appName = `microservicio.productos.${countryCode.toLocaleLowerCase()}`
-  const isProduction = env.NODE_ENV === 'production' // ⬅️ Agregué esta línea que faltaba
+  const isProduction = env.NODE_ENV === 'production'
 
   console.log(`🚀 Configurando PM2 para: ${appName}`)
   console.log(`🔍 Debug - NODE_ENV: "${env.NODE_ENV}", isProduction: ${isProduction}`)
@@ -61,5 +60,5 @@ function generateConfig() {
   }
 }
 
-// ✅ Exportar configuración generada dinámicamente (ES modules)
-export default generateConfig()
+// ✅ Exportar configuración generada dinámicamente (CommonJS)
+module.exports = generateConfig()
