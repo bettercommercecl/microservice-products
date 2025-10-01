@@ -23,9 +23,10 @@ function loadEnvFile() {
 function generateConfig() {
   const env = loadEnvFile()
   const countryCode = env.COUNTRY_CODE || 'CL'
-  const appName = `microservicio.productos.${countryCode.toLocaleLowerCase()}`
+  const name = `microservicio.productos.${countryCode.toLocaleLowerCase()}`
   const isProduction = env.NODE_ENV === 'production'
-
+  const prefix = isProduction ? 'prod.' : 'dev.'
+  const appName = `${prefix}${name}`
   console.log(`🚀 Configurando PM2 para: ${appName}`)
   console.log(`🔍 Debug - NODE_ENV: "${env.NODE_ENV}", isProduction: ${isProduction}`)
 
@@ -33,10 +34,10 @@ function generateConfig() {
     apps: [
       // 🚀 API Principal
       {
-        name: appName,
+        name: appName ,
         script: 'server.js',
         cwd: './build/bin',
-        instances: countryCode === 'CL' ? 3 : 1,
+        instances: countryCode === 'CL' && isProduction ? 3 : 1,
         exec_mode: 'cluster',
         env: {
           ...env // ✅ Pasar todas las variables del .env
