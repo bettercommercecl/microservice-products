@@ -13,13 +13,6 @@ export default class ErrorCatcherMiddleware {
    */
   async handle(ctx: HttpContext, next: () => Promise<void>) {
     try {
-      // 🔍 Agregar información de contexto para debugging
-      ctx.request.updateBody({
-        ...ctx.request.body(),
-        _requestId: this.generateRequestId(),
-        _timestamp: new Date().toISOString(),
-      })
-
       // ➡️ Continuar con el siguiente middleware/controlador
       await next()
     } catch (error) {
@@ -35,12 +28,5 @@ export default class ErrorCatcherMiddleware {
       // 🔄 Re-lanzar el error para que lo maneje el handler global
       throw error
     }
-  }
-
-  /**
-   * 🆔 Genera un ID único para cada request
-   */
-  private generateRequestId(): string {
-    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
 }
