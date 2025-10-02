@@ -22,3 +22,8 @@ router.get('/', async () => {
     hello: 'world',
   }
 })
+
+// 🎯 Ruta para favicon.ico - evitar errores 404
+router.get('/favicon.ico', async ({ response }) => {
+  return response.status(204).send('') // No Content
+})

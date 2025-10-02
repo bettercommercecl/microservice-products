@@ -183,7 +183,9 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       error instanceof Error &&
       (error.message.includes('not found') ||
         error.message.includes('does not exist') ||
-        error.message.includes('No rows returned'))
+        error.message.includes('No rows returned') ||
+        error.message.includes('Cannot GET:') ||
+        (error as any).code === 'E_ROUTE_NOT_FOUND')
     )
   }
 
