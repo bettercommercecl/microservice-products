@@ -71,6 +71,12 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 
     // 🔍 Error de recurso no encontrado
     if (this.isNotFoundError(error)) {
+      // 🎯 Manejo especial para favicon.ico
+      if (ctx.request.url().includes('favicon.ico')) {
+        logger.debug('🔍 Favicon request ignorado:', ctx.request.url())
+        return response.status(204).send('') // No Content
+      }
+
       logger.warn('🔍 Recurso no encontrado:', error.message)
       return response.notFound({
         success: false,
@@ -127,10 +133,13 @@ export default class HttpExceptionHandler extends ExceptionHandler {
     }
 
     // ⚡ Error interno del servidor (fallback)
-    logger.error('⚡ Error interno no manejado:', error)
-    if (error instanceof Error) {
-      logger.error('📋 Stack trace completo:', error.stack)
-    }
+    logger.error('⚡ Error interno no manejado:', {
+      error: error instanceof Error ? error.message : String(error),
+      name: error instanceof Error ? error.name : 'Unknown',
+      stack: error instanceof Error ? error.stack : undefined,
+      type: typeof error,
+      constructor: error?.constructor?.name,
+    })
     return response.internalServerError({
       success: false,
       message: this.debug
@@ -174,7 +183,9 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       error instanceof Error &&
       (error.message.includes('not found') ||
         error.message.includes('does not exist') ||
-        error.message.includes('No rows returned'))
+        error.message.includes('No rows returned') ||
+        error.message.includes('Cannot GET:') ||
+        (error as any).code === 'E_ROUTE_NOT_FOUND')
     )
   }
 
@@ -249,18 +260,14 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       timestamp: new Date().toISOString(),
     }
 
-    if (error instanceof Error) {
-      logger.error('❌ Error capturado globalmente:', {
-        error: error.message,
-        stack: this.debug ? error.stack : undefined,
-        request: requestInfo,
-      })
-    } else {
-      logger.error('❌ Error desconocido capturado globalmente:', {
-        error: String(error),
-        request: requestInfo,
-      })
-    }
+    logger.error('❌ Error capturado globalmente:', {
+      error: error instanceof Error ? error.message : String(error),
+      name: error instanceof Error ? error.name : 'Unknown',
+      stack: error instanceof Error ? error.stack : undefined,
+      type: typeof error,
+      constructor: error?.constructor?.name,
+      request: requestInfo,
+    })
   }
 
   /**

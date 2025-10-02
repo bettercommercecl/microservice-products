@@ -3,7 +3,6 @@ import Product from '#models/product'
 import CategoryService from '#services/categories_service'
 import env from '#start/env'
 import FiltersProduct from '#models/filters_product'
-import ChannelProduct from '#models/channel_product'
 import Logger from '@adonisjs/core/services/logger'
 
 export default class VariantService {
@@ -161,29 +160,28 @@ export default class VariantService {
   }
 
   // Nuevo: variantes paginadas optimizadas
-  public async getAllVariantsPaginated(page = 1, limit = 200, channelId?: number) {
+  public async getAllVariantsPaginated(page = 1, limit = 100, channelId?: number) {
     try {
+      this.logger.info(
+        `🚀 Iniciando getAllVariantsPaginated - página: ${page}, límite: ${limit}, canal: ${channelId}`
+      )
       let paginated: any
       let productIds: number[] = []
       if (channelId) {
-        // Buscar los product_id que están en el canal
-        const channelProducts = await ChannelProduct.query().where('channel_id', channelId)
-        productIds = channelProducts.map((cp) => cp.product_id)
-
-        if (productIds.length === 0) {
-          // Si no hay productos en el canal, retorna paginación vacía
-          return {
-            data: [],
-            meta: { pagination: { total: 0, per_page: limit, current_page: page, total_pages: 0 } },
-          }
-        }
-
+        // 🚀 OPTIMIZACIÓN: Query directa con JOIN para evitar N+1
         paginated = await Variant.query()
-          .whereIn('product_id', productIds)
-          .where('is_visible', '=', true)
+          .join('channel_product', 'variants.product_id', 'channel_product.product_id')
+          .where('channel_product.channel_id', channelId)
+          .where('variants.is_visible', '=', true)
+          .select('variants.*')
           .paginate(page, limit)
+
+        // Obtener product_ids de las variantes paginadas
+        productIds = paginated.all().map((variant: any) => variant.product_id)
       } else {
-        paginated = await Variant.query().paginate(page, limit)
+        // 🚀 OPTIMIZACIÓN: Query más eficiente sin JOIN innecesario
+        paginated = await Variant.query().where('is_visible', '=', true).paginate(page, limit)
+
         // Obtener todos los product_ids de las variantes paginadas
         productIds = paginated.all().map((variant: any) => variant.product_id)
       }
@@ -200,30 +198,96 @@ export default class VariantService {
         })
       }
 
-      // 🚀 OPTIMIZACIÓN: Procesar variantes con filtros ya cargados
-      const variantsWithFilters = paginated.all().map((variant: any) => {
-        const variantData = variant.toJSON()
-        const filters = filtersMap.get(variant.product_id) || []
+      // 🚀 OPTIMIZACIÓN MASIVA: Cargar todos los datos de productos en una sola query
+      this.logger.info(`🔍 Cargando productos para ${productIds.length} productIds`)
+      const uniqueProductIds = [...new Set(productIds)]
+      const productsMap = new Map<number, any>()
 
-        // 📦 Parsear campos JSON si existen
-        const { categories, ...variantWithoutCategories } = variantData
+      if (uniqueProductIds.length > 0) {
+        this.logger.info(
+          `🔍 Ejecutando query de productos para ${uniqueProductIds.length} productos únicos`
+        )
+        const products = await Product.query()
+          .whereIn('id', uniqueProductIds)
+          .preload('categoryProducts')
+          .preload('brand')
+
+        this.logger.info(`✅ Productos cargados: ${products.length}`)
+        products.forEach((product) => {
+          productsMap.set(product.id, product)
+        })
+      }
+
+      // 🚀 OPTIMIZACIÓN: Procesar variantes sin serialización innecesaria
+      this.logger.info(`🔍 Procesando ${paginated.all().length} variantes`)
+      const variantsWithFilters = paginated.all().map((variant: any) => {
+        const filters = filtersMap.get(variant.product_id) || []
+        const product = productsMap.get(variant.product_id)
+
+        // 📦 Construir estructura optimizada (solo campos esenciales)
         const processedVariant = {
-          ...variantWithoutCategories,
-          // 🔧 Asegurar que product_id se preserve (puede perderse en toJSON)
-          product_id: variant.product_id || variantData.product_id,
-          filters,
-          // Parsear campos que pueden venir como JSON strings
-          images: this.parseJsonField(variantData.images),
-          options: this.parseJsonField(variantData.options),
-          related_products: this.parseJsonField(variantData.related_products),
+          id: variant.id,
+          product_id: variant.product_id,
+          image: variant.image,
+          images: this.parseJsonField(variant.images), // 🚀 Directo del objeto, no toJSON()
+          title: variant.title,
+          page_title: variant.title,
+          sku: variant.sku,
+          stock: variant.stock,
+          warning_stock: variant.warning_stock,
+          normal_price: variant.normal_price,
+          discount_price: variant.discount_price,
+          cash_price: variant.cash_price,
+          percent: variant.discount_rate,
+          keywords: variant.keywords,
+          filters, // 🎯 Conservar los filtros del canal
+          // 🚀 Campos del producto solo si existe
+          ...(product && {
+            hover: product.hover,
+            description: product.description,
+            brand_id: product.brand_id,
+            url: product.url,
+            type: product.type,
+            weight: product.weight,
+            sort_order: product.sort_order,
+            reserve: product.reserve,
+            sameday: product.sameday,
+            free_shipping: product.free_shipping,
+            despacho24horas: product.despacho24horas,
+            featured: product.featured,
+            pickup_in_store: product.pickup_in_store,
+            is_visible: product.is_visible,
+            turbo: product.turbo,
+            meta_keywords: product.meta_keywords,
+            meta_description: product.meta_description,
+            brand: product.brand?.name || null,
+            categoriesArray: product.categoryProducts?.map((cp: any) => cp.category_id) || [],
+            categories: product.categoryProducts?.map((cp: any) => cp.category_id) || [],
+          }),
+          // 🚀 Campos fijos para evitar procesamiento
+          quantity: 0,
+          armed_cost: 0,
+          variants: [],
+          options: this.parseJsonField(variant.options),
+          packs: [],
+          sizes: [],
+          tags: [],
+          campaigns: [],
+          reviews: null,
         }
 
         return processedVariant
       })
 
+      this.logger.info(`✅ Variantes procesadas: ${variantsWithFilters.length}`)
+
       // 🔍 FILTRADO: Agrupar variantes con Size+Color y quedarse con la de menor ID
+      this.logger.info(`🔍 Iniciando filtrado por Size+Color`)
       const filteredVariants = this.filterVariantsBySizeAndColor(variantsWithFilters)
 
+      this.logger.info(
+        `✅ Filtrado completado: ${variantsWithFilters.length} → ${filteredVariants.length} variantes`
+      )
       return { data: filteredVariants, meta: paginated.getMeta() }
     } catch (error) {
       this.logger.error('❌ Error obteniendo variantes paginadas', {
@@ -235,7 +299,6 @@ export default class VariantService {
       throw error
     }
   }
-
   /**
    * 🔧 Helper para parsear campos JSON de forma segura
    */
