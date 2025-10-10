@@ -18,7 +18,7 @@ class PriceService {
 
       return response.data
     } catch (error) {
-      this.logger.error('❌ Error obteniendo precio por variante', {
+      this.logger.error('Error obteniendo precio por variante', {
         variant_id,
         error: error.message,
       })

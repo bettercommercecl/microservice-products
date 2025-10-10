@@ -8,12 +8,12 @@ export default class FiltersService {
   private readonly logger = Logger.child({ service: 'FiltersService' })
 
   /**
-   * 🔍 Sincroniza las relaciones producto-categoría hija de TODAS las categorías "Filtros" en filters_products
+   * Sincroniza las relaciones producto-categoría hija de TODAS las categorías "Filtros" en filters_products
    * Responsabilidad: Gestionar filtros de productos y sus categorías específicas
    */
   async syncFiltersProducts(trx?: any) {
     try {
-      this.logger.info('🔍 Iniciando sincronización de filtros de productos...')
+      this.logger.info('Iniciando sincronización de filtros de productos...')
       const startTime = Date.now()
 
       const idAdvanced = Number(env.get('ID_ADVANCED'))
@@ -21,8 +21,8 @@ export default class FiltersService {
         throw new Error('ID_ADVANCED no está configurado en las variables de entorno')
       }
 
-      // 🚀 OPTIMIZACIÓN EXTREMA: Una sola consulta SQL para todo
-      this.logger.info('🚀 Ejecutando consulta optimizada para obtener relaciones...')
+      // OPTIMIZACIÓN EXTREMA: Una sola consulta SQL para todo
+      this.logger.info('Ejecutando consulta optimizada para obtener relaciones...')
 
       // 🔥 Consulta SQL directa para obtener todas las relaciones en una sola operación
       const relations = await CategoryProduct.query()
@@ -32,10 +32,10 @@ export default class FiltersService {
         .select('category_products.product_id', 'category_products.category_id')
         .distinct()
 
-      this.logger.info(`✅ Encontradas ${relations.length} relaciones producto-categoría`)
+      this.logger.info(`Encontradas ${relations.length} relaciones producto-categoría`)
 
       if (relations.length === 0) {
-        this.logger.warn('⚠️ No se encontraron relaciones para sincronizar')
+        this.logger.warn('No se encontraron relaciones para sincronizar')
         return {
           success: true,
           message: 'No hay relaciones para sincronizar',
@@ -43,18 +43,18 @@ export default class FiltersService {
         }
       }
 
-      // 🚀 OPTIMIZACIÓN: Procesamiento en lotes paralelos optimizados
+      // OPTIMIZACIÓN: Procesamiento en lotes paralelos optimizados
       const BATCH_SIZE = 1000 // Lotes optimizados para mejor rendimiento
       const batches = []
 
-      // 📦 Crear lotes
+      // Crear lotes
       for (let i = 0; i < relations.length; i += BATCH_SIZE) {
         batches.push(relations.slice(i, i + BATCH_SIZE))
       }
 
-      this.logger.info(`📦 Procesando ${batches.length} lotes de filtros en paralelo...`)
+      this.logger.info(`Procesando ${batches.length} lotes de filtros en paralelo...`)
 
-      // 🚀 Procesar lotes con límite de concurrencia reducido para mayor estabilidad
+      // Procesar lotes con límite de concurrencia reducido para mayor estabilidad
       const limitConcurrency = pLimit(3) // Máximo 3 lotes en paralelo para evitar timeouts
       const batchResults = await Promise.all(
         batches.map((batch, batchIndex) =>
@@ -69,34 +69,34 @@ export default class FiltersService {
                 client: trx,
               })
 
-              this.logger.info(`✅ Lote ${batchIndex + 1}: ${batch.length} relaciones procesadas`)
+              this.logger.info(`Lote ${batchIndex + 1}: ${batch.length} relaciones procesadas`)
               return { processed: batch.length, batch: batchIndex + 1 }
             } catch (error) {
-              this.logger.error('❌ Error en lote de filtros', {
+              this.logger.error('Error en lote de filtros', {
                 batch: batchIndex + 1,
                 error: error.message,
                 batch_size: batch.length,
                 error_type: error.constructor.name,
               })
-              // 🚨 Re-lanzar el error para que la transacción haga rollback
+              // Re-lanzar el error para que la transacción haga rollback
               throw error
             }
           })
         )
       )
 
-      // 📊 Consolidar resultados
+      // Consolidar resultados
       const totalProcessed = batchResults.reduce((sum, result) => sum + result.processed, 0)
 
       const totalTime = Date.now() - startTime
 
       this.logger.info(
-        `🎉 Sincronización completada: ${totalProcessed} relaciones procesadas en ${totalTime}ms`
+        `Sincronización completada: ${totalProcessed} relaciones procesadas en ${totalTime}ms`
       )
 
       return {
         success: true,
-        message: `${totalProcessed} relaciones sincronizadas exitosamente`,
+        message: `${totalProcessed} relaciones sincronizadas`,
         data: {
           processed: totalProcessed,
           total_relations: relations.length,
@@ -111,7 +111,7 @@ export default class FiltersService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al sincronizar filtros de productos', {
+      this.logger.error('Error al sincronizar filtros de productos', {
         error: error.message,
       })
       return {
@@ -123,7 +123,7 @@ export default class FiltersService {
   }
 
   /**
-   * 📊 Obtiene estadísticas de filtros
+   * Obtiene estadísticas de filtros
    */
   async getFiltersStats() {
     try {
@@ -146,7 +146,7 @@ export default class FiltersService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener estadísticas de filtros', {
+      this.logger.error('Error al obtener estadísticas de filtros', {
         error: error.message,
       })
       throw error
@@ -154,7 +154,7 @@ export default class FiltersService {
   }
 
   /**
-   * 🔍 Obtiene filtros por producto
+   * Obtiene filtros por producto
    */
   async getFiltersByProduct(productId: number) {
     try {
@@ -173,7 +173,7 @@ export default class FiltersService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener filtros del producto', {
+      this.logger.error('Error al obtener filtros del producto', {
         product_id: productId,
         error: error.message,
       })
@@ -182,7 +182,7 @@ export default class FiltersService {
   }
 
   /**
-   * 🔍 Obtiene productos por filtro (categoría)
+   * Obtiene productos por filtro (categoría)
    */
   async getProductsByFilter(categoryId: number) {
     try {
@@ -201,7 +201,7 @@ export default class FiltersService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener productos del filtro', {
+      this.logger.error('Error al obtener productos del filtro', {
         category_id: categoryId,
         error: error.message,
       })

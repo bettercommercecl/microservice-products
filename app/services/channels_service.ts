@@ -19,15 +19,15 @@ export default class ChannelsService {
         errors: [] as string[],
       }
 
-      // 🚀 Iterar sobre cada marca (UF, FC, AF, etc.)
+      // Iterar sobre cada marca (UF, FC, AF, etc.)
       for (const [brandName, countries] of Object.entries(channelsConfig)) {
-        // 🚀 Iterar sobre cada país (CL, CO, PE)
+        // Iterar sobre cada país (CL, CO, PE)
         for (const [countryCode, config] of Object.entries(countries as Record<string, any>)) {
           try {
             const channelId = config.CHANNEL
             const channelName = `${brandName}_${countryCode}`
 
-            // ✅ Usar updateOrCreate con el channel_id como id
+            // Usar updateOrCreate con el channel_id como id
             const channel = await Channel.updateOrCreate(
               { id: channelId }, // Buscar por id (que será el channel_id)
               {
@@ -44,7 +44,7 @@ export default class ChannelsService {
           } catch (error) {
             const errorMsg = `Error procesando ${brandName}_${countryCode}: ${error.message}`
             results.errors.push(errorMsg)
-            this.logger.error('❌ Error procesando canal', {
+            this.logger.error('Error procesando canal', {
               brand: brandName,
               country: countryCode,
               error: error.message,
@@ -54,14 +54,14 @@ export default class ChannelsService {
       }
 
       if (results.errors.length > 0) {
-        this.logger.warn('⚠️ Errores durante inicialización de canales', {
+        this.logger.warn('Errores durante inicialización de canales', {
           errors_count: results.errors.length,
           created: results.created,
           updated: results.updated,
         })
       }
     } catch (error) {
-      this.logger.error('❌ Error en inicialización de canales', {
+      this.logger.error('Error en inicialización de canales', {
         error: error.message,
       })
       throw error
@@ -69,7 +69,7 @@ export default class ChannelsService {
   }
 
   /**
-   * 🔗 Sincroniza las relaciones producto-canal
+   * Sincroniza las relaciones producto-canal
    * Responsabilidad: Gestionar asociaciones entre productos y canales
    */
   async syncChannelByProduct(
@@ -113,7 +113,7 @@ export default class ChannelsService {
         await transaction.rollback()
       }
 
-      this.logger.error('❌ Error al sincronizar canal', {
+      this.logger.error('Error al sincronizar canal', {
         channel_id,
         products_count: products.length,
         error: error.message,
@@ -160,7 +160,7 @@ export default class ChannelsService {
         await transaction.rollback()
       }
 
-      this.logger.error('❌ Error al limpiar productos del canal', {
+      this.logger.error('Error al limpiar productos del canal', {
         channel_id,
         error: error.message,
       })
@@ -173,7 +173,7 @@ export default class ChannelsService {
   }
 
   /**
-   * 📊 Obtiene estadísticas de canales
+   * Obtiene estadísticas de canales
    */
   async getChannelStats() {
     try {
@@ -188,7 +188,7 @@ export default class ChannelsService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener estadísticas de canales', {
+      this.logger.error('Error al obtener estadísticas de canales', {
         error: error.message,
       })
       throw error
@@ -203,7 +203,7 @@ export default class ChannelsService {
       // Inicializar canales
       await this.initializeChannels()
     } catch (error) {
-      this.logger.error('❌ Error en servicios de arranque', {
+      this.logger.error('Error en servicios de arranque', {
         error: error.message,
       })
       throw error

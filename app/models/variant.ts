@@ -122,7 +122,7 @@ export default class Variant extends BaseModel {
   declare keywords: string
   @column()
   declare is_visible: boolean
-  // ✅ RELACIONES
+  // RELACIONES
   @belongsTo(() => Product, {
     foreignKey: 'product_id',
   })
@@ -141,10 +141,10 @@ export default class Variant extends BaseModel {
   declare updatedAt: DateTime
 
   /**
-   * 📦 Obtiene variantes con su producto principal
+   * Obtiene variantes con su producto principal
    * @param productId - ID del producto (opcional)
    * @returns Promise<Variant[]> - Variantes con producto preload
-   * ✅ NECESARIO: Para mostrar variantes con datos del producto
+   * NECESARIO: Para mostrar variantes con datos del producto
    */
   static async getVariantsWithProduct(productId?: number) {
     try {
@@ -156,7 +156,7 @@ export default class Variant extends BaseModel {
 
       return await query.orderBy('id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo variantes con producto:', error)
+      console.error('Error obteniendo variantes con producto:', error)
       throw error
     }
   }
@@ -165,7 +165,7 @@ export default class Variant extends BaseModel {
    * 👁️ Obtiene solo variantes visibles con su producto
    * @param productId - ID del producto (opcional)
    * @returns Promise<Variant[]> - Variantes visibles con producto
-   * ✅ NECESARIO: Para mostrar solo variantes activas al público
+   * NECESARIO: Para mostrar solo variantes activas al público
    */
   static async getVisibleVariantsWithProduct(productId?: number) {
     try {
@@ -177,7 +177,7 @@ export default class Variant extends BaseModel {
 
       return await query.orderBy('id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo variantes visibles:', error)
+      console.error('Error obteniendo variantes visibles:', error)
       throw error
     }
   }
@@ -186,7 +186,7 @@ export default class Variant extends BaseModel {
    * 🚫 Obtiene solo variantes no visibles con su producto
    * @param productId - ID del producto (opcional)
    * @returns Promise<Variant[]> - Variantes ocultas con producto
-   * ✅ NECESARIO: Para administración y gestión de inventario
+   * NECESARIO: Para administración y gestión de inventario
    */
   static async getHiddenVariantsWithProduct(productId?: number) {
     try {
@@ -198,16 +198,16 @@ export default class Variant extends BaseModel {
 
       return await query.orderBy('id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo variantes ocultas:', error)
+      console.error('Error obteniendo variantes ocultas:', error)
       throw error
     }
   }
 
   /**
-   * 📊 Obtiene variantes con datos de stock
+   * Obtiene variantes con datos de stock
    * @param productId - ID del producto (opcional)
    * @returns Promise<Variant[]> - Variantes con stock preload
-   * ✅ NECESARIO: Para gestión de inventario y stock
+   * NECESARIO: Para gestión de inventario y stock
    */
   static async getVariantsWithStock(productId?: number) {
     try {
@@ -219,22 +219,22 @@ export default class Variant extends BaseModel {
 
       return await query.orderBy('id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo variantes con stock:', error)
+      console.error('Error obteniendo variantes con stock:', error)
       throw error
     }
   }
 
   /**
-   * 🔍 Obtiene variantes por SKU con producto
+   * Obtiene variantes por SKU con producto
    * @param sku - SKU de la variante
    * @returns Promise<Variant | null> - Variante encontrada o null
-   * ✅ NECESARIO: Para búsquedas específicas por SKU
+   * NECESARIO: Para búsquedas específicas por SKU
    */
   static async getVariantBySkuWithProduct(sku: string) {
     try {
       return await Variant.query().where('sku', sku).preload('product').first()
     } catch (error) {
-      console.error('❌ Error obteniendo variante por SKU:', error)
+      console.error('Error obteniendo variante por SKU:', error)
       throw error
     }
   }
@@ -243,7 +243,7 @@ export default class Variant extends BaseModel {
    * 📈 Obtiene variantes con stock bajo (warning_stock)
    * @param productId - ID del producto (opcional)
    * @returns Promise<Variant[]> - Variantes con stock bajo
-   * ✅ NECESARIO: Para alertas de inventario
+   * NECESARIO: Para alertas de inventario
    */
   static async getVariantsWithLowStock(productId?: number) {
     try {
@@ -255,7 +255,7 @@ export default class Variant extends BaseModel {
 
       return await query.orderBy('stock', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo variantes con stock bajo:', error)
+      console.error('Error obteniendo variantes con stock bajo:', error)
       throw error
     }
   }
@@ -264,7 +264,7 @@ export default class Variant extends BaseModel {
    * 💰 Obtiene variantes con descuento
    * @param productId - ID del producto (opcional)
    * @returns Promise<Variant[]> - Variantes con descuento
-   * ✅ NECESARIO: Para mostrar ofertas y promociones
+   * NECESARIO: Para mostrar ofertas y promociones
    */
   static async getVariantsWithDiscount(productId?: number) {
     try {
@@ -279,17 +279,17 @@ export default class Variant extends BaseModel {
 
       return await query.orderBy('discount_rate', 'desc')
     } catch (error) {
-      console.error('❌ Error obteniendo variantes con descuento:', error)
+      console.error('Error obteniendo variantes con descuento:', error)
       throw error
     }
   }
 
   /**
-   * 📋 Obtiene variantes por categorías
+   * Obtiene variantes por categorías
    * @param categoryIds - Array de IDs de categorías
    * @param visibleOnly - Solo variantes visibles (default: true)
    * @returns Promise<Variant[]> - Variantes filtradas por categorías
-   * ✅ NECESARIO: Para filtros de categorías en frontend
+   * NECESARIO: Para filtros de categorías en frontend
    */
   static async getVariantsByCategories(categoryIds: number[], visibleOnly: boolean = true) {
     try {
@@ -304,28 +304,28 @@ export default class Variant extends BaseModel {
 
       return await query.orderBy('id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo variantes por categorías:', error)
+      console.error('Error obteniendo variantes por categorías:', error)
       throw error
     }
   }
 
   // ========================================
-  // 🔧 HELPERS DE INSTANCIA
+  // HELPERS DE INSTANCIA
   // ========================================
 
   /**
    * 👁️ Verifica si la variante es visible
    * @returns boolean - true si es visible
-   * ✅ NECESARIO: Para validaciones en tiempo de ejecución
+   * NECESARIO: Para validaciones en tiempo de ejecución
    */
   isVisible() {
     return this.is_visible === true
   }
 
   /**
-   * 📊 Verifica si la variante tiene stock bajo
+   * Verifica si la variante tiene stock bajo
    * @returns boolean - true si stock <= warning_stock
-   * ✅ NECESARIO: Para alertas de inventario
+   * NECESARIO: Para alertas de inventario
    */
   hasLowStock() {
     return this.stock <= this.warning_stock
@@ -334,25 +334,25 @@ export default class Variant extends BaseModel {
   /**
    * 💰 Verifica si la variante tiene descuento activo
    * @returns boolean - true si tiene descuento válido
-   * ✅ NECESARIO: Para mostrar badges de oferta
+   * NECESARIO: Para mostrar badges de oferta
    */
   hasDiscount() {
     return this.discount_price > 0 && this.discount_price < this.normal_price
   }
 
   /**
-   * 📦 Obtiene el precio final (descuento o normal)
+   * Obtiene el precio final (descuento o normal)
    * @returns number - Precio final a mostrar
-   * ✅ NECESARIO: Para cálculos de precios en frontend
+   * NECESARIO: Para cálculos de precios en frontend
    */
   getFinalPrice() {
     return this.hasDiscount() ? this.discount_price : this.normal_price
   }
 
   /**
-   * 📊 Obtiene el porcentaje de descuento
+   * Obtiene el porcentaje de descuento
    * @returns number - Porcentaje de descuento (0-100)
-   * ✅ NECESARIO: Para mostrar porcentajes de descuento
+   * NECESARIO: Para mostrar porcentajes de descuento
    */
   getDiscountPercentage() {
     if (!this.hasDiscount()) return 0

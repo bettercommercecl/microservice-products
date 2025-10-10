@@ -40,7 +40,7 @@ export default class CategoryService {
         }
       }
 
-      // 🚀 OPTIMIZACIÓN: Preparar datos para operación masiva
+      // OPTIMIZACIÓN: Preparar datos para operación masiva
       const categoriesData = categories.map((categoryData) => ({
         category_id: categoryData.category_id,
         title: categoryData.name,
@@ -52,7 +52,7 @@ export default class CategoryService {
         tree_id: categoryData.tree_id || null,
       }))
 
-      // 🚀 OPTIMIZACIÓN: Sincronización masiva usando updateOrCreateMany
+      // OPTIMIZACIÓN: Sincronización masiva usando updateOrCreateMany
       try {
         await Category.updateOrCreateMany(
           ['category_id'], // Clave única para identificar registros
@@ -69,11 +69,11 @@ export default class CategoryService {
           },
         }
       } catch (massiveError) {
-        this.logger.warn('⚠️ Error en sincronización masiva, usando método individual', {
+        this.logger.warn('Error en sincronización masiva, usando método individual', {
           error: massiveError.message,
         })
 
-        // 🚀 FALLBACK: Si falla la masiva, usar la estrategia individual como respaldo
+        // FALLBACK: Si falla la masiva, usar la estrategia individual como respaldo
         const results = await Promise.all(
           categories.map(async (categoryData) => {
             try {
@@ -97,7 +97,7 @@ export default class CategoryService {
                 data: category,
               }
             } catch (error) {
-              this.logger.warn('⚠️ Error al sincronizar categoría', {
+              this.logger.warn('Error al sincronizar categoría', {
                 category_name: categoryData.name,
                 category_id: categoryData.category_id,
                 error: error.message,
@@ -115,7 +115,7 @@ export default class CategoryService {
         const failedCategories = results.filter((result) => result.error)
 
         if (failedCategories.length > 0) {
-          this.logger.warn('⚠️ Fallaron categorías en sincronización individual', {
+          this.logger.warn('Fallaron categorías en sincronización individual', {
             failed_count: failedCategories.length,
             total_categories: categories.length,
           })
@@ -135,7 +135,7 @@ export default class CategoryService {
         }
       }
     } catch (error) {
-      this.logger.error('❌ Error general en sincronización de categorías', {
+      this.logger.error('Error general en sincronización de categorías', {
         error: error.message,
       })
       throw new Error(
@@ -145,19 +145,19 @@ export default class CategoryService {
   }
 
   /**
-   * 🔗 Sincroniza las relaciones producto-categoría
+   * Sincroniza las relaciones producto-categoría
    * Responsabilidad: Gestionar asociaciones entre productos y categorías
    */
   async syncCategoriesByProduct(products: FormattedProductWithModelVariants[], trx?: any) {
     try {
-      this.logger.info(`🔄 Sincronizando categorías para ${products.length} productos...`)
+      this.logger.info(`Sincronizando categorías para ${products.length} productos...`)
       const startTime = Date.now()
 
       if (products.length === 0) {
         return { success: true, message: 'No hay productos para procesar', data: { processed: 0 } }
       }
 
-      // 🚀 Formatear todas las relaciones de una vez
+      // Formatear todas las relaciones de una vez
       const allRelations = products
         .filter((product) => product.categories && product.categories.trim() !== '')
         .flatMap((product) => {
@@ -171,7 +171,7 @@ export default class CategoryService {
               }))
           } catch (error) {
             this.logger.warn(
-              `⚠️ Error parseando categories del producto ${product.product_id}:`,
+              `Error parseando categories del producto ${product.product_id}:`,
               error
             )
             return []
@@ -179,7 +179,7 @@ export default class CategoryService {
         })
 
       if (allRelations.length === 0) {
-        this.logger.info('ℹ️ No se encontraron categorías válidas para procesar')
+        this.logger.info('No se encontraron categorías válidas para procesar')
         return {
           success: true,
           message: 'No hay categorías válidas para procesar',
@@ -187,9 +187,9 @@ export default class CategoryService {
         }
       }
 
-      this.logger.info(`📦 Formateadas ${allRelations.length} relaciones para guardar masivamente`)
+      this.logger.info(`Formateadas ${allRelations.length} relaciones para guardar masivamente`)
 
-      // 🚀 Procesar en lotes // Límite seguro para PostgreSQL
+      // Procesar en lotes // Límite seguro para PostgreSQL
       const BATCH_SIZE = 1000
       const batches = []
       for (let i = 0; i < allRelations.length; i += BATCH_SIZE) {
@@ -197,10 +197,10 @@ export default class CategoryService {
       }
 
       this.logger.info(
-        `📦 Procesando ${batches.length} lotes de máximo ${BATCH_SIZE} relaciones cada uno`
+        `Procesando ${batches.length} lotes de máximo ${BATCH_SIZE} relaciones cada uno`
       )
 
-      // 🚀 Procesar lotes con límite de concurrencia reducido para mayor estabilidad
+      // Procesar lotes con límite de concurrencia reducido para mayor estabilidad
       const limitConcurrency = pLimit(3) // Máximo 3 lotes en paralelo para evitar timeouts
       const batchResults = await Promise.all(
         batches.map((batch, batchIndex) =>
@@ -209,23 +209,23 @@ export default class CategoryService {
               await CategoryProduct.updateOrCreateMany(['product_id', 'category_id'], batch, {
                 client: trx,
               })
-              this.logger.info(`✅ Lote ${batchIndex + 1}: ${batch.length} relaciones guardadas`)
+              this.logger.info(`Lote ${batchIndex + 1}: ${batch.length} relaciones guardadas`)
               return { processed: batch.length, batch: batchIndex + 1 }
             } catch (error) {
-              this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, {
+              this.logger.error(`Error en lote ${batchIndex + 1}:`, {
                 error: error.message,
                 batch_size: batch.length,
                 batch_index: batchIndex + 1,
                 error_type: error.constructor.name,
               })
-              // 🚨 Re-lanzar el error para que la transacción haga rollback
+              // Re-lanzar el error para que la transacción haga rollback
               throw error
             }
           })
         )
       )
 
-      // 📊 Consolidar resultados
+      // Consolidar resultados
       const totalProcessed = batchResults.reduce(
         (sum: number, result: any) => sum + result.processed,
         0
@@ -234,17 +234,17 @@ export default class CategoryService {
 
       const totalTime = Date.now() - startTime
 
-      this.logger.info(`✅ Sincronización completada: ${totalProcessed} relaciones guardadas`)
+      this.logger.info(`Sincronización completada: ${totalProcessed} relaciones guardadas`)
 
       if (errors.length > 0) {
-        this.logger.warn(`⚠️ ${errors.length} lotes tuvieron errores`)
+        this.logger.warn(`${errors.length} lotes tuvieron errores`)
       }
 
       return {
         success: errors.length === 0,
         message:
           errors.length === 0
-            ? `${totalProcessed} relaciones sincronizadas exitosamente`
+            ? `${totalProcessed} relaciones sincronizadas`
             : `${totalProcessed} relaciones procesadas con ${errors.length} errores`,
         data: {
           processed: totalProcessed,
@@ -267,12 +267,12 @@ export default class CategoryService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error sincronizando categorías por producto:', error)
+      this.logger.error('Error sincronizando categorías por producto:', error)
       throw error
     }
   }
   /**
-   * 📊 Obtiene estadísticas de categorías
+   * Obtiene estadísticas de categorías
    */
   async getCategoriesStats() {
     try {
@@ -297,7 +297,7 @@ export default class CategoryService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener estadísticas de categorías', {
+      this.logger.error('Error al obtener estadísticas de categorías', {
         error: error.message,
       })
       throw error
@@ -317,7 +317,7 @@ export default class CategoryService {
       )
       return result
     } catch (error) {
-      this.logger.error('❌ Error al obtener categorías hijas', {
+      this.logger.error('Error al obtener categorías hijas', {
         category_id,
         error: error.message,
       })
@@ -339,7 +339,7 @@ export default class CategoryService {
       const result = productCategories.map((item: any) => item.category?.title).filter(Boolean)
       return result
     } catch (error) {
-      this.logger.error('❌ Error al obtener campañas por categorías', {
+      this.logger.error('Error al obtener campañas por categorías', {
         product_id: product,
         categories_count: categories.length,
         error: error.message,

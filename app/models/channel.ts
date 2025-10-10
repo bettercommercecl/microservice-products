@@ -23,9 +23,9 @@ export default class Channel extends BaseModel {
   })
   declare products: HasMany<typeof ChannelProduct>
 
-  // ✅ HELPERS ADICIONALES
+  // HELPERS ADICIONALES
   /**
-   * 📦 Obtiene todos los productos de este canal
+   * Obtiene todos los productos de este canal
    * @returns Promise<ChannelProduct[]> - Lista de productos con preload
    */
   async getProducts() {
@@ -35,13 +35,13 @@ export default class Channel extends BaseModel {
         .preload('product')
         .orderBy('product_id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo productos del canal:', error)
+      console.error('Error obteniendo productos del canal:', error)
       throw error
     }
   }
 
   /**
-   * 🔢 Cuenta el total de productos en este canal
+   * Cuenta el total de productos en este canal
    * @returns Promise<number> - Número total de productos
    */
   async getProductsCount(): Promise<number> {
@@ -52,13 +52,13 @@ export default class Channel extends BaseModel {
         .first()
         .then((result) => result?.$extras.total || 0)
     } catch (error) {
-      console.error('❌ Error contando productos del canal:', error)
+      console.error('Error contando productos del canal:', error)
       return 0
     }
   }
 
   /**
-   * ➕ Asigna un producto a este canal
+   * Asigna un producto a este canal
    * @param productId - ID del producto a asignar
    * @returns Promise<ChannelProduct> - Relación creada o actualizada
    */
@@ -69,13 +69,13 @@ export default class Channel extends BaseModel {
         { channel_id: this.id, product_id: productId }
       )
     } catch (error) {
-      console.error('❌ Error agregando producto al canal:', error)
+      console.error('Error agregando producto al canal:', error)
       throw error
     }
   }
 
   /**
-   * ➖ Remueve un producto de este canal
+   * Remueve un producto de este canal
    * @param productId - ID del producto a remover
    * @returns Promise<number> - Número de registros eliminados
    */
@@ -86,12 +86,12 @@ export default class Channel extends BaseModel {
         .where('product_id', productId)
         .delete()
     } catch (error) {
-      console.error('❌ Error removiendo producto del canal:', error)
+      console.error('Error removiendo producto del canal:', error)
       throw error
     }
   }
 
-  // ✅ MÉTODOS ESTÁTICOS ADICIONALES
+  // MÉTODOS ESTÁTICOS ADICIONALES
   /**
    * 📺 Obtiene todos los canales que tienen productos asignados
    * @returns Promise<Channel[]> - Lista de canales con productos
@@ -104,13 +104,13 @@ export default class Channel extends BaseModel {
         })
         .orderBy('name', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo canales con productos:', error)
+      console.error('Error obteniendo canales con productos:', error)
       throw error
     }
   }
 
   /**
-   * 🔍 Busca un canal por nombre (búsqueda parcial)
+   * Busca un canal por nombre (búsqueda parcial)
    * @param name - Nombre o parte del nombre del canal
    * @returns Promise<Channel | null> - Canal encontrado o null
    */
@@ -118,7 +118,7 @@ export default class Channel extends BaseModel {
     try {
       return await Channel.query().where('name', 'ilike', `%${name}%`).first()
     } catch (error) {
-      console.error('❌ Error obteniendo canal por nombre:', error)
+      console.error('Error obteniendo canal por nombre:', error)
       throw error
     }
   }

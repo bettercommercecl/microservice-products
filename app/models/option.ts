@@ -32,13 +32,13 @@ export default class Option extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // ✅ MÉTODOS PARA OPERACIONES MASIVAS
+  // MÉTODOS PARA OPERACIONES MASIVAS
   static async syncOptionsForProduct(productId: number, optionsData: any[]) {
     try {
-      // ✅ 1. Eliminar opciones existentes del producto
+      // 1. Eliminar opciones existentes del producto
       await Option.query().where('product_id', productId).delete()
 
-      // ✅ 2. Crear nuevas opciones
+      // 2. Crear nuevas opciones
       if (optionsData.length > 0) {
         const optionsToCreate = optionsData.map((option) => ({
           product_id: productId,
@@ -52,7 +52,7 @@ export default class Option extends BaseModel {
 
       return true
     } catch (error) {
-      console.error('❌ Error sincronizando opciones:', error)
+      console.error('Error sincronizando opciones:', error)
       throw error
     }
   }
@@ -69,7 +69,7 @@ export default class Option extends BaseModel {
         }
       )
     } catch (error) {
-      console.error('❌ Error actualizando/creando opción:', error)
+      console.error('Error actualizando/creando opción:', error)
       throw error
     }
   }
@@ -78,7 +78,7 @@ export default class Option extends BaseModel {
     try {
       return await Option.createMany(optionsData)
     } catch (error) {
-      console.error('❌ Error creando opciones masivamente:', error)
+      console.error('Error creando opciones masivamente:', error)
       throw error
     }
   }
@@ -87,12 +87,12 @@ export default class Option extends BaseModel {
     try {
       return await Option.query().where('product_id', productId).orderBy('option_id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo opciones del producto:', error)
+      console.error('Error obteniendo opciones del producto:', error)
       throw error
     }
   }
 
-  // ✅ HELPERS ADICIONALES
+  // HELPERS ADICIONALES
   static async getOptionsByOptionId(optionId: number) {
     try {
       return await Option.query()
@@ -100,7 +100,7 @@ export default class Option extends BaseModel {
         .preload('product')
         .orderBy('product_id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo opciones por option_id:', error)
+      console.error('Error obteniendo opciones por option_id:', error)
       throw error
     }
   }
@@ -109,7 +109,7 @@ export default class Option extends BaseModel {
     try {
       return await Option.query().where('product_id', productId).delete()
     } catch (error) {
-      console.error('❌ Error eliminando opciones del producto:', error)
+      console.error('Error eliminando opciones del producto:', error)
       throw error
     }
   }
@@ -126,17 +126,17 @@ export default class Option extends BaseModel {
         label: option.label,
       }))
     } catch (error) {
-      console.error('❌ Error obteniendo labels de opciones:', error)
+      console.error('Error obteniendo labels de opciones:', error)
       throw error
     }
   }
 
-  // ✅ MÉTODOS DE INSTANCIA
+  // MÉTODOS DE INSTANCIA
   async getProduct() {
     try {
       return await Product.query().where('id', this.product_id).first()
     } catch (error) {
-      console.error('❌ Error obteniendo producto de la opción:', error)
+      console.error('Error obteniendo producto de la opción:', error)
       throw error
     }
   }
@@ -148,7 +148,7 @@ export default class Option extends BaseModel {
       await this.save()
       return this
     } catch (error) {
-      console.error('❌ Error actualizando datos de opción:', error)
+      console.error('Error actualizando datos de opción:', error)
       throw error
     }
   }

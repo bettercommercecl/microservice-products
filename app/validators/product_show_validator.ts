@@ -1,6 +1,6 @@
 import vine from '@vinejs/vine'
 
-// 📋 Esquema de validación para obtener producto por ID
+// Esquema de validación para obtener producto por ID
 export const productShowSchema = vine.object({
   id: vine
     .number()
@@ -8,5 +8,5 @@ export const productShowSchema = vine.object({
     .transform((value) => Number(value)),
 })
 
-// 🔍 Tipo TypeScript para el esquema validado
+// Tipo TypeScript para el esquema validado
 export type ProductShowSchema = typeof productShowSchema

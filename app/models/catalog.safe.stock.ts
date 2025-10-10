@@ -31,7 +31,7 @@ export default class CatalogSafeStock extends BaseModel {
   @column()
   declare bin_picking_number: string | null
 
-  // ✅ RELACIONES FALTANTES
+  // RELACIONES FALTANTES
   @belongsTo(() => Product, {
     foreignKey: 'product_id',
   })
@@ -48,12 +48,12 @@ export default class CatalogSafeStock extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // ✅ HELPERS ADICIONALES
+  // HELPERS ADICIONALES
   async getProduct() {
     try {
       return await Product.query().where('id', this.product_id).first()
     } catch (error) {
-      console.error('❌ Error obteniendo producto del stock:', error)
+      console.error('Error obteniendo producto del stock:', error)
       throw error
     }
   }
@@ -62,7 +62,7 @@ export default class CatalogSafeStock extends BaseModel {
     try {
       return await Variant.query().where('id', this.variant_id).first()
     } catch (error) {
-      console.error('❌ Error obteniendo variante del stock:', error)
+      console.error('Error obteniendo variante del stock:', error)
       throw error
     }
   }
@@ -74,7 +74,7 @@ export default class CatalogSafeStock extends BaseModel {
       await this.save()
       return this
     } catch (error) {
-      console.error('❌ Error actualizando stock:', error)
+      console.error('Error actualizando stock:', error)
       throw error
     }
   }
@@ -83,7 +83,7 @@ export default class CatalogSafeStock extends BaseModel {
     try {
       return this.available_to_sell > 0
     } catch (error) {
-      console.error('❌ Error verificando stock:', error)
+      console.error('Error verificando stock:', error)
       return false
     }
   }
@@ -92,17 +92,17 @@ export default class CatalogSafeStock extends BaseModel {
     try {
       return this.available_to_sell <= this.safety_stock
     } catch (error) {
-      console.error('❌ Error verificando stock bajo:', error)
+      console.error('Error verificando stock bajo:', error)
       return false
     }
   }
 
-  // ✅ MÉTODOS ESTÁTICOS ADICIONALES
+  // MÉTODOS ESTÁTICOS ADICIONALES
   static async getStockBySku(sku: string) {
     try {
       return await CatalogSafeStock.query().where('sku', sku).first()
     } catch (error) {
-      console.error('❌ Error obteniendo stock por SKU:', error)
+      console.error('Error obteniendo stock por SKU:', error)
       throw error
     }
   }
@@ -114,7 +114,7 @@ export default class CatalogSafeStock extends BaseModel {
         .preload('product')
         .preload('variant')
     } catch (error) {
-      console.error('❌ Error obteniendo stock por producto:', error)
+      console.error('Error obteniendo stock por producto:', error)
       throw error
     }
   }
@@ -127,7 +127,7 @@ export default class CatalogSafeStock extends BaseModel {
         .preload('variant')
         .first()
     } catch (error) {
-      console.error('❌ Error obteniendo stock por variante:', error)
+      console.error('Error obteniendo stock por variante:', error)
       throw error
     }
   }
@@ -140,7 +140,7 @@ export default class CatalogSafeStock extends BaseModel {
         .preload('variant')
         .orderBy('available_to_sell', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo items con stock bajo:', error)
+      console.error('Error obteniendo items con stock bajo:', error)
       throw error
     }
   }
@@ -153,7 +153,7 @@ export default class CatalogSafeStock extends BaseModel {
         .preload('variant')
         .orderBy('sku', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo items sin stock:', error)
+      console.error('Error obteniendo items sin stock:', error)
       throw error
     }
   }
@@ -169,7 +169,7 @@ export default class CatalogSafeStock extends BaseModel {
 
       return await Promise.all(promises)
     } catch (error) {
-      console.error('❌ Error actualizando stock masivamente:', error)
+      console.error('Error actualizando stock masivamente:', error)
       throw error
     }
   }

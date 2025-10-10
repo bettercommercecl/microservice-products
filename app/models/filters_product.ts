@@ -16,7 +16,7 @@ export default class FiltersProduct extends BaseModel {
   @column()
   declare category_id: number
 
-  // ✅ RELACIONES FALTANTES
+  // RELACIONES FALTANTES
   @belongsTo(() => Product, {
     foreignKey: 'product_id',
   })

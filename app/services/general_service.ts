@@ -49,28 +49,28 @@
 // //   }
 
 // //   /**
-// //    * 🖼️ Obtiene la imagen miniatura del producto (delegado a ImageProcessingService)
+// //    *  Obtiene la imagen miniatura del producto (delegado a ImageProcessingService)
 // //    */
 // //   static getThumbnailByProducts(images: ProductImage[]): string | undefined {
 // //     return GeneralService.imageProcessingService.getThumbnailImage(images)
 // //   }
 
 // //   /**
-// //    * 🖱️ Obtiene la imagen hover del producto (delegado a ImageProcessingService)
+// //    *  Obtiene la imagen hover del producto (delegado a ImageProcessingService)
 // //    */
 // //   static getHoverByProducts(images: ProductImage[]): string | undefined {
 // //     return GeneralService.imageProcessingService.getHoverImage(images)
 // //   }
 
 // //   /**
-// //    * 🖼️ Obtiene las imágenes del producto por variación (delegado a ImageProcessingService)
+// //    *  Obtiene las imágenes del producto por variación (delegado a ImageProcessingService)
 // //    */
 // //   static getImagesByVariation(images: ProductImage[], sku: string, thumbnail: string): string[] {
 // //     return GeneralService.imageProcessingService.getImagesByVariation(images, sku, thumbnail)
 // //   }
 
 // //   /**
-// //    * 🔧 Formatea los valores de las opciones del producto (delegado a OptionProcessingService)
+// //    * Formatea los valores de las opciones del producto (delegado a OptionProcessingService)
 // //    */
 // //   static getOptionsValues(options: OptionValue[]): FormattedOption[] {
 // //     return GeneralService.optionProcessingService.formatOptionsValues(options)
@@ -81,13 +81,13 @@
 // //    */
 // //   static async FormatProductsArray(products: Product[]): Promise<any[]> {
 // //     try {
-// //       // 🚀 OPTIMIZACIÓN: Obtener solo productos con variantes válidas
+// //       // OPTIMIZACIÓN: Obtener solo productos con variantes válidas
 // //       const validProducts = products.filter((p) => p.variants && p.variants.length > 0)
 
 // //       if (validProducts.length === 0) {
 // //         // Assuming 'this.logger' is available or needs to be imported/defined
 // //         // For now, commenting out the line as it's not defined in the original file
-// //         // this.logger.warn('⚠️ No hay productos con variantes válidas para procesar')
+// //         // this.logger.warn('No hay productos con variantes válidas para procesar')
 // //         return []
 // //       }
 
@@ -102,25 +102,25 @@
 // //       // 3. Crear un mapa para acceso rápido O(1)
 // //       const inventoryMap = new Map(inventoryLevels.map((item) => [item.sku.trim(), item]))
 
-// //       // 🚀 OPTIMIZACIÓN: Procesar productos en paralelo sin operaciones innecesarias
+// //       // OPTIMIZACIÓN: Procesar productos en paralelo sin operaciones innecesarias
 // //       const productInfoArray = await Promise.all(
 // //         validProducts.map(async (product) => {
 // //           try {
 // //             const sku = product.variants[0].sku.trim()
 // //             const inventoryLevel = inventoryMap.get(sku)
 
-// //             // 🚀 OPTIMIZACIÓN: Cálculos más eficientes
+// //             // OPTIMIZACIÓN: Cálculos más eficientes
 // //             const volumetric = (product.width * product.depth * product.height) / 4000
 // //             const weight =
 // //               Env.get('COUNTRY_CODE') === 'PE'
 // //                 ? product.weight
 // //                 : Math.max(volumetric, product.weight)
 
-// //             // 🚀 OPTIMIZACIÓN: Usar ImageProcessingService para obtener imágenes
+// //             // OPTIMIZACIÓN: Usar ImageProcessingService para obtener imágenes
 // //             const thumbnailImage = GeneralService.getThumbnailByProducts(product.images || []) || ''
 // //             const hoverImage = GeneralService.getHoverByProducts(product.images || []) || ''
 
-// //             // 🚀 OPTIMIZACIÓN: Calcular stock una sola vez
+// //             // OPTIMIZACIÓN: Calcular stock una sola vez
 // //             const stock = inventoryLevel
 // //               ? (inventoryLevel as SafeStockItem).available_to_sell || 0
 // //               : Math.max(
@@ -129,7 +129,7 @@
 // //                     ((inventoryLevel as unknown as SafeStockItem)?.safety_stock || 0)
 // //                 )
 
-// //             // 🚀 OPTIMIZACIÓN: Calcular precios usando PriceCalculationService
+// //             // OPTIMIZACIÓN: Calcular precios usando PriceCalculationService
 // //             const cashPrice = GeneralService.calculateTransferPrice(
 // //               product.price,
 // //               product.sale_price,
@@ -181,18 +181,18 @@
 // //           } catch (err) {
 // //             // Assuming 'this.logger' is available or needs to be imported/defined
 // //             // For now, commenting out the line as it's not defined in the original file
-// //             // this.logger.error(`❌ Error procesando producto ID ${product.id}:`, err)
+// //             // this.logger.error(`Error procesando producto ID ${product.id}:`, err)
 // //             return null
 // //           }
 // //         })
 // //       )
 // //       console.log('general', productInfoArray)
-// //       // 🚀 OPTIMIZACIÓN: Filtrar productos fallidos y procesar JSON una sola vez
+// //       // OPTIMIZACIÓN: Filtrar productos fallidos y procesar JSON una sola vez
 // //       const validProductsInfo = productInfoArray
 // //         .filter((product): product is NonNullable<typeof product> => product !== null)
 // //         .map((product) => ({
 // //           ...product,
-// //           // ✅ CORREGIDO: Convertir arrays/objetos a JSON strings para la BD (como en product_service.ts)
+// //           // CORREGIDO: Convertir arrays/objetos a JSON strings para la BD (como en product_service.ts)
 // //           images: Array.isArray(product.images) ? JSON.stringify(product.images) : null,
 // //           meta_keywords: Array.isArray(product.meta_keywords)
 // //             ? JSON.stringify(product.meta_keywords)
@@ -206,18 +206,18 @@
 
 // //       // Assuming 'this.logger' is available or needs to be imported/defined
 // //       // For now, commenting out the line as it's not defined in the original file
-// //       // this.logger.info(`✅ Procesados ${validProductsInfo.length} productos exitosamente de ${validProducts.length} totales`)
+// //       // this.logger.info(`Procesados ${validProductsInfo.length} productos correctamente de ${validProducts.length} totales`)
 // //       return validProductsInfo
 // //     } catch (error) {
 // //       // Assuming 'this.logger' is available or needs to be imported/defined
 // //       // For now, commenting out the line as it's not defined in the original file
-// //       // this.logger.error('❌ Error en FormatProductsArray:', error)
+// //       // this.logger.error('Error en FormatProductsArray:', error)
 // //       throw error
 // //     }
 // //   }
 
 //   // /**
-//   //  * 🔧 Formatea las opciones por variante del producto (delegado a OptionProcessingService)
+//   //  * Formatea las opciones por variante del producto (delegado a OptionProcessingService)
 //   //  */
 //   // static async formatOptionsByVariantByProduct(
 //   //   product: Product
@@ -231,14 +231,14 @@
 
 //   //     // Validar datos antes de procesar
 //   //     if (!GeneralService.optionProcessingService.validateOptions(data)) {
-//   //       GeneralService.logger.warn(`⚠️ Opciones inválidas para producto ${product.id}`)
+//   //       GeneralService.logger.warn(`Opciones inválidas para producto ${product.id}`)
 //   //       return []
 //   //     }
 
 //   //     return GeneralService.optionProcessingService.formatProductOptions(data)
 //   //   } catch (error) {
 //   //     GeneralService.logger.error(
-//   //       `❌ Error formateando opciones para producto ${product.id}:`,
+//   //       `Error formateando opciones para producto ${product.id}:`,
 //   //       error
 //   //     )
 //   //     return []
@@ -250,13 +250,13 @@
 //   //  */
 //   // static async formatVariantsByProduct(product: Product): Promise<FormattedVariant[]> {
 //   //   console.time(`formatVariantsByProduct - TOTAL (producto ${product.id})`)
-//   //   console.log(`🔄 Iniciando formatVariantsByProduct para producto ${product.id}`)
+//   //   console.log(`Iniciando formatVariantsByProduct para producto ${product.id}`)
 
 //   //   // console.time(`formatVariantsByProduct - getVariantsOfProduct (producto ${product.id})`)
 //   //   // let data = await GeneralService.bigCommerceService.getVariantsOfProduct(product.id)
 //   //   // console.timeEnd(`formatVariantsByProduct - getVariantsOfProduct (producto ${product.id})`)
 
-//   //   // console.log(`📊 Producto ${product.id} - Procesando ${data.length} variantes`)
+//   //   // console.log(`Producto ${product.id} - Procesando ${data.length} variantes`)
 
 //   //   let arrayVariants: FormattedVariant[] = []
 
@@ -279,7 +279,7 @@
 //   //     `formatVariantsByProduct - batch CatalogSafeStock query (producto ${product.id})`
 //   //   )
 //   //   console.log(
-//   //     `📦 Cache de CatalogSafeStock creado con ${safeStockBatch.length} registros para ${skus.length} SKUs`
+//   //     `Cache de CatalogSafeStock creado con ${safeStockBatch.length} registros para ${skus.length} SKUs`
 //   //   )
 
 //   //   // Procesar todas las variantes en paralelo
@@ -297,7 +297,7 @@
 //   //         // Verificar si ya tenemos el inventario en cache
 //   //         let inventoryData
 //   //         if (inventoryCache.has(elem.sku)) {
-//   //           console.log(`📦 Cache hit para SKU ${elem.sku}`)
+//   //           console.log(`Cache hit para SKU ${elem.sku}`)
 //   //           inventoryData = inventoryCache.get(elem.sku)
 //   //         } else {
 //   //           console.time(`formatVariantsByProduct - variante ${elem.id} - InventoryService`)
@@ -389,7 +389,7 @@
 //   //         )
 //   //         return variant
 //   //       } catch (error) {
-//   //         console.error(`❌ Error procesando variante ${elem.id}:`, error)
+//   //         console.error(`Error procesando variante ${elem.id}:`, error)
 //   //         console.timeEnd(
 //   //           `formatVariantsByProduct - variante ${elem.id} (${index + 1}/${product.variants.length})`
 //   //         )
@@ -406,7 +406,7 @@
 //   // }
 
 //   // /**
-//   //  * 🖱️ Obtiene imagen hover por variación (delegado a ImageProcessingService)
+//   //  *  Obtiene imagen hover por variación (delegado a ImageProcessingService)
 //   //  */
 //   // static getHoverImageByVariation(images: ProductImage[], sku: string): string | undefined {
 //   //   return GeneralService.imageProcessingService.getHoverImageByVariation(images, sku)

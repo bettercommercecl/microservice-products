@@ -12,7 +12,7 @@ export default class ImageProcessingService {
   private readonly logger = Logger.child({ service: 'ImageProcessingService' })
 
   /**
-   * 🖼️ Obtiene la imagen miniatura del producto
+   *  Obtiene la imagen miniatura del producto
    * @param images - Array de imágenes del producto
    * @returns URL de la imagen miniatura o undefined
    */
@@ -25,13 +25,13 @@ export default class ImageProcessingService {
       const thumbnail = images.find((image) => image.is_thumbnail === true)
       return thumbnail?.url_standard
     } catch (error) {
-      this.logger.error('❌ Error obteniendo imagen miniatura:', error)
+      this.logger.error('Error obteniendo imagen miniatura:', error)
       return undefined
     }
   }
 
   /**
-   * 🖱️ Obtiene la imagen hover del producto
+   *  Obtiene la imagen hover del producto
    * @param images - Array de imágenes del producto
    * @returns URL de la imagen hover o undefined
    */
@@ -46,13 +46,13 @@ export default class ImageProcessingService {
       )
       return hover?.url_standard
     } catch (error) {
-      this.logger.error('❌ Error obteniendo imagen hover:', error)
+      this.logger.error('Error obteniendo imagen hover:', error)
       return undefined
     }
   }
 
   /**
-   * 🖼️ Obtiene las imágenes del producto por variación
+   *  Obtiene las imágenes del producto por variación
    * @param images - Array de imágenes del producto
    * @param sku - SKU de la variante
    * @param thumbnail - Imagen miniatura
@@ -85,13 +85,13 @@ export default class ImageProcessingService {
 
       return variationImages
     } catch (error) {
-      this.logger.error('❌ Error obteniendo imágenes por variación:', error)
+      this.logger.error('Error obteniendo imágenes por variación:', error)
       return thumbnail ? [thumbnail] : []
     }
   }
 
   /**
-   * 🖱️ Obtiene imagen hover por variación
+   *  Obtiene imagen hover por variación
    * @param images - Array de imágenes del producto
    * @param sku - SKU de la variante
    * @returns URL de la imagen hover o undefined
@@ -111,7 +111,7 @@ export default class ImageProcessingService {
 
       return hoverImage?.url_standard
     } catch (error) {
-      this.logger.error('❌ Error obteniendo imagen hover por variación:', error)
+      this.logger.error('Error obteniendo imagen hover por variación:', error)
       return undefined
     }
   }
@@ -131,7 +131,7 @@ export default class ImageProcessingService {
         .filter((image) => image && image.url_standard)
         .sort((a, b) => a.sort_order - b.sort_order)
     } catch (error) {
-      this.logger.error('❌ Error procesando array de imágenes:', error)
+      this.logger.error('Error procesando array de imágenes:', error)
       return []
     }
   }

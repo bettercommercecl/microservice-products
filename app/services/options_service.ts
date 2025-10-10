@@ -6,7 +6,7 @@ export default class OptionsService {
   private readonly logger = Logger.child({ service: 'OptionsService' })
 
   /**
-   * 📊 Obtiene estadísticas de opciones
+   * Obtiene estadísticas de opciones
    */
   async getOptionsStats() {
     try {
@@ -29,13 +29,13 @@ export default class OptionsService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener estadísticas de opciones:', error)
+      this.logger.error('Error al obtener estadísticas de opciones:', error)
       throw error
     }
   }
 
   /**
-   * 🔍 Obtiene opciones por producto
+   * Obtiene opciones por producto
    */
   async getOptionsByProduct(productId: number) {
     try {
@@ -50,7 +50,7 @@ export default class OptionsService {
         },
       }
     } catch (error) {
-      this.logger.error(`❌ Error al obtener opciones del producto ${productId}:`, error)
+      this.logger.error(`Error al obtener opciones del producto ${productId}:`, error)
       throw error
     }
   }

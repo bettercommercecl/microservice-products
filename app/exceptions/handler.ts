@@ -17,7 +17,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
     const logger = Logger.child({ service: 'GlobalExceptionHandler' })
 
     try {
-      // 🔍 Identificar el tipo de error y manejarlo apropiadamente
+      // Identificar el tipo de error y manejarlo apropiadamente
       const errorResponse = this.handleError(error, ctx, logger)
 
       // 📝 Log del error para debugging
@@ -26,7 +26,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       return errorResponse
     } catch (handlerError) {
       // 🚨 Si el manejador falla, usar fallback básico
-      logger.error('❌ Error en el manejador de excepciones:', handlerError)
+      logger.error('Error en el manejador de excepciones:', handlerError)
       return ctx.response.internalServerError({
         success: false,
         message: 'Error interno del servidor',
@@ -37,14 +37,14 @@ export default class HttpExceptionHandler extends ExceptionHandler {
   }
 
   /**
-   * 🎯 Maneja diferentes tipos de errores y retorna respuestas apropiadas
+   * Maneja diferentes tipos de errores y retorna respuestas apropiadas
    */
   private handleError(error: unknown, ctx: HttpContext, logger: any) {
     const response = ctx.response
 
     // 🚫 Error de validación (VineJS)
     if (this.isValidationError(error)) {
-      logger.warn('⚠️ Error de validación detectado:', error.message)
+      logger.warn('Error de validación detectado:', error.message)
       return response.badRequest({
         success: false,
         message: 'Error de validación en los datos de entrada',
@@ -69,15 +69,15 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       })
     }
 
-    // 🔍 Error de recurso no encontrado
+    // Error de recurso no encontrado
     if (this.isNotFoundError(error)) {
-      // 🎯 Manejo especial para favicon.ico
+      // Manejo especial para favicon.ico
       if (ctx.request.url().includes('favicon.ico')) {
-        logger.debug('🔍 Favicon request ignorado:', ctx.request.url())
+        logger.debug('Favicon request ignorado:', ctx.request.url())
         return response.status(204).send('') // No Content
       }
 
-      logger.warn('🔍 Recurso no encontrado:', error.message)
+      logger.warn('Recurso no encontrado:', error.message)
       return response.notFound({
         success: false,
         message: 'Recurso no encontrado',
@@ -102,9 +102,9 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       })
     }
 
-    // 🗄️ Error de base de datos
+    //  Error de base de datos
     if (this.isDatabaseError(error)) {
-      logger.error('🗄️ Error de base de datos:', error.message)
+      logger.error(' Error de base de datos:', error.message)
       return response.status(500).json({
         success: false,
         message: 'Error en la base de datos',
@@ -156,7 +156,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
   }
 
   /**
-   * 🔍 Detecta si es un error de validación de VineJS
+   * Detecta si es un error de validación de VineJS
    */
   private isValidationError(error: unknown): error is Error & { name: string; messages: any } {
     return error instanceof Error && error.name === 'E_VALIDATION_ERROR'
@@ -176,7 +176,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
   }
 
   /**
-   * 🔍 Detecta si es un error de recurso no encontrado
+   * Detecta si es un error de recurso no encontrado
    */
   private isNotFoundError(error: unknown): error is Error {
     return (
@@ -205,7 +205,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
   }
 
   /**
-   * 🗄️ Detecta si es un error de base de datos
+   *  Detecta si es un error de base de datos
    */
   private isDatabaseError(error: unknown): error is Error {
     return (
@@ -260,7 +260,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       timestamp: new Date().toISOString(),
     }
 
-    logger.error('❌ Error capturado globalmente:', {
+    logger.error('Error capturado globalmente:', {
       error: error instanceof Error ? error.message : String(error),
       name: error instanceof Error ? error.name : 'Unknown',
       stack: error instanceof Error ? error.stack : undefined,
@@ -279,16 +279,16 @@ export default class HttpExceptionHandler extends ExceptionHandler {
   async report(error: unknown, ctx: HttpContext) {
     const logger = Logger.child({ service: 'GlobalExceptionHandler' })
 
-    // 📊 Reportar error a servicios externos (Sentry, LogRocket, etc.)
+    // Reportar error a servicios externos (Sentry, LogRocket, etc.)
     if (app.inProduction) {
       try {
         // Aquí puedes integrar con servicios de monitoreo
         // await Sentry.captureException(error)
         // await LogRocket.captureException(error)
 
-        logger.error('📊 Error reportado a servicios externos:', error)
+        logger.error('Error reportado a servicios externos:', error)
       } catch (reportError) {
-        logger.error('❌ Error al reportar a servicios externos:', reportError)
+        logger.error('Error al reportar a servicios externos:', reportError)
       }
     }
 

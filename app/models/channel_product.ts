@@ -33,7 +33,7 @@ export default class ChannelProduct extends BaseModel {
   declare updatedAt: DateTime
 
   /**
-   * 📦 Obtiene todos los productos de un canal específico
+   * Obtiene todos los productos de un canal específico
    * @param channelId - ID del canal
    * @returns Promise<ChannelProduct[]> - Lista de productos del canal con preload
    */
@@ -44,13 +44,13 @@ export default class ChannelProduct extends BaseModel {
         .preload('product')
         .orderBy('product_id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo productos del canal:', error)
+      console.error('Error obteniendo productos del canal:', error)
       throw error
     }
   }
 
   /**
-   * 🔢 Cuenta el total de productos en un canal
+   * Cuenta el total de productos en un canal
    * @param channelId - ID del canal
    * @returns Promise<number> - Número total de productos
    */
@@ -62,13 +62,13 @@ export default class ChannelProduct extends BaseModel {
         .first()
         .then((result) => result?.$extras.total || 0)
     } catch (error) {
-      console.error('❌ Error contando productos del canal:', error)
+      console.error('Error contando productos del canal:', error)
       return 0
     }
   }
 
   /**
-   * ➕ Asigna un producto a un canal
+   * Asigna un producto a un canal
    * @param channelId - ID del canal
    * @param productId - ID del producto
    * @returns Promise<ChannelProduct> - Relación creada o actualizada
@@ -80,13 +80,13 @@ export default class ChannelProduct extends BaseModel {
         { channel_id: channelId, product_id: productId }
       )
     } catch (error) {
-      console.error('❌ Error asignando producto al canal:', error)
+      console.error('Error asignando producto al canal:', error)
       throw error
     }
   }
 
   /**
-   * ➖ Remueve un producto de un canal
+   * Remueve un producto de un canal
    * @param channelId - ID del canal
    * @param productId - ID del producto
    * @returns Promise<number> - Número de registros eliminados
@@ -98,13 +98,13 @@ export default class ChannelProduct extends BaseModel {
         .where('product_id', productId)
         .delete()
     } catch (error) {
-      console.error('❌ Error removiendo producto del canal:', error)
+      console.error('Error removiendo producto del canal:', error)
       throw error
     }
   }
 
   /**
-   * 🔄 Sincroniza productos de un canal (elimina existentes y crea nuevos)
+   * Sincroniza productos de un canal (elimina existentes y crea nuevos)
    * @param channelId - ID del canal
    * @param productIds - Array de IDs de productos
    * @returns Promise<boolean> - true si la sincronización fue exitosa
@@ -126,13 +126,13 @@ export default class ChannelProduct extends BaseModel {
 
       return true
     } catch (error) {
-      console.error('❌ Error sincronizando productos del canal:', error)
+      console.error('Error sincronizando productos del canal:', error)
       throw error
     }
   }
 
   /**
-   * 📋 Obtiene canales donde está asignado un producto
+   * Obtiene canales donde está asignado un producto
    * @param productId - ID del producto
    * @returns Promise<ChannelProduct[]> - Lista de canales con preload
    */
@@ -143,13 +143,13 @@ export default class ChannelProduct extends BaseModel {
         .preload('channel')
         .orderBy('channel_id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo canales del producto:', error)
+      console.error('Error obteniendo canales del producto:', error)
       throw error
     }
   }
 
   /**
-   * 🔍 Verifica si un producto está asignado a un canal
+   * Verifica si un producto está asignado a un canal
    * @param channelId - ID del canal
    * @param productId - ID del producto
    * @returns Promise<boolean> - true si está asignado, false si no
@@ -163,13 +163,13 @@ export default class ChannelProduct extends BaseModel {
 
       return !!relation
     } catch (error) {
-      console.error('❌ Error verificando asignación producto-canal:', error)
+      console.error('Error verificando asignación producto-canal:', error)
       return false
     }
   }
 
   /**
-   * 📊 Obtiene estadísticas de productos por canal
+   * Obtiene estadísticas de productos por canal
    * @param channelId - ID del canal
    * @returns Promise<object> - Estadísticas del canal
    */
@@ -194,7 +194,7 @@ export default class ChannelProduct extends BaseModel {
         hiddenProducts: (totalProducts?.$extras.total || 0) - (visibleProducts?.$extras.total || 0),
       }
     } catch (error) {
-      console.error('❌ Error obteniendo estadísticas del canal:', error)
+      console.error('Error obteniendo estadísticas del canal:', error)
       throw error
     }
   }

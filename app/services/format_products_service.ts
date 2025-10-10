@@ -56,7 +56,7 @@ export default class FormatProductsService {
   }
 
   /**
-   * 🔄 Procesa un producto individual y lo formatea para la base de datos
+   * Procesa un producto individual y lo formatea para la base de datos
    * @param product - Producto de Bigcommerce
    * @param config - Configuración del canal
    * @returns Producto formateado
@@ -111,7 +111,7 @@ export default class FormatProductsService {
 
       return dateReserve || ''
     } catch (error) {
-      this.logger.warn('⚠️ Error identificando si el producto es de reserva', {
+      this.logger.warn('Error identificando si el producto es de reserva', {
         error: error.message,
       })
       return ''
@@ -119,7 +119,7 @@ export default class FormatProductsService {
   }
 
   /**
-   * 🔍 Obtiene el nivel de inventario del producto basado en el SKU de su primera variante
+   * Obtiene el nivel de inventario del producto basado en el SKU de su primera variante
    * @param product - Producto de Bigcommerce con sus variantes
    * @returns Array con los datos de inventario del SKU
    */
@@ -150,7 +150,7 @@ export default class FormatProductsService {
 
       return [resultInventory]
     } catch (error) {
-      this.logger.warn('⚠️ Error obteniendo inventario para producto', {
+      this.logger.warn('Error obteniendo inventario para producto', {
         product_id: product.id,
         error: error.message,
       })
@@ -159,7 +159,7 @@ export default class FormatProductsService {
   }
 
   /**
-   * ⏰ Obtiene los metafields del timer del producto basado en el país
+   * Obtiene los metafields del timer del producto basado en el país
    * @param productId - ID del producto en Bigcommerce
    * @returns Objeto con timer_status, timer_price y timer_datetime
    */
@@ -204,7 +204,7 @@ export default class FormatProductsService {
         timer_datetime: timerDatetime,
       }
     } catch (error) {
-      this.logger.warn('⚠️ Error obteniendo timer metafields para producto', {
+      this.logger.warn('Error obteniendo timer metafields para producto', {
         product_id: productId,
         country: this.country,
         error: error.message,
@@ -265,7 +265,7 @@ export default class FormatProductsService {
         }
       }
     } catch (error) {
-      this.logger.warn('⚠️ Sin datos de precios para producto', {
+      this.logger.warn('Sin datos de precios para producto', {
         product_id: product.id,
         error: error.message,
       })
@@ -283,7 +283,7 @@ export default class FormatProductsService {
         return null
       }
 
-      this.logger.error('❌ Error crítico obteniendo reviews', {
+      this.logger.error('Error crítico obteniendo reviews', {
         product_id: productId,
         error: error.message,
       })
@@ -292,7 +292,7 @@ export default class FormatProductsService {
   }
 
   /**
-   * 🏷️ Procesa las categorías especiales del producto
+   * Procesa las categorías especiales del producto
    * @param product - Producto de Bigcommerce
    * @param config - Configuración del canal
    * @returns Objeto con las categorías especiales procesadas
@@ -410,7 +410,7 @@ export default class FormatProductsService {
     return jsonStores
   }
   /**
-   * 📊 Procesa los datos asíncronos del producto (inventario, timer, precios)
+   * Procesa los datos asíncronos del producto (inventario, timer, precios)
    * @param product - Producto de Bigcommerce
    * @param percentDiscount - Porcentaje de descuento
    * @returns Objeto con los datos procesados
@@ -428,7 +428,7 @@ export default class FormatProductsService {
         percentDiscount || FormatProductsService.DEFAULT_PERCENT_DISCOUNT
       )
     } catch (error) {
-      this.logger.warn('⚠️ Error procesando datos del producto', {
+      this.logger.warn('Error procesando datos del producto', {
         product_id: product.id,
         error: error.message,
       })

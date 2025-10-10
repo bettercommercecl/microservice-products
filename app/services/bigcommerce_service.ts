@@ -65,7 +65,7 @@ export default class BigCommerceService {
 
       return response.data.data
     } catch (error) {
-      this.logger.error('❌ Error al obtener marcas de BigCommerce', {
+      this.logger.error('Error al obtener marcas de BigCommerce', {
         ids_count: ids.length,
         error: error.message,
       })
@@ -106,7 +106,7 @@ export default class BigCommerceService {
 
       return allCategories
     } catch (error) {
-      this.logger.error('❌ Error al obtener las categorías de BigCommerce', {
+      this.logger.error('Error al obtener las categorías de BigCommerce', {
         error: error.message,
       })
       throw new Error(
@@ -127,7 +127,7 @@ export default class BigCommerceService {
 
       return response.data.data
     } catch (error) {
-      this.logger.error('❌ Error al obtener productos de BigCommerce', {
+      this.logger.error('Error al obtener productos de BigCommerce', {
         error: error.message,
       })
       throw new Error(
@@ -147,7 +147,7 @@ export default class BigCommerceService {
       })
       return response.data.data
     } catch (error) {
-      this.logger.error('❌ Error al obtener producto de BigCommerce', {
+      this.logger.error('Error al obtener producto de BigCommerce', {
         product_id: id,
         error: error.message,
       })
@@ -168,7 +168,7 @@ export default class BigCommerceService {
       })
       return response.data.data
     } catch (error) {
-      this.logger.error('❌ Error al obtener opciones de variantes', {
+      this.logger.error('Error al obtener opciones de variantes', {
         product_id: productId,
         error: error.message,
       })
@@ -192,7 +192,7 @@ export default class BigCommerceService {
       )
       return response.data.data
     } catch (error) {
-      this.logger.error('❌ Error al obtener variantes de producto', {
+      this.logger.error('Error al obtener variantes de producto', {
         product_id: productId,
         error: error.message,
       })
@@ -223,7 +223,7 @@ export default class BigCommerceService {
       })
       return response.data
     } catch (error) {
-      this.logger.error('❌ Error al obtener productos por canal', {
+      this.logger.error('Error al obtener productos por canal', {
         channel_id: channel,
         page,
         limit,
@@ -267,7 +267,7 @@ export default class BigCommerceService {
 
         page++
       } catch (error) {
-        this.logger.error('❌ Error obteniendo página de productos', {
+        this.logger.error('Error obteniendo página de productos', {
           page,
           offset,
           error: error.message,
@@ -312,7 +312,7 @@ export default class BigCommerceService {
   }
 
   /**
-   * 🔍 Obtener metafields de un producto por clave específica
+   * Obtener metafields de un producto por clave específica
    * @param product - ID del producto
    * @param key - Clave del metafield a buscar
    * @returns Valor del metafield o array vacío si no existe
@@ -337,7 +337,7 @@ export default class BigCommerceService {
 
       return data
     } catch (error) {
-      this.logger.error('❌ Error obteniendo metafield', {
+      this.logger.error('Error obteniendo metafield', {
         product_id: product,
         key,
         error: error.message,
@@ -401,7 +401,7 @@ export default class BigCommerceService {
 
       return reviews
     } catch (error) {
-      this.logger.error('❌ Error obteniendo reviews para producto', {
+      this.logger.error('Error obteniendo reviews para producto', {
         product_id: product,
         error: error.message,
       })

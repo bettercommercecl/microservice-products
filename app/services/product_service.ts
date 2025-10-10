@@ -21,7 +21,7 @@ export default class ProductService {
         data: products,
       }
     } catch (error) {
-      this.logger.error('❌ Error obteniendo todos los productos', { error: error.message })
+      this.logger.error('Error obteniendo todos los productos', { error: error.message })
       throw new Error(
         `Error al obtener productos: ${error instanceof Error ? error.message : 'Error desconocido'}`
       )
@@ -38,7 +38,7 @@ export default class ProductService {
         data: product,
       }
     } catch (error) {
-      this.logger.error('❌ Error obteniendo producto por ID', { id, error: error.message })
+      this.logger.error('Error obteniendo producto por ID', { id, error: error.message })
       throw new Error(
         `Error al obtener producto: ${error instanceof Error ? error.message : 'Error desconocido'}`
       )
@@ -71,7 +71,7 @@ export default class ProductService {
       }
 
       // 3. Lanzar el resto de páginas en paralelo (con límite de concurrencia optimizado)
-      const limitConcurrency = pLimit(15) // 🚀 OPTIMIZADO: Aumentado de 4 a 15 para mejor rendimiento
+      const limitConcurrency = pLimit(15) // OPTIMIZADO: Aumentado de 4 a 15 para mejor rendimiento
       const pagePromises = []
 
       for (let page = 2; page <= totalPages; page++) {
@@ -92,7 +92,7 @@ export default class ProductService {
 
       return allIds.filter(Boolean)
     } catch (error) {
-      this.logger.error('❌ Error obteniendo IDs de productos por canal', {
+      this.logger.error('Error obteniendo IDs de productos por canal', {
         channelId,
         limit,
         error: error.message,

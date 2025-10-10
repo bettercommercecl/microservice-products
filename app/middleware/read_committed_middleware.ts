@@ -5,13 +5,8 @@ import Logger from '@adonisjs/core/services/logger'
 export default class ReadCommittedMiddleware {
   private readonly logger = Logger.child({ service: 'ReadCommittedMiddleware' })
 
-  async handle({ request }: HttpContext, next: () => Promise<void>) {
-    this.logger.debug(`🔍 Aplicando READ COMMITTED a: ${request.method()} ${request.url()}`)
-
-    const startTime = Date.now()
-
+  async handle(_ctx: HttpContext, next: () => Promise<void>) {
     try {
-      // Envolver en transacción READ COMMITTED
       await db.transaction(
         async (_trx) => {
           await next()
@@ -20,15 +15,8 @@ export default class ReadCommittedMiddleware {
           isolationLevel: 'read committed',
         }
       )
-
-      const duration = Date.now() - startTime
-      this.logger.info(`⏱️ Transacción READ COMMITTED completada: ${duration}ms`)
-
-      // 🔍 Log adicional para debugging
-      this.logger.debug(`✅ Middleware READ COMMITTED finalizado exitosamente`)
     } catch (error) {
-      const duration = Date.now() - startTime
-      this.logger.error(`❌ Error en middleware READ COMMITTED (${duration}ms):`, error)
+      this.logger.error('Error en transacción READ COMMITTED', error)
       throw error
     }
   }
