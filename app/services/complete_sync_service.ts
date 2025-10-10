@@ -45,7 +45,7 @@ export default class CompleteSyncService {
   }
 
   /**
-   * 🔄 Sincronización Completa de Productos
+   * Sincronización Completa de Productos
    */
   async syncProductsComplete(): Promise<{
     success: boolean
@@ -62,32 +62,32 @@ export default class CompleteSyncService {
       }
     }
   }> {
-    const startTime = Date.now() // ⏱️ Iniciar cronómetro
+    const startTime = Date.now() // Iniciar cronómetro
     const { CHANNEL, API_URL } = this.currentChannelConfig
-    // 🎯 Obtener el país configurado
+    // Obtener el país configurado
     const configuredCountry = env.get('COUNTRY_CODE')
-    this.logger.info(`🌍 País configurado en variables de entorno: ${configuredCountry}`)
-    this.logger.info(`🔄 Iniciando sincronización completa para: ${API_URL}`)
+    this.logger.info(`País configurado en variables de entorno: ${configuredCountry}`)
+    this.logger.info(`Iniciando sincronización completa para: ${API_URL}`)
 
     // ============================================================================
     // PASO 0: INICIO DE SINCRONIZACIÓN
     // ============================================================================
-    this.logger.info(`🚀 Iniciando sincronización para canal ${CHANNEL}...`)
+    this.logger.info(`Iniciando sincronización para canal ${CHANNEL}...`)
 
     // ============================================================================
     // PROCESAMIENTO SIN TRANSACCIÓN GLOBAL (CADA LOTE TIENE SU PROPIA TRANSACCIÓN)
     // ============================================================================
     try {
-      this.logger.info(`🛡️ Iniciando sincronización...`)
+      this.logger.info(`Sincronizando`)
       // 1. Obtener actualizar o crear inventario
       const inventoryResult = await this.inventoryService.syncSafeStock()
       if (inventoryResult && 'status' in inventoryResult && inventoryResult.status === 'Error') {
-        this.logger.error('❌ Error en sincronización de stock de seguridad')
+        this.logger.error('Error en sincronización de stock de seguridad')
         throw new Error('Error al sincronizar el stock de seguridad')
       }
       // 2. Obtener productos de Bigcommerce
       const bigcommerceProducts = await this.fetchBigcommerceProducts(CHANNEL)
-      this.logger.info(`📦 Obtenidos ${bigcommerceProducts.length} productos de Bigcommerce`)
+      this.logger.info(`Obtenidos ${bigcommerceProducts.length} productos de Bigcommerce`)
 
       // ============================================================================
       // PASO 3: PROCESAR PRODUCTOS POR LOTES COMPLETOS (OPTIMIZADO)
@@ -95,18 +95,18 @@ export default class CompleteSyncService {
       const BATCH_SIZE = 200 // Tamaño de lote optimizado
       const allFormattedVariants: FormattedProductWithModelVariants[] = []
 
-      // 📦 Crear lotes
+      // Crear lotes
       const batches = []
       for (let i = 0; i < bigcommerceProducts.length; i += BATCH_SIZE) {
         batches.push(bigcommerceProducts.slice(i, i + BATCH_SIZE))
       }
 
-      this.logger.info(`📦 Procesando ${batches.length} lotes completos de productos...`)
+      this.logger.info(`Procesando ${batches.length} lotes completos de productos...`)
 
-      // ✅ PROCESAMIENTO PROGRESIVO SIN LIMPIEZA INICIAL
+      // PROCESAMIENTO PROGRESIVO SIN LIMPIEZA INICIAL
       // La limpieza se hará al final para evitar datos vacíos durante la sincronización
 
-      // 🔄 Procesar cada lote completamente (secuencial para mejor control)
+      // Procesar cada lote completamente (secuencial para mejor control)
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
         const batch = batches[batchIndex]
 
@@ -114,7 +114,7 @@ export default class CompleteSyncService {
         await db.transaction(async (batchTrx) => {
           try {
             this.logger.info(
-              `🔄 Procesando lote ${batchIndex + 1}/${batches.length} (${batch.length} productos)`
+              `Procesando lote ${batchIndex + 1}/${batches.length} (${batch.length} productos)`
             )
 
             // ========================================
@@ -146,7 +146,7 @@ export default class CompleteSyncService {
             // ========================================
             const allVariants = formattedVariants.flatMap((product) => product.variants)
 
-            // 🔧 Dividir variantes en lotes más pequeños para evitar timeouts
+            // Dividir variantes en lotes más pequeños para evitar timeouts
             const VARIANT_BATCH_SIZE = 100
             const variantBatches = []
             for (let i = 0; i < allVariants.length; i += VARIANT_BATCH_SIZE) {
@@ -154,10 +154,10 @@ export default class CompleteSyncService {
             }
 
             this.logger.info(
-              `📦 Procesando ${variantBatches.length} sub-lotes de variantes en paralelo...`
+              `Procesando ${variantBatches.length} sub-lotes de variantes en paralelo...`
             )
 
-            // 🚀 Procesar sub-lotes de variantes en paralelo con límite de concurrencia
+            // Procesar sub-lotes de variantes en paralelo con límite de concurrencia
             const limitConcurrency = pLimit(3) // Máximo 3 sub-lotes en paralelo
             const variantBatchResults = await Promise.all(
               variantBatches.map((variantBatch, variantBatchIndex) =>
@@ -165,7 +165,7 @@ export default class CompleteSyncService {
                   try {
                     await Variant.updateOrCreateMany('sku', variantBatch, { client: batchTrx })
                     this.logger.debug(
-                      `✅ Sub-lote de variantes ${variantBatchIndex + 1}/${variantBatches.length} procesado`
+                      `Sub-lote de variantes ${variantBatchIndex + 1}/${variantBatches.length} procesado`
                     )
                     return {
                       success: true,
@@ -173,27 +173,24 @@ export default class CompleteSyncService {
                       batch: variantBatchIndex + 1,
                     }
                   } catch (variantError) {
-                    this.logger.error(
-                      `❌ Error en sub-lote de variantes ${variantBatchIndex + 1}:`,
-                      {
-                        error: variantError.message,
-                        batch_size: variantBatch.length,
-                        skus: variantBatch.map((v) => v.sku).slice(0, 5), // Solo primeros 5 SKUs para log
-                      }
-                    )
+                    this.logger.error(`Error en sub-lote de variantes ${variantBatchIndex + 1}:`, {
+                      error: variantError.message,
+                      batch_size: variantBatch.length,
+                      skus: variantBatch.map((v) => v.sku).slice(0, 5), // Solo primeros 5 SKUs para log
+                    })
                     throw variantError // Re-lanzar para que la transacción haga rollback
                   }
                 })
               )
             )
 
-            // 📊 Consolidar resultados de sub-lotes
+            // Consolidar resultados de sub-lotes
             const totalVariantsProcessed = variantBatchResults.reduce(
               (sum, result) => sum + result.processed,
               0
             )
             this.logger.info(
-              `✅ Variantes procesadas: ${totalVariantsProcessed} en ${variantBatches.length} sub-lotes`
+              `Variantes procesadas: ${totalVariantsProcessed} en ${variantBatches.length} sub-lotes`
             )
 
             // ========================================
@@ -208,7 +205,7 @@ export default class CompleteSyncService {
                 )
               })
             } catch (channelError) {
-              this.logger.error(`❌ Error al sincronizar canal:`, channelError)
+              this.logger.error(`Error al sincronizar canal:`, channelError)
             }
 
             // ========================================
@@ -219,17 +216,17 @@ export default class CompleteSyncService {
             // ========================================
             // SUB-PASO 3.7: COMMIT AUTOMÁTICO DEL LOTE
             // ========================================
-            this.logger.info(`🔄 Commit automático del lote ${batchIndex + 1}...`)
+            this.logger.info(`Commit automático del lote ${batchIndex + 1}...`)
             // El commit se hace automáticamente al salir del bloque transaction
 
             // Acumular para estadísticas finales
             allFormattedVariants.push(...formattedVariants)
 
             this.logger.info(
-              `✅ Lote ${batchIndex + 1} completado: ${formattedVariants.length} productos procesados completamente`
+              `Lote ${batchIndex + 1} completado: ${formattedVariants.length} productos procesados completamente`
             )
           } catch (error) {
-            // 🚨 Manejo robusto de errores con rollback automático
+            // Manejo robusto de errores con rollback automático
             const errorDetails = {
               error: error.message,
               stack: error.stack,
@@ -238,10 +235,10 @@ export default class CompleteSyncService {
               error_type: error.constructor.name,
             }
 
-            // 🔍 Detectar errores específicos de PostgreSQL
+            // Detectar errores específicos de PostgreSQL
             if (error.message && error.message.includes('current transaction is aborted')) {
               this.logger.error(
-                `🚨 Error de transacción PostgreSQL abortada en lote ${batchIndex + 1}:`,
+                `Error de transacción PostgreSQL abortada en lote ${batchIndex + 1}:`,
                 {
                   ...errorDetails,
                   solution:
@@ -249,22 +246,22 @@ export default class CompleteSyncService {
                 }
               )
             } else if (error.message && error.message.includes('timeout')) {
-              this.logger.error(`⏰ Timeout en lote ${batchIndex + 1}:`, {
+              this.logger.error(`Timeout en lote ${batchIndex + 1}:`, {
                 ...errorDetails,
                 solution: 'Reducir tamaño de lote o aumentar timeout de base de datos',
               })
             } else {
-              this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, errorDetails)
+              this.logger.error(`Error en lote ${batchIndex + 1}:`, errorDetails)
             }
 
-            // 🔄 El rollback se ejecuta automáticamente al salir del catch
+            // El rollback se ejecuta automáticamente al salir del catch
             // debido a que la transacción no se commitea
             throw error
           }
         })
       }
 
-      this.logger.info(`✅ Total productos procesados: ${allFormattedVariants.length}`)
+      this.logger.info(`Total productos procesados: ${allFormattedVariants.length}`)
 
       // ============================================================================
       // PASO 3.5: LIMPIEZA FINAL - ELIMINAR PRODUCTOS OBSOLETOS DEL CANAL
@@ -275,7 +272,7 @@ export default class CompleteSyncService {
 
       const allProductIds = bigcommerceProducts.map((p) => p.id)
       await db.transaction(async (cleanupTrx) => {
-        this.logger.info(`🔍 Eliminando productos obsoletos del canal...`)
+        this.logger.info(`Eliminando productos obsoletos del canal...`)
 
         const deletedCount = await ChannelProduct.query({ client: cleanupTrx })
           .where('channel_id', this.currentChannelConfig.CHANNEL)
@@ -283,33 +280,33 @@ export default class CompleteSyncService {
           .delete()
 
         this.logger.info(
-          `✅ Limpieza final completada: ${deletedCount} productos obsoletos eliminados`
+          `Limpieza final completada: ${deletedCount} productos obsoletos eliminados`
         )
       })
 
       // ============================================================================
       // PASO 4: SINCRONIZAR FILTROS DE PRODUCTOS (CON TRANSACCIÓN)
       // ============================================================================
-      this.logger.info(`🔍 Sincronizando filtros de productos...`)
+      this.logger.info(`Sincronizando filtros de productos...`)
       await db.transaction(async (filtersTrx) => {
         await this.syncFilters(filtersTrx)
       })
-      this.logger.info(`✅ Filtros sincronizados exitosamente`)
+      this.logger.info(`Filtros sincronizados correctamente`)
 
       // ============================================================================
       // PASO 5: LOGS FINALES
       // ============================================================================
-      this.logger.info(`✅ Sincronización completada exitosamente`)
+      this.logger.info(`Sincronización completada`)
 
       // ============================================================================
       // PASO 6: PREPARAR RESPUESTA FINAL (ULTRA OPTIMIZADO)
       // ============================================================================
 
-      // 📊 Preparar respuesta simplificada con totales procesados
+      // Preparar respuesta simplificada con totales procesados
       const totalTime = Date.now() - startTime
       const finalResponse = {
         success: true,
-        message: `Sincronización completada exitosamente para canal ${CHANNEL}`,
+        message: `Sincronización completada para canal ${CHANNEL}`,
         data: {
           timestamp: new Date().toISOString(),
           channelId: CHANNEL,
@@ -326,35 +323,35 @@ export default class CompleteSyncService {
         },
       }
 
-      // 🎉 Log final con tiempo total
-      this.logger.info(`🎉 Sincronización completada en ${totalTime}ms - Enviando respuesta...`)
+      // Log final con tiempo total
+      this.logger.info(`Sincronización completada en ${totalTime}ms - Enviando respuesta...`)
 
       return finalResponse
     } catch (error) {
-      this.logger.error(`❌ Error en sincronización de productos:`, error)
+      this.logger.error(`Error en sincronización de productos:`, error)
       throw error
     }
   }
 
   /**
-   * 🔍 Obtener productos de Bigcommerce con estrategia de batching
+   * Obtener productos de Bigcommerce con estrategia de batching
    */
   private async fetchBigcommerceProducts(channelId: number): Promise<BigcommerceProduct[]> {
-    this.logger.info(`🔍 Obteniendo productos de Bigcommerce para canal ${channelId}...`)
+    this.logger.info(`Obteniendo productos de Bigcommerce para canal ${channelId}...`)
 
     try {
       // ============================================================================
       // PASO 1: OBTENER TODOS LOS PRODUCTOS POR CANAL (CON PAGINACIÓN)
       // ============================================================================
-      this.logger.info(`📋 Obteniendo todos los productos por canal con paginación...`)
+      this.logger.info(`Obteniendo todos los productos por canal con paginación...`)
 
       const productIds = await this.getAllProductIdsByChannel(channelId)
       const totalProducts = productIds.length
 
-      this.logger.info(`📦 Total de productos en API: ${totalProducts}`)
+      this.logger.info(`Total de productos en API: ${totalProducts}`)
 
       if (totalProducts === 0) {
-        this.logger.warn(`⚠️ No hay productos asignados al canal ${channelId}`)
+        this.logger.warn(`No hay productos asignados al canal ${channelId}`)
         return []
       }
 
@@ -368,18 +365,18 @@ export default class CompleteSyncService {
         batches.push(batch)
       }
 
-      this.logger.info(`📦 Dividido en ${batches.length} batches de máximo ${batchSize} productos`)
-      this.logger.info(`🏷️ Usando PARENT_CATEGORY: ${this.currentChannelConfig.PARENT_CATEGORY}`)
+      this.logger.info(`Dividido en ${batches.length} batches de máximo ${batchSize} productos`)
+      this.logger.info(`Usando PARENT_CATEGORY: ${this.currentChannelConfig.PARENT_CATEGORY}`)
 
       // ============================================================================
       // PASO 3: CONSULTAR INFORMACIÓN DETALLADA EN PARALELO
       // ============================================================================
-      this.logger.info(`🚀 Procesando ${batches.length} batches en paralelo...`)
+      this.logger.info(`Procesando ${batches.length} batches en paralelo...`)
 
       const batchPromises = batches.map(async (batchIds, index) => {
         try {
           this.logger.info(
-            `🔍 Procesando batch ${index + 1}/${batches.length} con ${batchIds.length} productos`
+            `Procesando batch ${index + 1}/${batches.length} con ${batchIds.length} productos`
           )
 
           const productsPerPage = await this.bigcommerceService.getAllProductsRefactoring(
@@ -389,11 +386,11 @@ export default class CompleteSyncService {
           )
 
           this.logger.info(
-            `✅ Batch ${index + 1} completado: ${productsPerPage.data?.length || 0} productos`
+            `Batch ${index + 1} completado: ${productsPerPage.data?.length || 0} productos`
           )
           return productsPerPage.data || []
         } catch (error) {
-          this.logger.error(`❌ Error en batch ${index + 1}:`, error)
+          this.logger.error(`Error en batch ${index + 1}:`, error)
           return []
         }
       })
@@ -411,9 +408,9 @@ export default class CompleteSyncService {
         (product, index, self) => index === self.findIndex((p) => p.id === product.id)
       )
 
-      this.logger.info(`📊 Productos únicos obtenidos: ${uniqueProducts.length}`)
+      this.logger.info(`Productos únicos obtenidos: ${uniqueProducts.length}`)
       this.logger.info(
-        `📊 Productos duplicados eliminados: ${allProducts.length - uniqueProducts.length}`
+        `Productos duplicados eliminados: ${allProducts.length - uniqueProducts.length}`
       )
 
       // Verificación final
@@ -422,26 +419,26 @@ export default class CompleteSyncService {
       const percentage = ((finalCount / expectedTotal) * 100).toFixed(1)
 
       this.logger.info(
-        `📊 Verificación final: ${finalCount} de ${expectedTotal} productos procesados (${percentage}%)`
+        `Verificación final: ${finalCount} de ${expectedTotal} productos procesados (${percentage}%)`
       )
 
       if (finalCount < expectedTotal) {
         const missingCount = expectedTotal - finalCount
-        this.logger.warn(`⚠️ ${missingCount} productos no pudieron ser obtenidos`)
+        this.logger.warn(`${missingCount} productos no pudieron ser obtenidos`)
       }
 
       return uniqueProducts
     } catch (error) {
-      this.logger.error(`❌ Error obteniendo productos de Bigcommerce:`, error)
+      this.logger.error(`Error obteniendo productos de Bigcommerce:`, error)
       throw error
     }
   }
 
   /**
-   * 🔍 Obtiene todos los IDs de productos asignados a un canal, recorriendo todas las páginas
+   * Obtiene todos los IDs de productos asignados a un canal, recorriendo todas las páginas
    */
   private async getAllProductIdsByChannel(channelId: number, limit = 200): Promise<number[]> {
-    this.logger.info(`🔍 Obteniendo todos los IDs de productos para canal ${channelId}...`)
+    this.logger.info(`Obteniendo todos los IDs de productos para canal ${channelId}...`)
 
     let allIds: number[] = []
 
@@ -449,7 +446,7 @@ export default class CompleteSyncService {
     const firstResponse = await this.bigcommerceService.getProductsByChannel(channelId, 1, limit)
 
     if (!firstResponse.data || !Array.isArray(firstResponse.data)) {
-      this.logger.warn(`⚠️ No se encontraron datos en la primera página para canal ${channelId}`)
+      this.logger.warn(`No se encontraron datos en la primera página para canal ${channelId}`)
       return []
     }
 
@@ -461,10 +458,10 @@ export default class CompleteSyncService {
       firstResponse.meta && firstResponse.meta.pagination
         ? firstResponse.meta.pagination.total_pages
         : 1
-    this.logger.info(`📄 Total de páginas a procesar: ${totalPages}`)
+    this.logger.info(`Total de páginas a procesar: ${totalPages}`)
 
     if (totalPages === 1) {
-      this.logger.info(`✅ Solo una página encontrada. Total productos: ${allIds.length}`)
+      this.logger.info(`Solo una página encontrada. Total productos: ${allIds.length}`)
       return allIds.filter(Boolean)
     }
 
@@ -482,7 +479,7 @@ export default class CompleteSyncService {
           )
 
           if (!response.data || !Array.isArray(response.data)) {
-            this.logger.warn(`⚠️ No se encontraron datos en la página ${page}`)
+            this.logger.warn(`No se encontraron datos en la página ${page}`)
             return []
           }
 
@@ -495,13 +492,13 @@ export default class CompleteSyncService {
     results.forEach((pageIds: number[]) => allIds.push(...pageIds))
 
     const finalIds = allIds.filter(Boolean)
-    this.logger.info(`✅ Obtenidos ${finalIds.length} IDs de productos de ${totalPages} páginas`)
+    this.logger.info(`Obtenidos ${finalIds.length} IDs de productos de ${totalPages} páginas`)
 
     return finalIds
   }
 
   /**
-   * 🔧 Sincroniza opciones de productos por lotes
+   * Sincroniza opciones de productos por lotes
    * @param productsWithVariants - Lista de productos con variantes formateadas
    * @param trx - Transacción de base de datos (opcional)
    */
@@ -510,28 +507,28 @@ export default class CompleteSyncService {
     trx?: QueryClientContract
   ): Promise<void> {
     this.logger.info(
-      `🔧 Iniciando sincronización de opciones para ${productsWithVariants.length} productos...`
+      `Iniciando sincronización de opciones para ${productsWithVariants.length} productos...`
     )
 
     try {
-      // 🚀 OPTIMIZACIÓN EXTREMA: Procesar todo en paralelo
+      // OPTIMIZACIÓN EXTREMA: Procesar todo en paralelo
       const BATCH_SIZE = 500 // Lotes más grandes para mejor rendimiento
       const batches = []
 
-      // 📦 Crear lotes
+      // Crear lotes
       for (let i = 0; i < productsWithVariants.length; i += BATCH_SIZE) {
         batches.push(productsWithVariants.slice(i, i + BATCH_SIZE))
       }
 
-      this.logger.info(`📦 Procesando ${batches.length} lotes de opciones en paralelo...`)
+      this.logger.info(`Procesando ${batches.length} lotes de opciones en paralelo...`)
 
-      // 🚀 Procesar todos los lotes en paralelo con pLimit para control de concurrencia
+      // Procesar todos los lotes en paralelo con pLimit para control de concurrencia
       const limit = pLimit(12) // Aumentado para mejor rendimiento
       const batchResults = await Promise.all(
         batches.map((batch, batchIndex) =>
           limit(async () => {
             try {
-              // 🔧 Formatear opciones del lote
+              // Formatear opciones del lote
               const batchOptions = await this.formatOptionsService.formatOptions(batch)
 
               if (batchOptions.length === 0) {
@@ -545,12 +542,10 @@ export default class CompleteSyncService {
                 trx ? { client: trx } : undefined
               )
 
-              this.logger.info(
-                `✅ Lote ${batchIndex + 1}: ${batchOptions.length} opciones guardadas`
-              )
+              this.logger.info(`Lote ${batchIndex + 1}: ${batchOptions.length} opciones guardadas`)
               return { processed: batchOptions.length, batch: batchIndex + 1 }
             } catch (error) {
-              this.logger.error(`❌ Error en lote ${batchIndex + 1}:`, error)
+              this.logger.error(`Error en lote ${batchIndex + 1}:`, error)
               console.log(error)
               return { processed: 0, batch: batchIndex + 1, error: error.message }
             }
@@ -558,25 +553,25 @@ export default class CompleteSyncService {
         )
       )
 
-      // 📊 Consolidar resultados
+      // Consolidar resultados
       const totalProcessed = batchResults.reduce((sum, result) => sum + result.processed, 0)
       const errors = batchResults.filter((result) => result.error)
 
       this.logger.info(
-        `🎉 Sincronización de opciones completada: ${totalProcessed} registros guardados`
+        `Sincronización de opciones completada: ${totalProcessed} registros guardados`
       )
 
       if (errors.length > 0) {
-        this.logger.warn(`⚠️ ${errors.length} lotes tuvieron errores`)
+        this.logger.warn(`${errors.length} lotes tuvieron errores`)
       }
     } catch (error) {
-      this.logger.error(`❌ Error al sincronizar opciones:`, error)
+      this.logger.error(`Error al sincronizar opciones:`, error)
       throw error
     }
   }
 
   /**
-   * 🔗 Sincroniza relaciones producto-categoría
+   * Sincroniza relaciones producto-categoría
    * @param products - Lista de productos con variantes formateadas
    * @param trx - Transacción de base de datos (obligatorio)
    */
@@ -584,7 +579,7 @@ export default class CompleteSyncService {
     products: FormattedProductWithModelVariants[],
     trx: TransactionClientContract
   ): Promise<void> {
-    this.logger.info(`🔗 Iniciando sincronización de relaciones producto-categoría...`)
+    this.logger.info(`Iniciando sincronización de relaciones producto-categoría...`)
 
     try {
       // Generar el lote de relaciones que se van a guardar desde los datos formateados
@@ -603,7 +598,7 @@ export default class CompleteSyncService {
       }
 
       this.logger.info(
-        `📊 Lote de relaciones a guardar: ${newRelationsToSave.length} para ${productIds.length} productos`
+        `Lote de relaciones a guardar: ${newRelationsToSave.length} para ${productIds.length} productos`
       )
 
       // Limpiar relaciones existentes que NO están en el lote nuevo
@@ -613,49 +608,47 @@ export default class CompleteSyncService {
       const result = await this.categoryService.syncCategoriesByProduct(products, trx)
 
       if (result && result.success) {
-        this.logger.info(`✅ Relaciones producto-categoría sincronizadas exitosamente`)
-        this.logger.info(`📊 Resultado: ${result.message}`)
+        this.logger.info(`Relaciones producto-categoría sincronizadas`)
+        this.logger.info(`Resultado: ${result.message}`)
 
-        // 📈 Mostrar estadísticas de procesamiento
+        // Mostrar estadísticas de procesamiento
         if (result.data?.processed) {
-          this.logger.info(`📈 Relaciones procesadas: ${result.data.processed}`)
+          this.logger.info(`Relaciones procesadas: ${result.data.processed}`)
         }
       } else {
         this.logger.warn(
-          `⚠️ Sincronización de relaciones producto-categoría completada con advertencias: ${result?.message || 'Sin mensaje'}`
+          `Sincronización de relaciones producto-categoría completada con advertencias: ${result?.message || 'Sin mensaje'}`
         )
       }
     } catch (error) {
-      this.logger.error(`❌ Error al sincronizar relaciones producto-categoría:`, error)
+      this.logger.error(`Error al sincronizar relaciones producto-categoría:`, error)
       throw error
     }
   }
 
   /**
-   * 🔍 Sincroniza filtros de productos
+   * Sincroniza filtros de productos
    * @param trx - Transacción de base de datos (opcional)
    */
   private async syncFilters(trx?: QueryClientContract): Promise<void> {
-    this.logger.info(`🔍 Iniciando sincronización de filtros...`)
+    this.logger.info(`Iniciando sincronización de filtros...`)
 
     try {
       const result = await this.filtersService.syncFiltersProducts(trx)
 
       if (result.success) {
-        this.logger.info(`✅ Filtros sincronizados exitosamente`)
-        this.logger.info(`📊 Resultado: ${result.message}`)
+        this.logger.info(`Filtros sincronizados correctamente`)
+        this.logger.info(`Resultado: ${result.message}`)
         if (result.meta?.performance) {
           this.logger.info(
-            `⚡ Rendimiento: ${result.meta.performance.relations_per_second} relaciones/segundo`
+            `Rendimiento: ${result.meta.performance.relations_per_second} relaciones/segundo`
           )
         }
       } else {
-        this.logger.warn(
-          `⚠️ Sincronización de filtros completada con advertencias: ${result.message}`
-        )
+        this.logger.warn(`Sincronización de filtros completada con advertencias: ${result.message}`)
       }
     } catch (error) {
-      this.logger.error(`❌ Error al sincronizar filtros:`, error)
+      this.logger.error(`Error al sincronizar filtros:`, error)
       throw error
     }
   }
@@ -669,7 +662,7 @@ export default class CompleteSyncService {
   // ============================================================================
 
   /**
-   * 🏷️ Limpieza de categorías huérfanas ANTES de guardar el lote nuevo
+   * Limpieza de categorías huérfanas ANTES de guardar el lote nuevo
    * Elimina las relaciones existentes que NO están en el lote que se va a guardar
    * @param productIds - IDs de productos que se van a sincronizar
    * @param newRelationsToSave - Lote de relaciones que se van a guardar
@@ -682,18 +675,16 @@ export default class CompleteSyncService {
     trx: TransactionClientContract
   ): Promise<number> {
     try {
-      this.logger.info(`🔍 Limpieza de categorías huérfanas antes de guardar...`)
+      this.logger.info(`Limpieza de categorías huérfanas antes de guardar...`)
 
       if (newRelationsToSave.length === 0) {
-        this.logger.info(
-          `✅ No hay relaciones nuevas para guardar, eliminando todas las existentes`
-        )
+        this.logger.info(`No hay relaciones nuevas para guardar, eliminando todas las existentes`)
         // Si no hay relaciones nuevas, eliminar todas las existentes para estos productos
         const deleted = await CategoryProduct.query({ client: trx })
           .whereIn('product_id', productIds)
           .delete()
         const totalDeleted = Array.isArray(deleted) ? deleted.length : deleted
-        this.logger.info(`✅ Categorías eliminadas: ${totalDeleted}`)
+        this.logger.info(`Categorías eliminadas: ${totalDeleted}`)
         return totalDeleted
       }
 
@@ -702,14 +693,14 @@ export default class CompleteSyncService {
         newRelationsToSave.map((rel) => `${rel.product_id}-${rel.category_id}`)
       )
 
-      this.logger.info(`📊 Relaciones que se van a guardar: ${newRelationsToSave.length}`)
+      this.logger.info(`Relaciones que se van a guardar: ${newRelationsToSave.length}`)
 
       // Obtener todas las relaciones existentes para estos productos
       const existingRelations = await CategoryProduct.query({ client: trx })
         .whereIn('product_id', productIds)
         .select('product_id', 'category_id')
 
-      this.logger.info(`📊 Relaciones existentes en BD: ${existingRelations.length}`)
+      this.logger.info(`Relaciones existentes en BD: ${existingRelations.length}`)
 
       // Identificar relaciones que existen en BD pero NO están en el lote nuevo
       const orphanedRelations = existingRelations.filter((rel) => {
@@ -718,7 +709,7 @@ export default class CompleteSyncService {
       })
 
       if (orphanedRelations.length === 0) {
-        this.logger.info(`✅ No hay categorías huérfanas para eliminar`)
+        this.logger.info(`No hay categorías huérfanas para eliminar`)
         return 0
       }
 
@@ -733,7 +724,7 @@ export default class CompleteSyncService {
         batches.push(orphanedRelations.slice(i, i + batchSize))
       }
 
-      this.logger.info(`📦 Procesando ${batches.length} lotes de categorías huérfanas...`)
+      this.logger.info(`Procesando ${batches.length} lotes de categorías huérfanas...`)
 
       const batchPromises = batches.map((batch) =>
         limit(async () => {
@@ -747,7 +738,7 @@ export default class CompleteSyncService {
               deleted += Array.isArray(result) ? result.length : result
             } catch (error) {
               this.logger.error(
-                `❌ Error eliminando categoría huérfana ${relation.product_id}-${relation.category_id}:`,
+                `Error eliminando categoría huérfana ${relation.product_id}-${relation.category_id}:`,
                 error
               )
             }
@@ -759,10 +750,10 @@ export default class CompleteSyncService {
       const results = await Promise.all(batchPromises)
       const totalDeleted = results.reduce((sum, count) => sum + count, 0)
 
-      this.logger.info(`✅ Categorías huérfanas eliminadas: ${totalDeleted}`)
+      this.logger.info(`Categorías huérfanas eliminadas: ${totalDeleted}`)
       return totalDeleted
     } catch (error) {
-      this.logger.error('❌ Error en limpieza de categorías antes de guardar:', error)
+      this.logger.error('Error en limpieza de categorías antes de guardar:', error)
       return 0
     }
   }

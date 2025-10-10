@@ -10,7 +10,7 @@ import ImageProcessingService from './image_processing_service.js'
 import CategoriesService from './categories_service.js'
 import Category from '#models/category'
 /**
- * 🏷️ Tipo para productos con variantes formateadas según el modelo
+ * Tipo para productos con variantes formateadas según el modelo
  */
 type FormattedProductWithModelVariants = Omit<FormattedProduct, 'variants'> & {
   variants: FormattedVariantForModel[]
@@ -41,11 +41,11 @@ export default class FormatVariantsService {
   }
 
   // ========================================
-  // 🎯 MÉTODOS PÚBLICOS PRINCIPALES
+  // MÉTODOS PÚBLICOS PRINCIPALES
   // ========================================
 
   /**
-   * 🔄 Formatea las variantes de una lista de productos
+   * Formatea las variantes de una lista de productos
    * @param productsList - Lista de productos con variantes
    * @param currentChannelConfig - Configuración del canal actual
    * @returns Lista de productos con variantes formateadas
@@ -76,11 +76,11 @@ export default class FormatVariantsService {
   }
 
   // ========================================
-  // 🔄 MÉTODOS DE PROCESAMIENTO DE VARIANTES
+  // MÉTODOS DE PROCESAMIENTO DE VARIANTES
   // ========================================
 
   /**
-   * 🔄 Procesa una variante individual y la formatea para la base de datos
+   * Procesa una variante individual y la formatea para la base de datos
    * @param variant - Variante de Bigcommerce
    * @param product - Producto padre de la variante
    * @param config - Configuración del canal
@@ -105,11 +105,11 @@ export default class FormatVariantsService {
   }
 
   // ========================================
-  // 📊 MÉTODOS DE DATOS DE VARIANTES
+  // MÉTODOS DE DATOS DE VARIANTES
   // ========================================
 
   /**
-   * 🔍 Obtiene el nivel de inventario de una variante específica
+   * Obtiene el nivel de inventario de una variante específica
    * @param variant - Variante de Bigcommerce
    * @returns Array con los datos de inventario de la variante
    */
@@ -131,7 +131,7 @@ export default class FormatVariantsService {
 
       return variantInventoryLevel
     } catch (error) {
-      this.logger.warn('⚠️ Error obteniendo inventario para variante', {
+      this.logger.warn('Error obteniendo inventario para variante', {
         variant_id: variant.id,
         sku: variant.sku,
         error: error.message,
@@ -196,7 +196,7 @@ export default class FormatVariantsService {
         }
       }
     } catch (error) {
-      this.logger.warn('⚠️ Sin datos de precios para variante', {
+      this.logger.warn('Sin datos de precios para variante', {
         variant_id: variant.id,
         sku: variant.sku,
         error: error.message,
@@ -206,7 +206,7 @@ export default class FormatVariantsService {
   }
 
   /**
-   * 📊 Procesa los datos asíncronos de la variante (inventario, precios)
+   * Procesa los datos asíncronos de la variante (inventario, precios)
    * @param variant - Variante de Bigcommerce
    * @param product - Producto padre
    * @param percentDiscount - Porcentaje de descuento
@@ -228,7 +228,7 @@ export default class FormatVariantsService {
         percentDiscount || FormatVariantsService.DEFAULT_PERCENT_DISCOUNT
       )
     } catch (error) {
-      this.logger.warn('⚠️ Error procesando datos de la variante', {
+      this.logger.warn('Error procesando datos de la variante', {
         variant_id: variant.id,
         sku: variant.sku,
         error: error.message,
@@ -243,11 +243,11 @@ export default class FormatVariantsService {
   }
 
   // ========================================
-  // 🏷️ MÉTODOS DE KEYWORDS Y CATEGORÍAS
+  // MÉTODOS DE KEYWORDS Y CATEGORÍAS
   // ========================================
 
   /**
-   * 🏷️ Genera keywords basados en categorías, tags y campañas del producto
+   * Genera keywords basados en categorías, tags y campañas del producto
    * @param product - Producto con sus categorías
    * @param config - Configuración del canal
    * @returns String con keywords separados por comas
@@ -277,7 +277,7 @@ export default class FormatVariantsService {
             ? categories.map((cat: any) => cat.category_id || cat)
             : []
         } catch (error) {
-          this.logger.warn('⚠️ Error parseando categorías del producto', {
+          this.logger.warn('Error parseando categorías del producto', {
             product_id: product.product_id,
             categories: product.categories,
             error: error.message,
@@ -317,7 +317,7 @@ export default class FormatVariantsService {
       const keywords = [...categoryTitles, ...tags, ...campaigns].filter(Boolean).join(', ')
       return keywords
     } catch (error) {
-      this.logger.warn('⚠️ Error generando keywords para producto', {
+      this.logger.warn('Error generando keywords para producto', {
         product_id: product.product_id,
         error: error.message,
       })

@@ -32,20 +32,20 @@ export default class CategoryProduct extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // ✅ MÉTODOS PARA OPERACIONES MASIVAS
+  // MÉTODOS PARA OPERACIONES MASIVAS
   /**
-   * 🔄 Sincroniza categorías de un producto (elimina existentes y crea nuevas)
+   * Sincroniza categorías de un producto (elimina existentes y crea nuevas)
    * @param productId - ID del producto
    * @param categoryIds - Array de IDs de categorías
    * @returns Promise<boolean> - true si la sincronización fue exitosa
-   * ⚠️ NECESARIO: Usado en sincronización de productos
+   * NECESARIO: Usado en sincronización de productos
    */
   static async syncCategoriesForProduct(productId: number, categoryIds: number[]) {
     try {
-      // ✅ 1. Eliminar categorías existentes del producto
+      // 1. Eliminar categorías existentes del producto
       await CategoryProduct.query().where('product_id', productId).delete()
 
-      // ✅ 2. Crear nuevas relaciones
+      // 2. Crear nuevas relaciones
       if (categoryIds.length > 0) {
         const categoriesToCreate = categoryIds.map((categoryId) => ({
           product_id: productId,
@@ -57,21 +57,21 @@ export default class CategoryProduct extends BaseModel {
 
       return true
     } catch (error) {
-      console.error('❌ Error sincronizando categorías:', error)
+      console.error('Error sincronizando categorías:', error)
       throw error
     }
   }
 
   /**
-   * ➕ Adjunta categorías adicionales a un producto (sin duplicados)
+   * Adjunta categorías adicionales a un producto (sin duplicados)
    * @param productId - ID del producto
    * @param categoryIds - Array de IDs de categorías a adjuntar
    * @returns Promise<boolean> - true si la operación fue exitosa
-   * ⚠️ NECESARIO: Para agregar categorías sin eliminar existentes
+   * NECESARIO: Para agregar categorías sin eliminar existentes
    */
   static async attachCategoriesToProduct(productId: number, categoryIds: number[]) {
     try {
-      // ✅ Verificar que no existan duplicados
+      // Verificar que no existan duplicados
       const existingCategories = await CategoryProduct.query()
         .where('product_id', productId)
         .whereIn('category_id', categoryIds)
@@ -91,17 +91,17 @@ export default class CategoryProduct extends BaseModel {
 
       return true
     } catch (error) {
-      console.error('❌ Error adjuntando categorías:', error)
+      console.error('Error adjuntando categorías:', error)
       throw error
     }
   }
 
   /**
-   * ➖ Desadjunta categorías específicas de un producto
+   * Desadjunta categorías específicas de un producto
    * @param productId - ID del producto
    * @param categoryIds - Array de IDs de categorías a desadjuntar
    * @returns Promise<boolean> - true si la operación fue exitosa
-   * ⚠️ NECESARIO: Para remover categorías específicas
+   * NECESARIO: Para remover categorías específicas
    */
   static async detachCategoriesFromProduct(productId: number, categoryIds: number[]) {
     try {
@@ -112,16 +112,16 @@ export default class CategoryProduct extends BaseModel {
 
       return true
     } catch (error) {
-      console.error('❌ Error desadjuntando categorías:', error)
+      console.error('Error desadjuntando categorías:', error)
       throw error
     }
   }
 
   /**
-   * 📋 Obtiene todas las categorías de un producto específico
+   * Obtiene todas las categorías de un producto específico
    * @param productId - ID del producto
    * @returns Promise<CategoryProduct[]> - Lista de categorías con preload
-   * ✅ NECESARIO: Para consultas de productos y sus categorías
+   * NECESARIO: Para consultas de productos y sus categorías
    */
   static async getCategoriesByProductId(productId: number) {
     try {
@@ -130,16 +130,16 @@ export default class CategoryProduct extends BaseModel {
         .preload('category')
         .orderBy('category_id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo categorías del producto:', error)
+      console.error('Error obteniendo categorías del producto:', error)
       throw error
     }
   }
 
   /**
-   * 📦 Obtiene todos los productos de una categoría específica
+   * Obtiene todos los productos de una categoría específica
    * @param categoryId - ID de la categoría
    * @returns Promise<CategoryProduct[]> - Lista de productos con preload
-   * ✅ NECESARIO: Para consultas de categorías y sus productos
+   * NECESARIO: Para consultas de categorías y sus productos
    */
   static async getProductsByCategoryId(categoryId: number) {
     try {
@@ -148,7 +148,7 @@ export default class CategoryProduct extends BaseModel {
         .preload('product')
         .orderBy('product_id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo productos de la categoría:', error)
+      console.error('Error obteniendo productos de la categoría:', error)
       throw error
     }
   }

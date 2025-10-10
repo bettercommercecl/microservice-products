@@ -50,7 +50,7 @@ export default class BrandService {
   async deleteBrand(id: number) {
     const brand = await Brand.findOrFail(id)
     await brand.delete()
-    return { success: true, message: 'Marca eliminada exitosamente' }
+    return { success: true, message: 'Marca eliminada correctamente' }
   }
 
   /**
@@ -58,7 +58,7 @@ export default class BrandService {
    */
   async syncBrands() {
     try {
-      // 🔍 Validar conexión con BigCommerce
+      // Validar conexión con BigCommerce
       const brands = await this.bigCommerceService.getBrands()
 
       if (!brands || !Array.isArray(brands)) {
@@ -88,10 +88,10 @@ export default class BrandService {
         processed: [] as any[],
       }
 
-      // 🚀 Procesar marcas de forma secuencial para mejor control de errores
+      // Procesar marcas de forma secuencial para mejor control de errores
       for (const brandData of brands) {
         try {
-          // ✅ Validar datos de entrada
+          // Validar datos de entrada
           if (!brandData.id || !brandData.name) {
             throw new Error(`Datos de marca inválidos: ID o nombre faltante`)
           }
@@ -102,7 +102,7 @@ export default class BrandService {
             name: brandData.name.trim(), // Limpiar espacios
           }
 
-          // 🔄 Crear o actualizar marca
+          // Crear o actualizar marca
           const existingBrand = await Brand.updateOrCreate(searchPayload, persistancePayload)
 
           if (existingBrand.$isNew) {
@@ -116,10 +116,10 @@ export default class BrandService {
           const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
           results.errors.push({ brand: brandData, error: errorMessage })
 
-          // 🔍 Clasificar tipo de error
+          // Clasificar tipo de error
           if (error instanceof Error) {
             if (error.message.includes('column') || error.message.includes('constraint')) {
-              this.logger.error('❌ Error de base de datos para marca', {
+              this.logger.error('Error de base de datos para marca', {
                 brand_name: brandData.name,
                 brand_id: brandData.id,
                 error: error.message,
@@ -131,7 +131,7 @@ export default class BrandService {
                 error: error.message,
               })
             } else {
-              this.logger.warn('⚠️ Error al procesar marca', {
+              this.logger.warn('Error al procesar marca', {
                 brand_name: brandData.name,
                 brand_id: brandData.id,
                 error: error.message,
@@ -141,12 +141,12 @@ export default class BrandService {
         }
       }
 
-      // 📊 Generar resumen de resultados
+      // Generar resumen de resultados
       const totalProcessed = results.created + results.updated + results.errors.length
       const hasErrors = results.errors.length > 0
 
       if (hasErrors) {
-        this.logger.warn('⚠️ Errores en sincronización de marcas', {
+        this.logger.warn('Errores en sincronización de marcas', {
           created: results.created,
           updated: results.updated,
           errors: results.errors.length,
@@ -158,7 +158,7 @@ export default class BrandService {
         success: !hasErrors,
         message: hasErrors
           ? `Sincronización completada con ${results.errors.length} errores`
-          : 'Marcas sincronizadas exitosamente',
+          : 'Marcas sincronizadas',
         data: results.processed,
         meta: {
           total: brands.length,
@@ -170,11 +170,11 @@ export default class BrandService {
         errors: hasErrors ? results.errors : [],
       }
     } catch (error) {
-      this.logger.error('❌ Error crítico en sincronización de marcas', {
+      this.logger.error('Error crítico en sincronización de marcas', {
         error: error.message,
       })
 
-      // 🔍 Clasificar error crítico
+      // Clasificar error crítico
       let errorMessage = 'Error desconocido en sincronización'
       if (error instanceof Error) {
         if (error.message.includes('timeout') || error.message.includes('ECONNREFUSED')) {

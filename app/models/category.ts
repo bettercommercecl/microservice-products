@@ -40,7 +40,7 @@ export default class Category extends BaseModel {
   })
   declare children: HasMany<typeof Category>
 
-  // ✅ RELACIONES FALTANTES
+  // RELACIONES FALTANTES
   @belongsTo(() => Category, {
     foreignKey: 'parent_id',
     localKey: 'category_id',
@@ -62,7 +62,7 @@ export default class Category extends BaseModel {
   declare updatedAt: DateTime
 
   /**
-   * 📦 Obtiene todos los productos de esta categoría
+   * Obtiene todos los productos de esta categoría
    * @returns Promise<CategoryProduct[]> - Lista de productos con preload
    */
   async getProducts() {
@@ -72,13 +72,13 @@ export default class Category extends BaseModel {
         .preload('product')
         .orderBy('product_id', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo productos de la categoría:', error)
+      console.error('Error obteniendo productos de la categoría:', error)
       throw error
     }
   }
 
   /**
-   * 🔢 Cuenta el total de productos en esta categoría
+   * Cuenta el total de productos en esta categoría
    * @returns Promise<number> - Número total de productos
    */
   async getProductsCount(): Promise<number> {
@@ -89,13 +89,13 @@ export default class Category extends BaseModel {
         .first()
         .then((result) => result?.$extras.total || 0)
     } catch (error) {
-      console.error('❌ Error contando productos de la categoría:', error)
+      console.error('Error contando productos de la categoría:', error)
       return 0
     }
   }
 
   /**
-   * 👆 Obtiene la categoría padre de esta categoría
+   * Obtiene la categoría padre de esta categoría
    * @returns Promise<Category | null> - Categoría padre o null si es raíz
    */
   async getParentCategory() {
@@ -103,26 +103,26 @@ export default class Category extends BaseModel {
       if (!this.parent_id) return null
       return await Category.query().where('category_id', this.parent_id).first()
     } catch (error) {
-      console.error('❌ Error obteniendo categoría padre:', error)
+      console.error('Error obteniendo categoría padre:', error)
       throw error
     }
   }
 
   /**
-   * 👶 Obtiene todas las categorías hijas de esta categoría
+   * Obtiene todas las categorías hijas de esta categoría
    * @returns Promise<Category[]> - Lista de categorías hijas ordenadas
    */
   async getChildCategories() {
     try {
       return await Category.query().where('parent_id', this.category_id).orderBy('order', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo categorías hijas:', error)
+      console.error('Error obteniendo categorías hijas:', error)
       throw error
     }
   }
 
   /**
-   * 🛤️ Obtiene la ruta completa desde la raíz hasta esta categoría
+   * Obtiene la ruta completa desde la raíz hasta esta categoría
    * @returns Promise<string[]> - Array con los nombres de categorías en orden jerárquico
    */
   async getFullPath(): Promise<string[]> {
@@ -137,13 +137,13 @@ export default class Category extends BaseModel {
 
       return path
     } catch (error) {
-      console.error('❌ Error obteniendo ruta completa:', error)
+      console.error('Error obteniendo ruta completa:', error)
       return [this.title]
     }
   }
 
   /**
-   * 🍃 Verifica si esta categoría es una hoja (sin categorías hijas)
+   * Verifica si esta categoría es una hoja (sin categorías hijas)
    * @returns Promise<boolean> - true si es hoja, false si tiene hijos
    */
   async isLeaf(): Promise<boolean> {
@@ -151,13 +151,13 @@ export default class Category extends BaseModel {
       const children = await this.getChildCategories()
       return children.length === 0
     } catch (error) {
-      console.error('❌ Error verificando si es hoja:', error)
+      console.error('Error verificando si es hoja:', error)
       return true
     }
   }
 
   /**
-   * 📏 Calcula la profundidad de esta categoría en el árbol jerárquico
+   * Calcula la profundidad de esta categoría en el árbol jerárquico
    * @returns Promise<number> - Nivel de profundidad (0 = raíz)
    */
   async getDepth(): Promise<number> {
@@ -165,26 +165,26 @@ export default class Category extends BaseModel {
       const path = await this.getFullPath()
       return path.length - 1
     } catch (error) {
-      console.error('❌ Error obteniendo profundidad:', error)
+      console.error('Error obteniendo profundidad:', error)
       return 0
     }
   }
 
   /**
-   * 🌳 Obtiene todas las categorías raíz (sin padre)
+   * Obtiene todas las categorías raíz (sin padre)
    * @returns Promise<Category[]> - Lista de categorías raíz ordenadas
    */
   static async getRootCategories() {
     try {
       return await Category.query().whereNull('parent_id').orderBy('order', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo categorías raíz:', error)
+      console.error('Error obteniendo categorías raíz:', error)
       throw error
     }
   }
 
   /**
-   * 🌲 Construye el árbol completo de categorías con sus hijos anidados
+   * Construye el árbol completo de categorías con sus hijos anidados
    * @returns Promise<any[]> - Árbol de categorías con estructura jerárquica
    */
   static async getCategoryTree() {
@@ -204,13 +204,13 @@ export default class Category extends BaseModel {
 
       return await buildTree(rootCategories)
     } catch (error) {
-      console.error('❌ Error construyendo árbol de categorías:', error)
+      console.error('Error construyendo árbol de categorías:', error)
       throw error
     }
   }
 
   /**
-   * 👶 Obtiene todas las categorías hijas de un padre específico
+   * Obtiene todas las categorías hijas de un padre específico
    * @param parentId - ID de la categoría padre
    * @returns Promise<Category[]> - Lista de categorías hijas ordenadas
    */
@@ -218,7 +218,7 @@ export default class Category extends BaseModel {
     try {
       return await Category.query().where('parent_id', parentId).orderBy('order', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo categorías por padre:', error)
+      console.error('Error obteniendo categorías por padre:', error)
       throw error
     }
   }

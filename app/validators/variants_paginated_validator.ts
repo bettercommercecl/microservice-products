@@ -5,11 +5,11 @@ import { channels } from '#utils/channels/channels'
 // 🌍 Obtener el country code del environment
 const countryCode = env.get('COUNTRY_CODE') as 'CL' | 'CO' | 'PE'
 
-// 🏷️ Obtener los channel_ids válidos según el país
+// Obtener los channel_ids válidos según el país
 const getValidChannelIds = (country: 'CL' | 'CO' | 'PE'): number[] => {
   const validIds: number[] = []
 
-  // 🔍 Iterar sobre todas las marcas en channels.ts
+  // Iterar sobre todas las marcas en channels.ts
   Object.values(channels).forEach((brand) => {
     const countryConfig = brand[country as keyof typeof brand] as any
     if (countryConfig?.CHANNEL) {
@@ -22,7 +22,7 @@ const getValidChannelIds = (country: 'CL' | 'CO' | 'PE'): number[] => {
 
 const validChannelIds = getValidChannelIds(countryCode)
 
-// 📋 Esquema de validación para variantes paginadas
+// Esquema de validación para variantes paginadas
 export const variantsPaginatedSchema = vine.object({
   page: vine.number().transform((value: any) => {
     const numValue = Number(value)
@@ -35,7 +35,7 @@ export const variantsPaginatedSchema = vine.object({
   limit: vine.number().transform((value: any) => {
     const numValue = Number(value)
     if (Number.isNaN(numValue) || numValue <= 0) {
-      throw new Error('📊 El límite debe ser un número positivo mayor a 0')
+      throw new Error('El límite debe ser un número positivo mayor a 0')
     }
     return numValue
   }),
@@ -63,5 +63,5 @@ export const variantsPaginatedSchema = vine.object({
     }),
 })
 
-// 🔍 Tipo TypeScript para el esquema validado
+// Tipo TypeScript para el esquema validado
 export type VariantsPaginatedSchema = typeof variantsPaginatedSchema

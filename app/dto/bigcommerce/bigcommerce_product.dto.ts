@@ -1,5 +1,5 @@
 /**
- * 🎯 DTOs para productos de Bigcommerce
+ * DTOs para productos de Bigcommerce
  * Interfaces que definen la estructura de datos que devuelve la API de Bigcommerce
  */
 
@@ -21,7 +21,7 @@ export interface BigcommerceProductImage {
 }
 
 /**
- * 🔧 Variante de producto de Bigcommerce
+ * Variante de producto de Bigcommerce
  */
 export interface BigcommerceProductVariant {
   id: number
@@ -63,7 +63,7 @@ export interface BigcommerceGiftWrappingOption {
 }
 
 /**
- * 🔗 URL personalizada de Bigcommerce
+ * URL personalizada de Bigcommerce
  */
 export interface BigcommerceCustomUrl {
   url: string
@@ -71,7 +71,7 @@ export interface BigcommerceCustomUrl {
 }
 
 /**
- * 📦 Producto completo de Bigcommerce
+ * Producto completo de Bigcommerce
  */
 export interface BigcommerceProduct {
   id: number
@@ -148,7 +148,7 @@ export interface BigcommerceProduct {
 }
 
 /**
- * 📋 Respuesta de la API de Bigcommerce para productos
+ * Respuesta de la API de Bigcommerce para productos
  */
 export interface BigcommerceProductsResponse {
   data: BigcommerceProduct[]
@@ -172,7 +172,7 @@ export interface BigcommerceProductChannelResponse {
   data: BigcommerceProductChannelAssignment[]
 }
 /**
- * 🔗 Asignación simple de producto a canal de Bigcommerce
+ * Asignación simple de producto a canal de Bigcommerce
  */
 export interface BigcommerceProductChannelAssignment {
   product_id: number
@@ -180,7 +180,7 @@ export interface BigcommerceProductChannelAssignment {
 }
 
 /**
- * 🔗 Asignación completa de producto a canal de Bigcommerce
+ * Asignación completa de producto a canal de Bigcommerce
  */
 export interface BigcommerceProductChannelAssignmentFull {
   product_id: number
@@ -191,7 +191,7 @@ export interface BigcommerceProductChannelAssignmentFull {
 }
 
 /**
- * 📋 Respuesta de la API de Bigcommerce para asignaciones de productos por canal
+ * Respuesta de la API de Bigcommerce para asignaciones de productos por canal
  */
 export interface BigcommerceProductChannelResponse {
   data: BigcommerceProductChannelAssignment[]

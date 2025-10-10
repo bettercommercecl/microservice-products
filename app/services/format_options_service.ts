@@ -3,7 +3,7 @@ import BigCommerceService from './bigcommerce_service.js'
 import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
 
 /**
- * 🔧 Interfaz para opciones formateadas listas para guardar en la DB
+ * Interfaz para opciones formateadas listas para guardar en la DB
  */
 export interface FormattedOption {
   option_id: number
@@ -20,7 +20,7 @@ export default class FormatOptionsService {
   }
 
   /**
-   * 🔧 Formatea opciones para múltiples productos por lotes
+   * Formatea opciones para múltiples productos por lotes
    * @param products - Array de productos con variantes formateadas
    * @returns Array plano de opciones listas para guardar
    */
@@ -29,9 +29,9 @@ export default class FormatOptionsService {
       return []
     }
 
-    // 🚀 OPTIMIZACIÓN EXTREMA: Procesamiento paralelo masivo
+    // OPTIMIZACIÓN EXTREMA: Procesamiento paralelo masivo
     try {
-      // 📊 Obtener IDs de productos únicos para evitar duplicados
+      // Obtener IDs de productos únicos para evitar duplicados
       const uniqueProductIds = [...new Set(products.map((p) => p.product_id))]
 
       // 🔥 Procesar todos los productos en paralelo (máximo rendimiento)
@@ -40,31 +40,31 @@ export default class FormatOptionsService {
           const productOptions = await this.formatOptionsByProduct(productId)
           return productOptions
         } catch (error) {
-          this.logger.warn('⚠️ Sin opciones para producto', { product_id: productId })
+          this.logger.warn('Sin opciones para producto', { product_id: productId })
           return []
         }
       })
 
-      // 🚀 Ejecutar todas las promesas en paralelo
+      // Ejecutar todas las promesas en paralelo
       const allResults = await Promise.all(productPromises)
       const allOptions = allResults.flat()
 
       return allOptions
     } catch (error) {
-      this.logger.warn('⚠️ Error en procesamiento paralelo, usando método individual', {
+      this.logger.warn('Error en procesamiento paralelo, usando método individual', {
         error: error.message,
       })
 
-      // 🔄 FALLBACK: Método individual si falla el procesamiento paralelo
+      // FALLBACK: Método individual si falla el procesamiento paralelo
       return this.formatOptionsIndividual(products)
     }
   }
 
-  // 🔄 Método de respaldo para procesamiento individual
+  // Método de respaldo para procesamiento individual
   private async formatOptionsIndividual(
     products: FormattedProductWithModelVariants[]
   ): Promise<FormattedOption[]> {
-    // 🚀 Procesar en lotes paralelos más pequeños
+    // Procesar en lotes paralelos más pequeños
     const BATCH_SIZE = 50
     const batches = []
 
@@ -78,7 +78,7 @@ export default class FormatOptionsService {
           try {
             return await this.formatOptionsByProduct(product.product_id)
           } catch (error) {
-            this.logger.warn('⚠️ Sin opciones para producto', { product_id: product.product_id })
+            this.logger.warn('Sin opciones para producto', { product_id: product.product_id })
             return []
           }
         })
@@ -92,7 +92,7 @@ export default class FormatOptionsService {
   }
 
   /**
-   * 🔧 Formatea opciones para un producto específico
+   * Formatea opciones para un producto específico
    * @param productId - ID del producto
    * @returns Array de opciones formateadas para el producto
    */
@@ -125,7 +125,7 @@ export default class FormatOptionsService {
 
       return productOptions
     } catch (error) {
-      this.logger.warn('⚠️ Error obteniendo opciones para producto', {
+      this.logger.warn('Error obteniendo opciones para producto', {
         product_id: productId,
         error: error.message,
       })
@@ -133,7 +133,7 @@ export default class FormatOptionsService {
     }
   }
   /**
-   * 🔧 Formatea valores de las opciones del producto
+   * Formatea valores de las opciones del producto
    * @param options - Array de opciones de Bigcommerce
    * @returns Array de opciones formateadas
    */

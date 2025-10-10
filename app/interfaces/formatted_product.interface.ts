@@ -3,7 +3,7 @@ import { ChannelConfigInterface } from './channel_interface.js'
 import { DateTime } from 'luxon'
 
 /**
- * 🏷️ Interfaz para la configuración de procesamiento de productos
+ * Interfaz para la configuración de procesamiento de productos
  * Extrae solo los campos necesarios de ChannelConfigInterface usando Pick
  */
 export type ProductProcessingConfig = Pick<
@@ -18,7 +18,7 @@ export type ProductProcessingConfig = Pick<
 >
 
 /**
- * 🏷️ Interfaz para los valores de opciones de variantes
+ * Interfaz para los valores de opciones de variantes
  */
 export interface VariantOptionValue {
   id: number
@@ -28,7 +28,7 @@ export interface VariantOptionValue {
 }
 
 /**
- * 🏷️ Interfaz para variantes de productos
+ * Interfaz para variantes de productos
  */
 export interface FormattedVariant {
   // Identificadores y información básica
@@ -71,7 +71,7 @@ export interface FormattedVariant {
 }
 
 /**
- * 🏷️ Interfaz para productos formateados listos para la base de datos
+ * Interfaz para productos formateados listos para la base de datos
  * Representa la estructura de datos que se guarda en la tabla 'products'
  */
 export interface FormattedProduct {
@@ -143,7 +143,7 @@ export type { FormattedVariantForModel } from './formatted_variant_for_model.int
 import type { FormattedVariantForModel } from './formatted_variant_for_model.interface.js'
 
 /**
- * 🏷️ Tipo para productos con variantes formateadas según el modelo
+ * Tipo para productos con variantes formateadas según el modelo
  */
 export type FormattedProductWithModelVariants = Omit<FormattedProduct, 'variants'> & {
   variants: FormattedVariantForModel[]

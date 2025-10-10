@@ -12,12 +12,8 @@ export default class ChannelsController {
    * Obtiene todos los canales
    */
   async index({ response }: HttpContext) {
-    this.logger.info('🔍 GET /channels - Obteniendo todos los canales...')
-
     try {
       const channels = await Channel.query().orderBy('id', 'asc')
-
-      this.logger.info(`✅ Canales obtenidos exitosamente: ${channels.length} canales`)
 
       return response.ok({
         success: true,
@@ -28,7 +24,7 @@ export default class ChannelsController {
         },
       })
     } catch (error) {
-      this.logger.error('❌ Error obteniendo canales:', error)
+      this.logger.error('Error obteniendo canales:', error)
       throw error
     }
   }
@@ -37,12 +33,9 @@ export default class ChannelsController {
    * Sincroniza los canales desde el archivo de configuració   * Solo sincroniza los canales del país configurado en COUNTRY_CODE
    */
   async sync({ response }: HttpContext) {
-    this.logger.info('🔄 POST /channels/sync - Iniciando sincronización de canales...')
-
     try {
-      // 🎯 Obtener el país configurado
+      // Obtener el país configurado
       const countryCode = env.get('COUNTRY_CODE')
-      this.logger.info(`🌍 País configurado: ${countryCode}`)
 
       const results = {
         created: 0,
@@ -51,14 +44,12 @@ export default class ChannelsController {
         countryCode,
       }
 
-      // 🚀 Iterar sobre cada marca (UF, FC, AF, etc.)
+      // Iterar sobre cada marca (UF, FC, AF, etc.)
       for (const [brandName, countries] of Object.entries(channelsConfig)) {
-        this.logger.info(`📦 Procesando marca: ${brandName}`)
-
-        // 🎯 Solo procesar el país configurado
+        // Solo procesar el país configurado
         const countryConfig = (countries as Record<string, any>)[countryCode]
         if (!countryConfig) {
-          this.logger.warn(`⚠️ No hay configuración para ${brandName} en ${countryCode}`)
+          this.logger.error(`No hay configuración para ${brandName} en ${countryCode}`)
           continue
         }
 
@@ -66,11 +57,7 @@ export default class ChannelsController {
           const channelId = countryConfig.CHANNEL
           const channelName = brandName // Solo la marca, sin el país
 
-          this.logger.info(
-            `🌍 Procesando canal: ${channelName} (ID: ${channelId}) para país ${countryCode}`
-          )
-
-          // ✅ Usar updateOrCreate con el channel_id como id
+          // Usar updateOrCreate con el channel_id como id
           const channel = await Channel.updateOrCreate(
             { id: channelId }, // Buscar por id (que será el channel_id)
             {
@@ -81,27 +68,15 @@ export default class ChannelsController {
 
           if (channel.$isNew) {
             results.created++
-            this.logger.info(
-              `✅ Canal creado: ${channelName} (ID: ${channelId}) para país ${countryCode}`
-            )
           } else {
             results.updated++
-            this.logger.info(
-              `🔄 Canal actualizado: ${channelName} (ID: ${channelId}) para país ${countryCode}`
-            )
           }
         } catch (error) {
           const errorMsg = `Error procesando ${brandName} para ${countryCode}: ${error.message}`
           results.errors.push(errorMsg)
-          this.logger.error(`❌ ${errorMsg}`)
+          this.logger.error(`${errorMsg}`)
         }
       }
-
-      // ✅ Logging del resultado final
-      this.logger.info(`✅ Sincronización de canales completada`)
-      this.logger.info(
-        `📊 Resultados: ${results.created} creados, ${results.updated} actualizados, ${results.errors.length} errores`
-      )
 
       return response.ok({
         success: true,
@@ -113,7 +88,7 @@ export default class ChannelsController {
         },
       })
     } catch (error) {
-      this.logger.error('❌ Error en sincronización de canales:', error)
+      this.logger.error('Error en sincronización de canales:', error)
       throw error
     }
   }
@@ -123,21 +98,18 @@ export default class ChannelsController {
    */
   async show({ params, response }: HttpContext) {
     const { id } = params
-    this.logger.info(`🔍 GET /channels/${id} - Obteniendo canal por ID...`)
 
     try {
       const channel = await Channel.find(id)
 
       if (!channel) {
-        this.logger.warn(`⚠️ Canal no encontrado con ID: ${id}`)
+        this.logger.error(`Canal no encontrado con ID: ${id}`)
         return response.notFound({
           success: false,
           message: 'Canal no encontrado',
           data: null,
         })
       }
-
-      this.logger.info(`✅ Canal obtenido exitosamente: ID ${id}`)
 
       return response.ok({
         success: true,
@@ -147,7 +119,7 @@ export default class ChannelsController {
         },
       })
     } catch (error) {
-      this.logger.error(`❌ Error obteniendo canal ${id}:`, error)
+      this.logger.error(`Error obteniendo canal ${id}:`, error)
       throw error
     }
   }
@@ -157,20 +129,17 @@ export default class ChannelsController {
    */
   async showByName({ params, response }: HttpContext) {
     const { name } = params
-    this.logger.info(`🔍 GET /channels/name/${name} - Obteniendo canal por nombre...`)
 
     try {
-      // 🎯 Validar el formato del nombre del canal
+      // Validar el formato del nombre del canal
       const validatedData = await channelNameValidator.validate({ name })
       const validatedName = validatedData.name
 
-      this.logger.info(`✅ Nombre validado: ${name} → ${validatedName}`)
-
-      // 🔍 Buscar el canal con el nombre validado (en mayúsculas)
+      // Buscar el canal con el nombre validado (en mayúsculas)
       const channel = await Channel.query().where('name', validatedName).first()
 
       if (!channel) {
-        this.logger.warn(`⚠️ Canal no encontrado con nombre: ${validatedName}`)
+        this.logger.error(`Canal no encontrado con nombre: ${validatedName}`)
         return response.notFound({
           success: false,
           message: `Canal no encontrado con nombre: ${validatedName}`,
@@ -182,8 +151,6 @@ export default class ChannelsController {
           },
         })
       }
-
-      this.logger.info(`✅ Canal obtenido exitosamente: ${validatedName}`)
 
       return response.ok({
         success: true,
@@ -197,7 +164,7 @@ export default class ChannelsController {
     } catch (error) {
       // 🚨 Si es error de validación, retornar mensaje descriptivo
       if (error.messages) {
-        this.logger.warn(`⚠️ Error de validación en nombre de canal: ${name}`, error.messages)
+        this.logger.error(`Error de validación en nombre de canal: ${name}`, error.messages)
         return response.badRequest({
           success: false,
           message: 'Formato de nombre de canal inválido',
@@ -213,7 +180,7 @@ export default class ChannelsController {
 
       // 🚨 Si es error de transformación (formato inválido), retornar 400
       if (error.message && error.message.includes('estructura MARCA_PAIS')) {
-        this.logger.warn(`⚠️ Formato inválido de nombre de canal: ${name}`, error.message)
+        this.logger.error(`Formato inválido de nombre de canal: ${name}`, error.message)
         return response.badRequest({
           success: false,
           message: 'Formato de nombre de canal inválido',
@@ -233,7 +200,7 @@ export default class ChannelsController {
         })
       }
 
-      this.logger.error(`❌ Error obteniendo canal ${name}:`, error)
+      this.logger.error(`Error obteniendo canal ${name}:`, error)
       throw error
     }
   }
@@ -242,12 +209,8 @@ export default class ChannelsController {
    * Obtiene canales con productos
    */
   async withProducts({ response }: HttpContext) {
-    this.logger.info('🔍 GET /channels/with-products - Obteniendo canales con productos...')
-
     try {
       const channels = await Channel.getChannelsWithProducts()
-
-      this.logger.info(`✅ Canales con productos obtenidos: ${channels.length} canales`)
 
       return response.ok({
         success: true,
@@ -258,7 +221,7 @@ export default class ChannelsController {
         },
       })
     } catch (error) {
-      this.logger.error('❌ Error obteniendo canales con productos:', error)
+      this.logger.error('Error obteniendo canales con productos:', error)
       throw error
     }
   }

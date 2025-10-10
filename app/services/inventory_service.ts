@@ -15,7 +15,7 @@ export default class InventoryService {
   }
 
   /**
-   * 📦 Obtiene inventario por ID de variante desde microservicio externo
+   * Obtiene inventario por ID de variante desde microservicio externo
    */
   async getInventoryByVariantId(variant_id: number) {
     try {
@@ -30,7 +30,7 @@ export default class InventoryService {
 
       return response.data
     } catch (error) {
-      this.logger.error('❌ Error obteniendo inventario por variante', {
+      this.logger.error('Error obteniendo inventario por variante', {
         variant_id,
         error: error.message,
       })
@@ -39,7 +39,7 @@ export default class InventoryService {
   }
 
   /**
-   * 🔄 Actualiza inventario de producto en microservicio externo
+   * Actualiza inventario de producto en microservicio externo
    */
   async updateInventory(product_id: number, quantity: number) {
     try {
@@ -54,7 +54,7 @@ export default class InventoryService {
 
       return response.data
     } catch (error) {
-      this.logger.error('❌ Error actualizando inventario', {
+      this.logger.error('Error actualizando inventario', {
         product_id,
         quantity,
         error: error.message,
@@ -64,12 +64,12 @@ export default class InventoryService {
   }
 
   /**
-   * 🛡️ Sincroniza stock de seguridad desde BigCommerce
+   * Sincroniza stock de seguridad desde BigCommerce
    * Responsabilidad: Gestionar todo lo relacionado con stock de seguridad
    */
   async syncSafeStock() {
     try {
-      this.logger.info('🛡️ Iniciando sincronización de stock de seguridad...')
+      this.logger.info('Iniciando sincronización de stock de seguridad...')
 
       const productInventory = await this.bigCommerceService.getSafeStockGlobal()
 
@@ -84,7 +84,7 @@ export default class InventoryService {
           bin_picking_number: item.settings.bin_picking_number,
         }))
 
-        // 🔧 Eliminar duplicados por SKU (mantener el último registro)
+        // Eliminar duplicados por SKU (mantener el último registro)
         const uniqueInventory = formattedInventory.reduce(
           (acc, current) => {
             acc[current.sku] = current
@@ -109,7 +109,7 @@ export default class InventoryService {
           },
         }
       } else if (productInventory && productInventory.status === 'Error') {
-        this.logger.error('❌ Error en respuesta de BigCommerce para stock de seguridad')
+        this.logger.error('Error en respuesta de BigCommerce para stock de seguridad')
         return productInventory
       }
 
@@ -119,7 +119,7 @@ export default class InventoryService {
         data: null,
       }
     } catch (error) {
-      this.logger.error('❌ Error crítico al sincronizar stock de seguridad', {
+      this.logger.error('Error crítico al sincronizar stock de seguridad', {
         error: error.message,
       })
       return {
@@ -131,7 +131,7 @@ export default class InventoryService {
   }
 
   /**
-   * 📊 Obtiene estadísticas de stock de seguridad
+   * Obtiene estadísticas de stock de seguridad
    */
   async getSafeStockStats() {
     try {
@@ -148,7 +148,7 @@ export default class InventoryService {
         },
       }
     } catch (error) {
-      this.logger.error('❌ Error obteniendo estadísticas de stock', {
+      this.logger.error('Error obteniendo estadísticas de stock', {
         error: error.message,
       })
       throw error

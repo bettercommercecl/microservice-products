@@ -27,7 +27,7 @@ export default class CalculationService {
 
       return '0%'
     } catch (error) {
-      this.logger.error('❌ Error calculando descuento:', error)
+      this.logger.error('Error calculando descuento:', error)
       return '0%'
     }
   }
@@ -51,13 +51,13 @@ export default class CalculationService {
 
       return Math.round(Math.max(0, transferPrice))
     } catch (error) {
-      this.logger.error('❌ Error calculando precio de transferencia:', error)
+      this.logger.error('Error calculando precio de transferencia:', error)
       return 0
     }
   }
 
   /**
-   * 📊 Calcula el peso volumétrico
+   * Calcula el peso volumétrico
    * @param width - Ancho
    * @param depth - Profundidad
    * @param height - Alto
@@ -82,13 +82,13 @@ export default class CalculationService {
 
       return Math.max(volumetric, weight)
     } catch (error) {
-      this.logger.error('❌ Error calculando peso volumétrico:', error)
+      this.logger.error('Error calculando peso volumétrico:', error)
       return weight
     }
   }
 
   /**
-   * 🎯 Calcula el stock disponible
+   * Calcula el stock disponible
    * @param inventoryLevel - Nivel de inventario
    * @param safetyStock - Stock de seguridad
    * @param availableToSell - Disponible para venta
@@ -106,7 +106,7 @@ export default class CalculationService {
 
       return Math.max(0, inventoryLevel - safetyStock)
     } catch (error) {
-      this.logger.error('❌ Error calculando stock disponible:', error)
+      this.logger.error('Error calculando stock disponible:', error)
       return 0
     }
   }

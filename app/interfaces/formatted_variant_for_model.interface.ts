@@ -1,5 +1,5 @@
 /**
- * 🏷️ Interfaz para variantes formateadas según el modelo Variant.ts
+ * Interfaz para variantes formateadas según el modelo Variant.ts
  * Representa la estructura de datos que se guarda en la tabla 'variants'
  */
 export interface FormattedVariantForModel {

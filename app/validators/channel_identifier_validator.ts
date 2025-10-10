@@ -1,7 +1,7 @@
 import vine from '@vinejs/vine'
 
 /**
- * 🎯 Validador para identificador de canal
+ * Validador para identificador de canal
  * Acepta tanto channel_id (número) como nombre de canal (MARCA)
  * Ejemplos válidos: 1, 1420393, "UF", "fc", "Af"
  */
@@ -11,7 +11,7 @@ export const channelIdentifierValidator = vine.compile(
       .string()
       .trim()
       .transform((value: string) => {
-        // 🔍 Verificar si es un número (channel_id)
+        // Verificar si es un número (channel_id)
         if (/^\d+$/.test(value)) {
           const numericValue = Number.parseInt(value, 10)
           if (numericValue <= 0) {
@@ -24,7 +24,7 @@ export const channelIdentifierValidator = vine.compile(
           }
         }
 
-        // 🔍 Verificar si es un nombre de canal (MARCA)
+        // Verificar si es un nombre de canal (MARCA)
         const upperValue = value.toUpperCase()
         const pattern = /^[A-Z]{2,3}$/
 
@@ -36,7 +36,7 @@ export const channelIdentifierValidator = vine.compile(
           }
         }
 
-        // 🚨 Formato inválido
+        // Formato inválido
         throw new Error(
           'El identificador debe ser un channel_id numérico (ej: 1, 1420393) o un nombre de canal con formato MARCA (ej: UF, FC, AF)'
         )

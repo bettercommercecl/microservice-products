@@ -3,6 +3,8 @@ import Product from '#models/product'
 import CategoryService from '#services/categories_service'
 import env from '#start/env'
 import FiltersProduct from '#models/filters_product'
+import CategoryProduct from '#models/category_product'
+import Category from '#models/category'
 import Logger from '@adonisjs/core/services/logger'
 
 export default class VariantService {
@@ -23,7 +25,7 @@ export default class VariantService {
         data: variants,
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener variantes', { error: error.message })
+      this.logger.error('Error obteniendo variantes', { error: error.message })
       throw new Error(
         `Error al obtener variantes: ${error instanceof Error ? error.message : 'Error desconocido'}`
       )
@@ -75,7 +77,7 @@ export default class VariantService {
             //         ? JSON.parse(product.reviews)
             //         : product.reviews
             //   } catch (error) {
-            //     this.logger.warn(`❌ Error parseando reviews para producto ${product.id}:`, error)
+            //     this.logger.warn(`Error parseando reviews para producto ${product.id}:`, error)
             //     parsedReviews = null
             //   }
             // }
@@ -92,7 +94,7 @@ export default class VariantService {
               sku: variant.sku,
               brand_id: product?.brand_id,
               categoriesArray: variantCategories,
-              categories: variantCategories, // ✅ Ya viene parseado del modelo
+              categories: variantCategories, // Ya viene parseado del modelo
               stock: variant.stock,
               warning_stock: variant.warning_stock,
               normal_price: variant.normal_price,
@@ -131,7 +133,7 @@ export default class VariantService {
       }
       return []
     } catch (error) {
-      this.logger.error('❌ Error formateando variantes', { error: error.message })
+      this.logger.error('Error formateando variantes', { error: error.message })
       throw error
     }
   }
@@ -152,23 +154,19 @@ export default class VariantService {
         data: variants,
       }
     } catch (error) {
-      this.logger.error('❌ Error al obtener variantes por IDs', { ids, error: error.message })
+      this.logger.error('Error obteniendo variantes por IDs', { ids, error: error.message })
       throw new Error(
         `Error al obtener variantes por IDs: ${error instanceof Error ? error.message : 'Error desconocido'}`
       )
     }
   }
 
-  // Nuevo: variantes paginadas optimizadas
   public async getAllVariantsPaginated(page = 1, limit = 100, channelId?: number) {
     try {
-      this.logger.info(
-        `🚀 Iniciando getAllVariantsPaginated - página: ${page}, límite: ${limit}, canal: ${channelId}`
-      )
       let paginated: any
       let productIds: number[] = []
+
       if (channelId) {
-        // 🚀 OPTIMIZACIÓN: Query directa con JOIN para evitar N+1
         paginated = await Variant.query()
           .join('channel_product', 'variants.product_id', 'channel_product.product_id')
           .where('channel_product.channel_id', channelId)
@@ -176,17 +174,13 @@ export default class VariantService {
           .select('variants.*')
           .paginate(page, limit)
 
-        // Obtener product_ids de las variantes paginadas
         productIds = paginated.all().map((variant: any) => variant.product_id)
       } else {
-        // 🚀 OPTIMIZACIÓN: Query más eficiente sin JOIN innecesario
         paginated = await Variant.query().where('is_visible', '=', true).paginate(page, limit)
-
-        // Obtener todos los product_ids de las variantes paginadas
         productIds = paginated.all().map((variant: any) => variant.product_id)
       }
 
-      // 🚀 OPTIMIZACIÓN: Obtener todos los filtros en una sola query
+      // Obtener filtros de productos
       const filtersMap = new Map<number, number[]>()
       if (productIds.length > 0) {
         const allFilters = await FiltersProduct.query().whereIn('product_id', productIds)
@@ -198,38 +192,88 @@ export default class VariantService {
         })
       }
 
-      // 🚀 OPTIMIZACIÓN MASIVA: Cargar todos los datos de productos en una sola query
-      this.logger.info(`🔍 Cargando productos para ${productIds.length} productIds`)
+      // Obtener tags y campaigns
+      const childTags = await this.categoryService.getChildCategories(
+        Number(env.get('ID_BENEFITS'))
+      )
+      const childCampaigns = await this.categoryService.getChildCategories(
+        Number(env.get('ID_CAMPAIGNS'))
+      )
+
+      // Cargar títulos de categorías una sola vez
+      const allCategoryIds = [...new Set([...childTags, ...childCampaigns])]
+      const categoryTitlesMap = new Map<number, string>()
+
+      if (allCategoryIds.length > 0) {
+        const categories = await Category.query()
+          .whereIn('category_id', allCategoryIds)
+          .select(['category_id', 'title'])
+
+        categories.forEach((cat) => {
+          categoryTitlesMap.set(cat.category_id, cat.title)
+        })
+      }
+
+      const childTagsSet = new Set(childTags)
+      const childCampaignsSet = new Set(childCampaigns)
+      const tagsMap = new Map<number, string[]>()
+      const campaignsMap = new Map<number, string[]>()
       const uniqueProductIds = [...new Set(productIds)]
+
+      if (uniqueProductIds.length > 0 && categoryTitlesMap.size > 0) {
+        const productCategories = await CategoryProduct.query()
+          .whereIn('product_id', uniqueProductIds)
+          .whereIn('category_id', allCategoryIds)
+          .select(['product_id', 'category_id'])
+
+        productCategories.forEach((relation) => {
+          const productId = relation.product_id
+          const categoryId = relation.category_id
+          const categoryTitle = categoryTitlesMap.get(categoryId)
+
+          if (!categoryTitle) return
+
+          if (childTagsSet.has(categoryId)) {
+            if (!tagsMap.has(productId)) {
+              tagsMap.set(productId, [])
+            }
+            tagsMap.get(productId)!.push(categoryTitle)
+          }
+
+          if (childCampaignsSet.has(categoryId)) {
+            if (!campaignsMap.has(productId)) {
+              campaignsMap.set(productId, [])
+            }
+            campaignsMap.get(productId)!.push(categoryTitle)
+          }
+        })
+      }
+
+      // Cargar datos de productos
       const productsMap = new Map<number, any>()
 
       if (uniqueProductIds.length > 0) {
-        this.logger.info(
-          `🔍 Ejecutando query de productos para ${uniqueProductIds.length} productos únicos`
-        )
         const products = await Product.query()
           .whereIn('id', uniqueProductIds)
           .preload('categoryProducts')
           .preload('brand')
 
-        this.logger.info(`✅ Productos cargados: ${products.length}`)
         products.forEach((product) => {
           productsMap.set(product.id, product)
         })
       }
 
-      // 🚀 OPTIMIZACIÓN: Procesar variantes sin serialización innecesaria
-      this.logger.info(`🔍 Procesando ${paginated.all().length} variantes`)
+      // Procesar variantes
       const variantsWithFilters = paginated.all().map((variant: any) => {
         const filters = filtersMap.get(variant.product_id) || []
         const product = productsMap.get(variant.product_id)
-
-        // 📦 Construir estructura optimizada (solo campos esenciales)
+        const tags = tagsMap.get(variant.product_id) || []
+        const campaigns = campaignsMap.get(variant.product_id) || []
         const processedVariant = {
           id: variant.id,
           product_id: variant.product_id,
           image: variant.image,
-          images: this.parseJsonField(variant.images), // 🚀 Directo del objeto, no toJSON()
+          images: this.parseJsonField(variant.images),
           title: variant.title,
           page_title: variant.title,
           sku: variant.sku,
@@ -240,8 +284,7 @@ export default class VariantService {
           cash_price: variant.cash_price,
           percent: variant.discount_rate,
           keywords: variant.keywords,
-          filters, // 🎯 Conservar los filtros del canal
-          // 🚀 Campos del producto solo si existe
+          filters,
           ...(product && {
             hover: product.hover,
             description: product.description,
@@ -264,33 +307,24 @@ export default class VariantService {
             categoriesArray: product.categoryProducts?.map((cp: any) => cp.category_id) || [],
             categories: product.categoryProducts?.map((cp: any) => cp.category_id) || [],
           }),
-          // 🚀 Campos fijos para evitar procesamiento
           quantity: 0,
           armed_cost: 0,
           variants: [],
           options: this.parseJsonField(variant.options),
           packs: [],
           sizes: [],
-          tags: [],
-          campaigns: [],
+          tags: tags.length > 0 ? [...new Set(tags)] : [],
+          campaigns: campaigns.length > 0 ? [...new Set(campaigns)] : [],
           reviews: null,
         }
 
         return processedVariant
       })
 
-      this.logger.info(`✅ Variantes procesadas: ${variantsWithFilters.length}`)
-
-      // 🔍 FILTRADO: Agrupar variantes con Size+Color y quedarse con la de menor ID
-      this.logger.info(`🔍 Iniciando filtrado por Size+Color`)
       const filteredVariants = this.filterVariantsBySizeAndColor(variantsWithFilters)
-
-      this.logger.info(
-        `✅ Filtrado completado: ${variantsWithFilters.length} → ${filteredVariants.length} variantes`
-      )
       return { data: filteredVariants, meta: paginated.getMeta() }
     } catch (error) {
-      this.logger.error('❌ Error obteniendo variantes paginadas', {
+      this.logger.error('Error obteniendo variantes paginadas', {
         page,
         limit,
         channelId,
@@ -299,8 +333,9 @@ export default class VariantService {
       throw error
     }
   }
+
   /**
-   * 🔧 Helper para parsear campos JSON de forma segura
+   * Helper para parsear campos JSON de forma segura
    */
   private parseJsonField(field: any): any {
     if (!field) return field
@@ -315,9 +350,7 @@ export default class VariantService {
   }
 
   /**
-   *  Filtra variantes que tengan Size+Color O Solo Size, agrupando por product_id y quedándose con la de menor ID
-   * @param variants - Array de variantes a filtrar
-   * @returns Array filtrado de variantes
+   * Filtra variantes por Size+Color, agrupando por product_id
    */
   private filterVariantsBySizeAndColor(variants: any[]): any[] {
     try {
@@ -326,21 +359,16 @@ export default class VariantService {
           const hasSize = this.hasSizeOptions(variant.options)
 
           if (hasSize) {
-            // 🎯 Agrupar por product_id y mantener solo la de menor ID
             const productId = variant.product_id
 
-            // 🔧 Manejar casos donde product_id es undefined
             if (productId === undefined || productId === null) {
-              // Si no tiene product_id, mantenerla directamente
               acc.variantsWithoutSize.push(variant)
             } else {
-              // Agrupar por product_id normalmente
               if (!acc.selectedMap[productId] || variant.id < acc.selectedMap[productId].id) {
                 acc.selectedMap[productId] = variant
               }
             }
           } else {
-            // 📦 Variantes sin Size se mantienen todas
             acc.variantsWithoutSize.push(variant)
           }
           return acc
@@ -351,28 +379,18 @@ export default class VariantService {
         }
       )
 
-      // Convertir el mapa a array de variantes seleccionadas
       const selectedVariantsArray = Object.values(selectedMap)
-
-      // Combinar resultados finales
       const finalResult = [...selectedVariantsArray, ...variantsWithoutSize]
-
-      this.logger.info(
-        `🔍 Filtrado completado: ${variants.length} → ${finalResult.length} variantes`
-      )
 
       return finalResult
     } catch (error) {
-      this.logger.error('❌ Error filtrando variantes por Size+Color:', error)
-      // En caso de error, devolver las variantes originales
+      this.logger.error('Error filtrando variantes por Size+Color', error)
       return variants
     }
   }
 
   /**
-   * 🔍 Verifica si una variante tiene opciones de Size (con o sin Color)
-   * @param options - Array de opciones de la variante
-   * @returns true si tiene Size, false en caso contrario
+   * Verifica si una variante tiene opciones de Size
    */
   private hasSizeOptions(options: any[]): boolean {
     if (!options || !Array.isArray(options) || options.length === 0) {

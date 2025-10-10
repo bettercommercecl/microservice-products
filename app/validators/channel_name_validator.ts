@@ -1,7 +1,7 @@
 import vine from '@vinejs/vine'
 
 /**
- * 🎯 Validador personalizado para nombres de canal
+ * Validador personalizado para nombres de canal
  * Valida que el nombre tenga la estructura: MARCA_PAIS (ej: UF_CL, FC_CL)
  * Acepta tanto mayúsculas como minúsculas
  */

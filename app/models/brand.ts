@@ -22,20 +22,20 @@ export default class Brand extends BaseModel {
   declare updatedAt: DateTime
 
   /**
-   * 📦 Obtiene todos los productos de esta marca
+   * Obtiene todos los productos de esta marca
    * @returns Promise<Product[]> - Lista de productos ordenados por nombre
    */
   async getProducts() {
     try {
       return await Product.query().where('brand_id', this.id).orderBy('name', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo productos de la marca:', error)
+      console.error('Error obteniendo productos de la marca:', error)
       throw error
     }
   }
 
   /**
-   * 🔢 Cuenta el total de productos de esta marca
+   * Cuenta el total de productos de esta marca
    * @returns Promise<number> - Número total de productos
    */
   async getProductsCount(): Promise<number> {
@@ -46,7 +46,7 @@ export default class Brand extends BaseModel {
         .first()
         .then((result) => result?.$extras.total || 0)
     } catch (error) {
-      console.error('❌ Error contando productos de la marca:', error)
+      console.error('Error contando productos de la marca:', error)
       return 0
     }
   }
@@ -62,7 +62,7 @@ export default class Brand extends BaseModel {
         .where('is_visible', true)
         .orderBy('name', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo productos visibles de la marca:', error)
+      console.error('Error obteniendo productos visibles de la marca:', error)
       throw error
     }
   }
@@ -78,14 +78,14 @@ export default class Brand extends BaseModel {
         .where('is_featured', true)
         .orderBy('name', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo productos destacados de la marca:', error)
+      console.error('Error obteniendo productos destacados de la marca:', error)
       throw error
     }
   }
 
-  // ✅ MÉTODOS ESTÁTICOS ADICIONALES
+  // MÉTODOS ESTÁTICOS ADICIONALES
   /**
-   * 🏷️ Obtiene todas las marcas que tienen productos asignados
+   * Obtiene todas las marcas que tienen productos asignados
    * @returns Promise<Brand[]> - Lista de marcas con productos
    */
   static async getBrandsWithProducts() {
@@ -96,7 +96,7 @@ export default class Brand extends BaseModel {
         })
         .orderBy('name', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo marcas con productos:', error)
+      console.error('Error obteniendo marcas con productos:', error)
       throw error
     }
   }
@@ -113,13 +113,13 @@ export default class Brand extends BaseModel {
         })
         .orderBy('name', 'asc')
     } catch (error) {
-      console.error('❌ Error obteniendo marcas con productos visibles:', error)
+      console.error('Error obteniendo marcas con productos visibles:', error)
       throw error
     }
   }
 
   /**
-   * 🔍 Busca una marca por nombre (búsqueda parcial)
+   * Busca una marca por nombre (búsqueda parcial)
    * @param name - Nombre o parte del nombre de la marca
    * @returns Promise<Brand | null> - Marca encontrada o null
    */
@@ -127,7 +127,7 @@ export default class Brand extends BaseModel {
     try {
       return await Brand.query().where('name', 'ilike', `%${name}%`).first()
     } catch (error) {
-      console.error('❌ Error obteniendo marca por nombre:', error)
+      console.error('Error obteniendo marca por nombre:', error)
       throw error
     }
   }
