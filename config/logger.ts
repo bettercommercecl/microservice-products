@@ -1,6 +1,5 @@
 import env from '#start/env'
-import app from '@adonisjs/core/services/app'
-import { defineConfig, targets } from '@adonisjs/core/logger'
+import { defineConfig } from '@adonisjs/core/logger'
 
 const loggerConfig = defineConfig({
   default: 'app',
@@ -14,12 +13,6 @@ const loggerConfig = defineConfig({
       enabled: true,
       name: env.get('APP_NAME', 'microservicio-productos'),
       level: env.get('LOG_LEVEL', 'info'),
-      transport: {
-        targets: targets()
-          .pushIf(!app.inProduction, targets.pretty()) // ✅ Desarrollo: pretty
-          .pushIf(app.inProduction, targets.file({ destination: 0 })) // ✅ Producción: stdout
-          .toArray(),
-      },
     },
   },
 })
