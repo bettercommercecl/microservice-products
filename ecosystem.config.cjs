@@ -37,16 +37,16 @@ function generateConfig() {
   const prefix = isProduction ? 'prod.' : 'dev.'
   const appName = `${prefix}${name}`
 
-  // 🔧 PM2 crea automáticamente el directorio ~/.pm2/logs/
+  // PM2 crea automáticamente el directorio ~/.pm2/logs/
 
-  console.log(`🚀 Configurando PM2 para: ${appName}`)
-  console.log(`🔍 Debug - NODE_ENV: "${env.NODE_ENV}", isProduction: ${isProduction}`)
-  console.log(`📁 Directorio de logs: ~/.pm2/logs/`)
-  console.log(`📄 Archivo de log: ~/.pm2/logs/${appName}.api.log`)
+  console.log(`Configurando PM2 para: ${appName}`)
+  console.log(`Debug - NODE_ENV: "${env.NODE_ENV}", isProduction: ${isProduction}`)
+  console.log(`Directorio de logs: ~/.pm2/logs/`)
+  console.log(`Archivo de log: ~/.pm2/logs/${appName}.api.log`)
 
   return {
     apps: [
-      // 🚀 API Principal
+      // API Principal
       {
         name: appName,
         script: 'server.js',
@@ -54,17 +54,16 @@ function generateConfig() {
         instances: countryCode === 'CL' && isProduction ? 3 : 1,
         exec_mode: 'cluster',
         env: {
-          ...env, // ✅ Pasar todas las variables del .env
-          LOG_LEVEL: 'info', // ✅ Forzar nivel de log a info
+          ...env, // Pasar todas las variables del .env
+          LOG_LEVEL: 'info', // Forzar nivel de log a info
         },
-        // 🔧 Logs en directorio por defecto de PM2 (~/.pm2/logs/)
-        log_file: `~/.pm2/logs/${appName}.api.log`,
-        error_file: `~/.pm2/logs/${appName}.api-error.log`,
-        out_file: `~/.pm2/logs/${appName}.api-out.log`,
+        // Logs en directorio por defecto de PM2
+        log_file: `/home/ploi/.pm2/logs/${appName}.api.log`,
+        error_file: `/home/ploi/.pm2/logs/${appName}.api-error.log`,
+        out_file: `/home/ploi/.pm2/logs/${appName}.api-out.log`,
         log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-        merge_logs: true,
-        // 🔍 Configuración adicional de logs
-        log_type: 'json',
+        merge_logs: false, // No mezclar logs para mejor debugging
+        // Configuración adicional de logs
         disable_logs: false,
         log_rotate: true,
         log_max_size: '10M',
@@ -83,5 +82,5 @@ function generateConfig() {
   }
 }
 
-// ✅ Exportar configuración generada dinámicamente (CommonJS)
+// Exportar configuración generada dinámicamente (CommonJS)
 module.exports = generateConfig()
