@@ -58,11 +58,17 @@ function generateConfig() {
           ...env, // ✅ Pasar todas las variables del .env
         },
         // 🔧 Logs con rutas absolutas desde el directorio raíz del proyecto
-        log_file: `../logs/${appName}.api.log`,
-        error_file: `../logs/${appName}.api-error.log`,
-        out_file: `../logs/${appName}.api-out.log`,
+        log_file: path.join(__dirname, 'logs', `${appName}.api.log`),
+        error_file: path.join(__dirname, 'logs', `${appName}.api-error.log`),
+        out_file: path.join(__dirname, 'logs', `${appName}.api-out.log`),
         log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
         merge_logs: true,
+        // 🔍 Configuración adicional de logs
+        log_type: 'json',
+        disable_logs: false,
+        log_rotate: true,
+        log_max_size: '10M',
+        log_retain: 7,
         max_memory_restart: '1G',
         restart_delay: 4000,
         autorestart: true,
