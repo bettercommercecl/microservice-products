@@ -58,9 +58,9 @@ function generateConfig() {
           ...env, // ✅ Pasar todas las variables del .env
         },
         // 🔧 Logs con rutas absolutas desde el directorio raíz del proyecto
-        log_file: `./logs/${appName}.api.log`,
-        error_file: `./logs/${appName}.api-error.log`,
-        out_file: `./logs/${appName}.api-out.log`,
+        log_file: `../logs/${appName}.api.log`,
+        error_file: `../logs/${appName}.api-error.log`,
+        out_file: `../logs/${appName}.api-out.log`,
         log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
         merge_logs: true,
         max_memory_restart: '1G',
