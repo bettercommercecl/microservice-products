@@ -55,6 +55,7 @@ function generateConfig() {
         exec_mode: 'cluster',
         env: {
           ...env, // ✅ Pasar todas las variables del .env
+          LOG_LEVEL: 'info', // ✅ Forzar nivel de log a info
         },
         // 🔧 Logs en directorio por defecto de PM2 (~/.pm2/logs/)
         log_file: `~/.pm2/logs/${appName}.api.log`,
