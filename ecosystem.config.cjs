@@ -57,10 +57,10 @@ function generateConfig() {
           ...env, // Pasar todas las variables del .env
           LOG_LEVEL: 'info', // Forzar nivel de log a info
         },
-        // Logs en directorio por defecto de PM2
-        log_file: `/home/ploi/.pm2/logs/${appName}.api.log`,
-        error_file: `/home/ploi/.pm2/logs/${appName}.api-error.log`,
-        out_file: `/home/ploi/.pm2/logs/${appName}.api-out.log`,
+        // Logs en directorio por defecto de PM2 (PM2 agrega el ID del proceso)
+        // log_file: `/home/ploi/.pm2/logs/${appName}.api.log`,
+        // error_file: `/home/ploi/.pm2/logs/${appName}.api-error.log`,
+        // out_file: `/home/ploi/.pm2/logs/${appName}.api-out.log`,
         log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
         merge_logs: false, // No mezclar logs para mejor debugging
         // Configuración adicional de logs
