@@ -11,8 +11,8 @@ const loggerConfig = defineConfig({
   loggers: {
     app: {
       enabled: true,
-      name: env.get('APP_NAME'),
-      level: env.get('LOG_LEVEL'),
+      name: env.get('APP_NAME', 'microservicio-productos'), // ✅ Valor por defecto
+      level: env.get('LOG_LEVEL', 'info'), // ✅ Valor por defecto: info
       transport: {
         targets: [targets.pretty()], // ✅ Siempre escribir a stdout
       },
