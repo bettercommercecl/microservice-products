@@ -37,13 +37,12 @@ function generateConfig() {
   const prefix = isProduction ? 'prod.' : 'dev.'
   const appName = `${prefix}${name}`
 
-  // 🔧 Asegurar que el directorio de logs existe
-  ensureLogsDirectory()
+  // 🔧 PM2 crea automáticamente el directorio ~/.pm2/logs/
 
   console.log(`🚀 Configurando PM2 para: ${appName}`)
   console.log(`🔍 Debug - NODE_ENV: "${env.NODE_ENV}", isProduction: ${isProduction}`)
-  console.log(`📁 Directorio de logs: ${path.join(__dirname, 'logs')}`)
-  console.log(`📄 Archivo de log: ./logs/${appName}.api.log`)
+  console.log(`📁 Directorio de logs: ~/.pm2/logs/`)
+  console.log(`📄 Archivo de log: ~/.pm2/logs/${appName}.api.log`)
 
   return {
     apps: [
@@ -57,10 +56,10 @@ function generateConfig() {
         env: {
           ...env, // ✅ Pasar todas las variables del .env
         },
-        // 🔧 Logs con rutas absolutas desde el directorio raíz del proyecto
-        log_file: path.join(__dirname, 'logs', `${appName}.api.log`),
-        error_file: path.join(__dirname, 'logs', `${appName}.api-error.log`),
-        out_file: path.join(__dirname, 'logs', `${appName}.api-out.log`),
+        // 🔧 Logs en directorio por defecto de PM2 (~/.pm2/logs/)
+        log_file: `~/.pm2/logs/${appName}.api.log`,
+        error_file: `~/.pm2/logs/${appName}.api-error.log`,
+        out_file: `~/.pm2/logs/${appName}.api-out.log`,
         log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
         merge_logs: true,
         // 🔍 Configuración adicional de logs
