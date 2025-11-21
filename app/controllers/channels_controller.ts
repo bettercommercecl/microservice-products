@@ -1,9 +1,7 @@
 import { HttpContext } from '@adonisjs/core/http'
 import Channel from '#models/channel'
 import Logger from '@adonisjs/core/services/logger'
-import { channels as channelsConfig } from '#utils/channels/channels'
 import { channelNameValidator } from '#validators/channel_name_validator'
-import env from '#start/env'
 
 export default class ChannelsController {
   private readonly logger = Logger.child({ service: 'ChannelsController' })
@@ -25,70 +23,6 @@ export default class ChannelsController {
       })
     } catch (error) {
       this.logger.error('Error obteniendo canales:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Sincroniza los canales desde el archivo de configuració   * Solo sincroniza los canales del país configurado en COUNTRY_CODE
-   */
-  async sync({ response }: HttpContext) {
-    try {
-      // Obtener el país configurado
-      const countryCode = env.get('COUNTRY_CODE')
-
-      const results = {
-        created: 0,
-        updated: 0,
-        errors: [] as string[],
-        countryCode,
-      }
-
-      // Iterar sobre cada marca (UF, FC, AF, etc.)
-      for (const [brandName, countries] of Object.entries(channelsConfig)) {
-        // Solo procesar el país configurado
-        const countryConfig = (countries as Record<string, any>)[countryCode]
-        if (!countryConfig) {
-          this.logger.error(`No hay configuración para ${brandName} en ${countryCode}`)
-          continue
-        }
-
-        try {
-          const channelId = countryConfig.CHANNEL
-          const channelName = brandName // Solo la marca, sin el país
-
-          // Usar updateOrCreate con el channel_id como id
-          const channel = await Channel.updateOrCreate(
-            { id: channelId }, // Buscar por id (que será el channel_id)
-            {
-              id: channelId, // El id será el channel_id
-              name: channelName, // Solo la marca
-            }
-          )
-
-          if (channel.$isNew) {
-            results.created++
-          } else {
-            results.updated++
-          }
-        } catch (error) {
-          const errorMsg = `Error procesando ${brandName} para ${countryCode}: ${error.message}`
-          results.errors.push(errorMsg)
-          this.logger.error(`${errorMsg}`)
-        }
-      }
-
-      return response.ok({
-        success: true,
-        message: 'Sincronización de canales completada exitosamente',
-        data: results,
-        meta: {
-          timestamp: new Date().toISOString(),
-          totalProcessed: results.created + results.updated + results.errors.length,
-        },
-      })
-    } catch (error) {
-      this.logger.error('Error en sincronización de canales:', error)
       throw error
     }
   }

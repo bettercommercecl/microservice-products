@@ -48,21 +48,4 @@ export default class CategoriesController {
       },
     })
   }
-
-  /**
-   * Sincroniza las categorías desde BigCommerce
-   */
-  async sync({ response }: HttpContext) {
-    const result = await this.categoryService.syncCategories()
-
-    // Respuesta estándar de sincronización usando Adonis 6
-    return response.ok({
-      success: true,
-      message: result.message,
-      data: result.data,
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    })
-  }
 }

@@ -6,6 +6,16 @@ import CatalogSafeStock from '#models/catalog.safe.stock'
 import db from '@adonisjs/lucid/services/db'
 import { SafeStockItem } from '#interfaces/inventory_interface'
 
+type FormattedInventoryItem = {
+  sku: string
+  variant_id: number
+  product_id: number
+  safety_stock: number
+  warning_level: number
+  available_to_sell: number
+  bin_picking_number: string | number | null | undefined
+}
+
 export default class InventoryService {
   private bigCommerceService: BigCommerceService
   private readonly logger = Logger.child({ service: 'InventoryService' })
@@ -95,7 +105,10 @@ export default class InventoryService {
 
         const deduplicatedInventory = Object.values(uniqueInventory)
 
-        const result = await CatalogSafeStock.updateOrCreateMany('variant_id', deduplicatedInventory)
+        const result = await CatalogSafeStock.updateOrCreateMany(
+          'variant_id',
+          deduplicatedInventory
+        )
 
         return {
           success: true,
@@ -129,7 +142,91 @@ export default class InventoryService {
       }
     }
   }
+  async saveInventoryReserve() {
+    try {
+      const locationId =
+        env.get('COUNTRY_CODE') === 'PE'
+          ? env.get('INVENTORY_RESERVE_PE_ID')
+          : env.get('INVENTORY_RESERVE_CO_ID')
 
+      if (!locationId) {
+        throw new Error('Location ID no está configurado en las variables de entorno')
+      }
+
+      this.logger.info('Iniciando sincronización de inventario de reserva...', {
+        country: env.get('COUNTRY_CODE'),
+        locationId,
+      })
+
+      let productInventory: any =
+        await this.bigCommerceService.getInventoryGlobalReserve(locationId)
+
+      if ('status' in productInventory && productInventory.status === 'Error') {
+        this.logger.error('Error obteniendo inventario de reserva', productInventory)
+        return productInventory
+      }
+
+      if (!Array.isArray(productInventory)) {
+        return {
+          status: 'Error',
+          message: 'Respuesta inválida de BigCommerce para inventario de reserva',
+        }
+      }
+
+      productInventory = productInventory.map(
+        (item: SafeStockItem): FormattedInventoryItem => ({
+          sku: item.identity.sku.trim(),
+          variant_id: item.identity.variant_id,
+          product_id: item.identity.product_id,
+          safety_stock: item.settings.safety_stock,
+          warning_level: item.settings.warning_level,
+          available_to_sell: item.available_to_sell,
+          bin_picking_number: item.settings.bin_picking_number,
+        })
+      )
+
+      const productsReserve = productInventory.filter(
+        (item: FormattedInventoryItem) =>
+          typeof item.bin_picking_number === 'string' && item.bin_picking_number.trim().length > 0
+      )
+
+      if (productsReserve.length === 0) {
+        this.logger.warn('No se encontraron productos con bin_picking_number válido')
+        return {
+          success: true,
+          message: 'No hay productos de reserva para guardar',
+          data: [],
+        }
+      }
+
+      const result = await CatalogSafeStock.updateOrCreateMany('variant_id', productsReserve)
+
+      this.logger.info('Inventario de reserva sincronizado correctamente', {
+        total: productsReserve.length,
+      })
+
+      return {
+        success: true,
+        message: 'Inventario de reserva sincronizado correctamente',
+        data: result,
+        meta: {
+          total: productsReserve.length,
+          timestamp: new Date().toISOString(),
+        },
+      }
+    } catch (error: any) {
+      this.logger.error('Error durante la sincronización de inventario de reserva', {
+        error: error.message,
+        stack: error.stack,
+      })
+      return {
+        status: 'Error',
+        message: 'Error al intentar guardar el inventario de reserva',
+        detail: error.message,
+        stack: error.stack,
+      }
+    }
+  }
   /**
    * Obtiene estadísticas de stock de seguridad
    */

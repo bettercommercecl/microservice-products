@@ -6,6 +6,7 @@ const CategoriesController = () => import('#controllers/categories_controller')
 // Rutas de categorías
 router
   .group(() => {
-    router.get('/sincronizar-categorias', [CategoriesController, 'sync'])
+    router.get('/categories', [CategoriesController, 'index'])
+    router.get('/categories/:id', [CategoriesController, 'show'])
   })
   .prefix('api')

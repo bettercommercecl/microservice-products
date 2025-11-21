@@ -413,4 +413,38 @@ export default class BigCommerceService {
       }
     }
   }
+  async getInventoryGlobalReserve(locationId: string, page = 1) {
+    try {
+      const axiosConfig = {
+        headers: {
+          'X-Auth-Token': env.get('BIGCOMMERCE_API_TOKEN'),
+          'Content-Type': 'application/json',
+          'host': 'api.bigcommerce.com',
+        },
+      }
+
+      const endpoint = `${this.baseUrl}/v3/inventory/locations/${locationId}/items?page=`
+
+      const firstPageResponse = await axios.get(endpoint + page, axiosConfig)
+      const totalPages = firstPageResponse.data.meta.pagination.total_pages
+      const pagesToFetch = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
+
+      const pagesData = await Promise.all(
+        pagesToFetch.map((pageNumber) =>
+          axios.get(endpoint + pageNumber, axiosConfig).then((response) => response.data.data)
+        )
+      )
+      const inventory = [...firstPageResponse.data.data, ...pagesData.flat()]
+
+      return inventory
+    } catch (error) {
+      console.log(error)
+      return {
+        status: 'Error',
+        message: `Error al intentar obtener el stock de seguridad desde BigCommerce para location ${locationId}`,
+        code: error.message,
+        title: error.response?.data?.title || 'Error desconocido',
+      }
+    }
+  }
 }

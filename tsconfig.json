@@ -25,7 +25,8 @@
       "#config/*": ["./config/*"],
       "#utils/*": ["./app/utils/*"],
       "#dto/*": ["./app/dto/*"],
-      "#interfaces/*": ["./app/interfaces/*"]
+      "#interfaces/*": ["./app/interfaces/*"],
+      "#infrastructure/*": ["./app/infrastructure/*"]
     }
   },
   "include": ["**/*"],

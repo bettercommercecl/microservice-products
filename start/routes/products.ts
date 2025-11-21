@@ -8,7 +8,6 @@ router
   .group(() => {
     router.get('/products', [ProductsController, 'index'])
     router.get('/products/:id', [ProductsController, 'show'])
-    router.get('/sincronizar-productos/:channel_id', [ProductsController, 'sync'])
     router.get('/sync-stats/:channel_id', [ProductsController, 'getSyncStats'])
   })
   .prefix('api')

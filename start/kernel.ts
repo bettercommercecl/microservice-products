@@ -11,6 +11,10 @@
 import router from '@adonisjs/core/services/router'
 import server from '@adonisjs/core/services/server'
 
+// Inicializar Rate Limit Interceptor para BigCommerce
+import BigcommerceRateLimitInterceptor from '#infrastructure/interceptors/bigcommerce_rate_limit_interceptor'
+BigcommerceRateLimitInterceptor.getInstance().setup()
+
 /**
  * The error handler is used to convert an exception
  * to an HTTP response.

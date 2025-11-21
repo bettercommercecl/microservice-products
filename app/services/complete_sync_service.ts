@@ -85,6 +85,20 @@ export default class CompleteSyncService {
         this.logger.error('Error en sincronización de stock de seguridad')
         throw new Error('Error al sincronizar el stock de seguridad')
       }
+      if (env.get('COUNTRY_CODE') === 'PE') {
+        const inventoryReserve = await this.inventoryService.saveInventoryReserve()
+        if ('status' in inventoryReserve && inventoryReserve.status === 'Error') {
+          console.log(' 😫 No se Guardó el Inventario de Reserva ')
+          throw new Error('Error al sincronizar el stock inventario reserva Peru')
+        }
+      }
+      if (env.get('COUNTRY_CODE') === 'CO') {
+        const inventoryReserveColombia = await this.inventoryService.saveInventoryReserve()
+        if ('status' in inventoryReserveColombia && inventoryReserveColombia.status === 'Error') {
+          console.log(' 😫 No se Guardó el Inventario de Reserva de Colombia ')
+          throw new Error('Error al sincronizar el stock inventario reserva Colombia')
+        }
+      }
       // 2. Obtener productos de Bigcommerce
       const bigcommerceProducts = await this.fetchBigcommerceProducts(CHANNEL)
       this.logger.info(`Obtenidos ${bigcommerceProducts.length} productos de Bigcommerce`)
