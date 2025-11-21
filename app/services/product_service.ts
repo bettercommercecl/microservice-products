@@ -8,8 +8,6 @@ export default class ProductService {
   private readonly logger = Logger.child({ service: 'ProductService' })
   private readonly bigCommerceService = new BigCommerceService()
 
-  constructor() {}
-
   /**
    * Obtiene todos los productos
    */

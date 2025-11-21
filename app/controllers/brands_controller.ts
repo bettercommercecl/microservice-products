@@ -52,27 +52,4 @@ export default class BrandsController {
       throw error
     }
   }
-
-  /**
-   * Sincroniza las marcas desde BigCommerce
-   */
-  public async sync({ response }: HttpContext) {
-    try {
-      const result = await this.brandService.syncBrands()
-
-      return response.ok({
-        success: result.success,
-        message: result.message,
-        data: result.data,
-        meta: {
-          timestamp: new Date().toISOString(),
-          ...result.meta,
-        },
-        errors: result.errors,
-      })
-    } catch (error) {
-      this.logger.error('Error en sincronización de marcas:', error)
-      throw error
-    }
-  }
 }
