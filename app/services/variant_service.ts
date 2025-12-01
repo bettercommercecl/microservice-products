@@ -273,26 +273,12 @@ export default class VariantService {
         let tags = tagsMap.get(variant.product_id) || []
         let campaigns = campaignsMap.get(variant.product_id) || []
 
-        // Si el producto tiene categorías de reserva, filtrar tags y campaigns
-        if (product?.categoryProducts) {
-          const hasReserveCategory = product.categoryProducts.some(
-            (cp: any) => cp.category_id === ID_RESERVE
+        // Si el producto tiene categorías de reserva, filtrar tags y campaigns que contengan "mañana"
+        if (product?.categoryProducts?.some((cp: any) => cp.category_id === ID_RESERVE)) {
+          tags = tags.filter((tag: string) => !tag.toLowerCase().includes('mañana'))
+          campaigns = campaigns.filter(
+            (campaign: string) => !campaign.toLowerCase().includes('mañana')
           )
-
-          if (hasReserveCategory) {
-            // Obtener los títulos de las categorías de reserva
-            const reserveCategoryTitles = product.categoryProducts
-              .filter((cp: any) => cp.category_id === ID_RESERVE)
-              .map((cp: any) => categoryTitlesMap.get(cp.category_id))
-              .filter((title: string | undefined): title is string => title !== undefined)
-
-            // Filtrar tags y campaigns eliminando los títulos de reserva
-            if (reserveCategoryTitles.length > 0) {
-              const reserveTitlesSet = new Set(reserveCategoryTitles)
-              tags = tags.filter((tag: string) => !reserveTitlesSet.has(tag))
-              campaigns = campaigns.filter((campaign: string) => !reserveTitlesSet.has(campaign))
-            }
-          }
         }
 
         const processedVariant = {
