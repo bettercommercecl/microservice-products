@@ -263,12 +263,38 @@ export default class VariantService {
         })
       }
 
+      // Obtener el ID de reserva según el país
+      const ID_RESERVE =
+        env.get('COUNTRY_CODE') === 'CL' ? 1487 : env.get('COUNTRY_CODE') === 'CO' ? 3053 : 1472
       // Procesar variantes
       const variantsWithFilters = paginated.all().map((variant: any) => {
         const filters = filtersMap.get(variant.product_id) || []
         const product = productsMap.get(variant.product_id)
-        const tags = tagsMap.get(variant.product_id) || []
-        const campaigns = campaignsMap.get(variant.product_id) || []
+        let tags = tagsMap.get(variant.product_id) || []
+        let campaigns = campaignsMap.get(variant.product_id) || []
+
+        // Si el producto tiene categorías de reserva, filtrar tags y campaigns
+        if (product?.categoryProducts) {
+          const hasReserveCategory = product.categoryProducts.some(
+            (cp: any) => cp.category_id === ID_RESERVE
+          )
+
+          if (hasReserveCategory) {
+            // Obtener los títulos de las categorías de reserva
+            const reserveCategoryTitles = product.categoryProducts
+              .filter((cp: any) => cp.category_id === ID_RESERVE)
+              .map((cp: any) => categoryTitlesMap.get(cp.category_id))
+              .filter((title: string | undefined): title is string => title !== undefined)
+
+            // Filtrar tags y campaigns eliminando los títulos de reserva
+            if (reserveCategoryTitles.length > 0) {
+              const reserveTitlesSet = new Set(reserveCategoryTitles)
+              tags = tags.filter((tag: string) => !reserveTitlesSet.has(tag))
+              campaigns = campaigns.filter((campaign: string) => !reserveTitlesSet.has(campaign))
+            }
+          }
+        }
+
         const processedVariant = {
           id: variant.id,
           product_id: variant.product_id,
