@@ -177,9 +177,42 @@ export default class CompleteSyncService {
               variantBatches.map((variantBatch, variantBatchIndex) =>
                 limitConcurrency(async () => {
                   try {
-                    await Variant.updateOrCreateMany('sku', variantBatch, { client: batchTrx })
+                    // Consultar variantes existentes por SKU para separar existentes de nuevas
+                    const skus = variantBatch.map((v) => v.sku)
+                    const existingVariants = await Variant.query({ client: batchTrx })
+                      .whereIn('sku', skus)
+                      .select('id', 'sku')
+
+                    const existingSkusMap = new Map(existingVariants.map((v) => [v.sku, v.id]))
+
+                    // Separar variantes existentes y nuevas
+                    const variantsToUpdate: any[] = []
+                    const variantsToCreate: any[] = []
+
+                    variantBatch.forEach((variant) => {
+                      const existingId = existingSkusMap.get(variant.sku)
+                      if (existingId) {
+                        // Variante existente: actualizar sin incluir 'id' para evitar conflictos
+                        const { id, ...variantWithoutId } = variant
+                        variantsToUpdate.push({ ...variantWithoutId, id: existingId })
+                      } else {
+                        // Variante nueva: crear con el 'id' de BigCommerce
+                        variantsToCreate.push(variant)
+                      }
+                    })
+
+                    // Actualizar variantes existentes
+                    if (variantsToUpdate.length > 0) {
+                      await Variant.updateOrCreateMany('id', variantsToUpdate, { client: batchTrx })
+                    }
+
+                    // Crear variantes nuevas
+                    if (variantsToCreate.length > 0) {
+                      await Variant.createMany(variantsToCreate, { client: batchTrx })
+                    }
+
                     this.logger.debug(
-                      `Sub-lote de variantes ${variantBatchIndex + 1}/${variantBatches.length} procesado`
+                      `Sub-lote de variantes ${variantBatchIndex + 1}/${variantBatches.length} procesado: ${variantsToUpdate.length} actualizadas, ${variantsToCreate.length} creadas`
                     )
                     return {
                       success: true,
