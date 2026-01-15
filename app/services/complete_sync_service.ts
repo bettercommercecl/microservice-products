@@ -177,24 +177,33 @@ export default class CompleteSyncService {
               variantBatches.map((variantBatch, variantBatchIndex) =>
                 limitConcurrency(async () => {
                   try {
-                    // Consultar variantes existentes por SKU para separar existentes de nuevas
+                    // Consultar variantes existentes por SKU e ID para evitar conflictos
                     const skus = variantBatch.map((v) => v.sku)
+                    const ids = variantBatch.map((v) => v.id)
                     const existingVariants = await Variant.query({ client: batchTrx })
-                      .whereIn('sku', skus)
+                      .where((query) => {
+                        query.whereIn('sku', skus).orWhereIn('id', ids)
+                      })
                       .select('id', 'sku')
 
                     const existingSkusMap = new Map(existingVariants.map((v) => [v.sku, v.id]))
+                    const existingIdsSet = new Set(existingVariants.map((v) => v.id))
 
                     // Separar variantes existentes y nuevas
                     const variantsToUpdate: any[] = []
                     const variantsToCreate: any[] = []
 
                     variantBatch.forEach((variant) => {
-                      const existingId = existingSkusMap.get(variant.sku)
-                      if (existingId) {
-                        // Variante existente: actualizar sin incluir 'id' para evitar conflictos
+                      const existingIdBySku = existingSkusMap.get(variant.sku)
+                      const existsById = existingIdsSet.has(variant.id)
+
+                      if (existingIdBySku) {
+                        // Variante existe por SKU: actualizar usando el ID existente
                         const { id, ...variantWithoutId } = variant
-                        variantsToUpdate.push({ ...variantWithoutId, id: existingId })
+                        variantsToUpdate.push({ ...variantWithoutId, id: existingIdBySku })
+                      } else if (existsById) {
+                        // Variante existe por ID pero con SKU diferente: actualizar por ID
+                        variantsToUpdate.push(variant)
                       } else {
                         // Variante nueva: crear con el 'id' de BigCommerce
                         variantsToCreate.push(variant)
