@@ -9,6 +9,7 @@ import { FormattedProduct, FormattedVariantForModel } from '#interfaces/formatte
 import ImageProcessingService from './image_processing_service.js'
 import CategoriesService from './categories_service.js'
 import Category from '#models/category'
+import pLimit from 'p-limit'
 /**
  * Tipo para productos con variantes formateadas según el modelo
  */
@@ -54,25 +55,57 @@ export default class FormatVariantsService {
     productsList: FormattedProduct[],
     currentChannelConfig: ChannelConfigInterface
   ): Promise<FormattedProductWithModelVariants[]> {
-    // Procesar cada producto y actualizar sus variantes
-    const productsWithFormattedVariants = await Promise.all(
-      productsList.map(async (product) => {
-        // Procesar todas las variantes del producto
-        const formattedVariants = await Promise.all(
-          product.variants.map(async (variant) => {
-            return await this.processIndividualVariant(variant, product, currentChannelConfig)
-          })
-        )
+    // Control de concurrencia para evitar sobrecargar el microservicio de precios
+    // Limitar a 10 variantes procesadas simultáneamente para evitar timeouts
+    const limitConcurrency = pLimit(10)
 
-        // Retornar el producto con las variantes formateadas
-        return {
-          ...product,
-          variants: formattedVariants,
-        }
+    // Obtener todas las variantes de todos los productos
+    const allVariants: Array<{
+      variant: BigcommerceProductVariant
+      product: FormattedProduct
+      config: ChannelConfigInterface
+    }> = []
+
+    productsList.forEach((product) => {
+      product.variants.forEach((variant) => {
+        allVariants.push({ variant, product, config: currentChannelConfig })
       })
+    })
+
+    this.logger.info(
+      {
+        totalVariants: allVariants.length,
+        totalProducts: productsList.length,
+        concurrencyLimit: 10,
+      },
+      'Procesando variantes con control de concurrencia'
     )
 
-    return productsWithFormattedVariants
+    // Procesar todas las variantes con límite de concurrencia
+    const formattedVariantsResults = await Promise.all(
+      allVariants.map(({ variant, product, config }) =>
+        limitConcurrency(() => this.processIndividualVariant(variant, product, config))
+      )
+    )
+
+    // Agrupar variantes formateadas por producto
+    const productsMap = new Map<number, FormattedVariantForModel[]>()
+    let variantIndex = 0
+
+    productsList.forEach((product) => {
+      const productVariants: FormattedVariantForModel[] = []
+      product.variants.forEach(() => {
+        productVariants.push(formattedVariantsResults[variantIndex])
+        variantIndex++
+      })
+      productsMap.set(product.product_id, productVariants)
+    })
+
+    // Construir respuesta con productos y sus variantes
+    return productsList.map((product) => ({
+      ...product,
+      variants: productsMap.get(product.product_id) || [],
+    }))
   }
 
   // ========================================
@@ -131,11 +164,14 @@ export default class FormatVariantsService {
 
       return variantInventoryLevel
     } catch (error) {
-      this.logger.warn('Error obteniendo inventario para variante', {
-        variant_id: variant.id,
-        sku: variant.sku,
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          variant_id: variant.id,
+          sku: variant.sku,
+          error: error.message,
+        },
+        'Error obteniendo inventario para variante'
+      )
       return [{ ...FormatVariantsService.DEFAULT_INVENTORY }]
     }
   }
@@ -196,11 +232,14 @@ export default class FormatVariantsService {
         }
       }
     } catch (error) {
-      this.logger.warn('Sin datos de precios para variante', {
-        variant_id: variant.id,
-        sku: variant.sku,
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          variant_id: variant.id,
+          sku: variant.sku,
+          error: error.message,
+        },
+        'Sin datos de precios para variante'
+      )
       return { ...FormatVariantsService.DEFAULT_PRICES }
     }
   }
@@ -228,11 +267,14 @@ export default class FormatVariantsService {
         percentDiscount || FormatVariantsService.DEFAULT_PERCENT_DISCOUNT
       )
     } catch (error) {
-      this.logger.warn('Error procesando datos de la variante', {
-        variant_id: variant.id,
-        sku: variant.sku,
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          variant_id: variant.id,
+          sku: variant.sku,
+          error: error.message,
+        },
+        'Error procesando datos de la variante'
+      )
       // Los valores por defecto ya están asignados arriba
     }
 
@@ -277,11 +319,14 @@ export default class FormatVariantsService {
             ? categories.map((cat: any) => cat.category_id || cat)
             : []
         } catch (error) {
-          this.logger.warn('Error parseando categorías del producto', {
-            product_id: product.product_id,
-            categories: product.categories,
-            error: error.message,
-          })
+          this.logger.warn(
+            {
+              product_id: product.product_id,
+              categories: product.categories,
+              error: error.message,
+            },
+            'Error parseando categorías del producto'
+          )
         }
       }
 
@@ -317,10 +362,13 @@ export default class FormatVariantsService {
       const keywords = [...categoryTitles, ...tags, ...campaigns].filter(Boolean).join(', ')
       return keywords
     } catch (error) {
-      this.logger.warn('Error generando keywords para producto', {
-        product_id: product.product_id,
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          product_id: product.product_id,
+          error: error.message,
+        },
+        'Error generando keywords para producto'
+      )
       return ''
     }
   }

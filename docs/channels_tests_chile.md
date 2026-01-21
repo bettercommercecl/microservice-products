@@ -179,6 +179,7 @@ npm test -- --grep "Chile"
 ## 📊 Cobertura de Tests
 
 ### Tests Funcionales: 16 tests
+
 - ✅ Obtener canales
 - ✅ Sincronización
 - ✅ Canales por ID
@@ -189,6 +190,7 @@ npm test -- --grep "Chile"
 - ✅ **Canales específicos de Chile**
 
 ### Tests Unitarios: 17 tests
+
 - ✅ Métodos del controlador
 - ✅ Manejo de errores
 - ✅ Validación de parámetros
@@ -209,6 +211,7 @@ npm test -- --grep "Chile"
 ## 🔧 Configuración de Tests
 
 Los tests usan:
+
 - **Base de datos de test**: Transacciones globales para aislamiento
 - **Channel IDs reales**: Extraídos de `app/utils/channels/channels.ts`
 - **Datos de Chile**: Solo canales con sufijo `_CL`

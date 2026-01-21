@@ -111,9 +111,12 @@ export default class FormatProductsService {
 
       return dateReserve || ''
     } catch (error) {
-      this.logger.warn('Error identificando si el producto es de reserva', {
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          error: error.message,
+        },
+        'Error identificando si el producto es de reserva'
+      )
       return ''
     }
   }
@@ -150,10 +153,13 @@ export default class FormatProductsService {
 
       return [resultInventory]
     } catch (error) {
-      this.logger.warn('Error obteniendo inventario para producto', {
-        product_id: product.id,
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          product_id: product.id,
+          error: error.message,
+        },
+        'Error obteniendo inventario para producto'
+      )
       return [{ ...FormatProductsService.DEFAULT_INVENTORY }]
     }
   }
@@ -204,11 +210,14 @@ export default class FormatProductsService {
         timer_datetime: timerDatetime,
       }
     } catch (error) {
-      this.logger.warn('Error obteniendo timer metafields para producto', {
-        product_id: productId,
-        country: this.country,
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          product_id: productId,
+          country: this.country,
+          error: error.message,
+        },
+        'Error obteniendo timer metafields para producto'
+      )
       return { ...FormatProductsService.DEFAULT_TIMER_METAFIELDS }
     }
   }
@@ -265,10 +274,13 @@ export default class FormatProductsService {
         }
       }
     } catch (error) {
-      this.logger.warn('Sin datos de precios para producto', {
-        product_id: product.id,
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          product_id: product.id,
+          error: error.message,
+        },
+        'Sin datos de precios para producto'
+      )
       return { ...FormatProductsService.DEFAULT_PRICES }
     }
   }
@@ -283,10 +295,13 @@ export default class FormatProductsService {
         return null
       }
 
-      this.logger.error('Error crítico obteniendo reviews', {
-        product_id: productId,
-        error: error.message,
-      })
+      this.logger.error(
+        {
+          product_id: productId,
+          error: error.message,
+        },
+        'Error crítico obteniendo reviews'
+      )
       return null
     }
   }
@@ -428,10 +443,13 @@ export default class FormatProductsService {
         percentDiscount || FormatProductsService.DEFAULT_PERCENT_DISCOUNT
       )
     } catch (error) {
-      this.logger.warn('Error procesando datos del producto', {
-        product_id: product.id,
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          product_id: product.id,
+          error: error.message,
+        },
+        'Error procesando datos del producto'
+      )
       // Los valores por defecto ya están asignados arriba
     }
 

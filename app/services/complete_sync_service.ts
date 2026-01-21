@@ -229,12 +229,15 @@ export default class CompleteSyncService {
                       batch: variantBatchIndex + 1,
                     }
                   } catch (variantError) {
-                    this.logger.error(`Error en sub-lote de variantes ${variantBatchIndex + 1}:`, {
-                      error: variantError.message,
-                      batch_size: variantBatch.length,
-                      skus: variantBatch.map((v) => v.sku).slice(0, 5), // Solo primeros 5 SKUs para log
-                    })
-                    throw variantError // Re-lanzar para que la transacción haga rollback
+                    this.logger.error(
+                      {
+                        error: variantError.message,
+                        batch_size: variantBatch.length,
+                        skus: variantBatch.map((v) => v.sku).slice(0, 5),
+                      },
+                      `Error en sub-lote de variantes ${variantBatchIndex + 1}`
+                    )
+                    throw variantError
                   }
                 })
               )
@@ -261,7 +264,7 @@ export default class CompleteSyncService {
                 )
               })
             } catch (channelError) {
-              this.logger.error(`Error al sincronizar canal:`, channelError)
+              this.logger.error({ error: channelError }, 'Error al sincronizar canal')
             }
 
             // ========================================
@@ -294,20 +297,23 @@ export default class CompleteSyncService {
             // Detectar errores específicos de PostgreSQL
             if (error.message && error.message.includes('current transaction is aborted')) {
               this.logger.error(
-                `Error de transacción PostgreSQL abortada en lote ${batchIndex + 1}:`,
                 {
                   ...errorDetails,
                   solution:
                     'La transacción fue abortada por un error anterior. Se ejecutará rollback automático.',
-                }
+                },
+                `Error de transacción PostgreSQL abortada en lote ${batchIndex + 1}`
               )
             } else if (error.message && error.message.includes('timeout')) {
-              this.logger.error(`Timeout en lote ${batchIndex + 1}:`, {
-                ...errorDetails,
-                solution: 'Reducir tamaño de lote o aumentar timeout de base de datos',
-              })
+              this.logger.error(
+                {
+                  ...errorDetails,
+                  solution: 'Reducir tamaño de lote o aumentar timeout de base de datos',
+                },
+                `Timeout en lote ${batchIndex + 1}`
+              )
             } else {
-              this.logger.error(`Error en lote ${batchIndex + 1}:`, errorDetails)
+              this.logger.error(errorDetails, `Error en lote ${batchIndex + 1}`)
             }
 
             // El rollback se ejecuta automáticamente al salir del catch
@@ -384,7 +390,7 @@ export default class CompleteSyncService {
 
       return finalResponse
     } catch (error) {
-      this.logger.error(`Error en sincronización de productos:`, error)
+      this.logger.error({ error }, 'Error en sincronización de productos')
       throw error
     }
   }
@@ -446,7 +452,7 @@ export default class CompleteSyncService {
           )
           return productsPerPage.data || []
         } catch (error) {
-          this.logger.error(`Error en batch ${index + 1}:`, error)
+          this.logger.error({ error }, `Error en batch ${index + 1}`)
           return []
         }
       })
@@ -485,7 +491,7 @@ export default class CompleteSyncService {
 
       return uniqueProducts
     } catch (error) {
-      this.logger.error(`Error obteniendo productos de Bigcommerce:`, error)
+      this.logger.error({ error }, 'Error obteniendo productos de Bigcommerce')
       throw error
     }
   }
@@ -601,7 +607,7 @@ export default class CompleteSyncService {
               this.logger.info(`Lote ${batchIndex + 1}: ${batchOptions.length} opciones guardadas`)
               return { processed: batchOptions.length, batch: batchIndex + 1 }
             } catch (error) {
-              this.logger.error(`Error en lote ${batchIndex + 1}:`, error)
+              this.logger.error({ error }, `Error en lote ${batchIndex + 1}`)
               console.log(error)
               return { processed: 0, batch: batchIndex + 1, error: error.message }
             }
@@ -621,7 +627,7 @@ export default class CompleteSyncService {
         this.logger.warn(`${errors.length} lotes tuvieron errores`)
       }
     } catch (error) {
-      this.logger.error(`Error al sincronizar opciones:`, error)
+      this.logger.error({ error }, 'Error al sincronizar opciones')
       throw error
     }
   }
@@ -677,7 +683,7 @@ export default class CompleteSyncService {
         )
       }
     } catch (error) {
-      this.logger.error(`Error al sincronizar relaciones producto-categoría:`, error)
+      this.logger.error({ error }, 'Error al sincronizar relaciones producto-categoría')
       throw error
     }
   }
@@ -704,7 +710,7 @@ export default class CompleteSyncService {
         this.logger.warn(`Sincronización de filtros completada con advertencias: ${result.message}`)
       }
     } catch (error) {
-      this.logger.error(`Error al sincronizar filtros:`, error)
+      this.logger.error({ error }, 'Error al sincronizar filtros')
       throw error
     }
   }
@@ -794,8 +800,8 @@ export default class CompleteSyncService {
               deleted += Array.isArray(result) ? result.length : result
             } catch (error) {
               this.logger.error(
-                `Error eliminando categoría huérfana ${relation.product_id}-${relation.category_id}:`,
-                error
+                { error },
+                `Error eliminando categoría huérfana ${relation.product_id}-${relation.category_id}`
               )
             }
           }
@@ -809,7 +815,7 @@ export default class CompleteSyncService {
       this.logger.info(`Categorías huérfanas eliminadas: ${totalDeleted}`)
       return totalDeleted
     } catch (error) {
-      this.logger.error('Error en limpieza de categorías antes de guardar:', error)
+      this.logger.error({ error }, 'Error en limpieza de categorías antes de guardar')
       return 0
     }
   }
