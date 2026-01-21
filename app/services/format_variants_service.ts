@@ -1,15 +1,15 @@
 import { BigcommerceProductVariant } from '#dto/bigcommerce/bigcommerce_product.dto'
 import { ChannelConfigInterface } from '#interfaces/channel_interface'
-import CatalogSafeStock from '#models/catalog.safe.stock'
-import Logger from '@adonisjs/core/services/logger'
-import env from '#start/env'
-import CalculationService from './calculation_service.js'
-import PriceService from './price_service.js'
 import { FormattedProduct, FormattedVariantForModel } from '#interfaces/formatted_product.interface'
-import ImageProcessingService from './image_processing_service.js'
-import CategoriesService from './categories_service.js'
+import CatalogSafeStock from '#models/catalog.safe.stock'
 import Category from '#models/category'
+import env from '#start/env'
+import Logger from '@adonisjs/core/services/logger'
 import pLimit from 'p-limit'
+import CalculationService from './calculation_service.js'
+import CategoriesService from './categories_service.js'
+import ImageProcessingService from './image_processing_service.js'
+import PriceService from './price_service.js'
 /**
  * Tipo para productos con variantes formateadas según el modelo
  */

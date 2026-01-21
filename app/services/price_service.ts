@@ -1,6 +1,6 @@
 import env from '#start/env'
-import axios, { AxiosError } from 'axios'
 import Logger from '@adonisjs/core/services/logger'
+import axios, { AxiosError } from 'axios'
 
 class PriceService {
   private readonly logger = Logger.child({ service: 'PriceService' })
