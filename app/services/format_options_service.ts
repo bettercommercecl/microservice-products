@@ -40,7 +40,7 @@ export default class FormatOptionsService {
           const productOptions = await this.formatOptionsByProduct(productId)
           return productOptions
         } catch (error) {
-          this.logger.warn('Sin opciones para producto', { product_id: productId })
+          this.logger.warn({ product_id: productId }, 'Sin opciones para producto')
           return []
         }
       })
@@ -51,9 +51,12 @@ export default class FormatOptionsService {
 
       return allOptions
     } catch (error) {
-      this.logger.warn('Error en procesamiento paralelo, usando método individual', {
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          error: error.message,
+        },
+        'Error en procesamiento paralelo, usando método individual'
+      )
 
       // FALLBACK: Método individual si falla el procesamiento paralelo
       return this.formatOptionsIndividual(products)
@@ -78,7 +81,7 @@ export default class FormatOptionsService {
           try {
             return await this.formatOptionsByProduct(product.product_id)
           } catch (error) {
-            this.logger.warn('Sin opciones para producto', { product_id: product.product_id })
+            this.logger.warn({ product_id: product.product_id }, 'Sin opciones para producto')
             return []
           }
         })
@@ -125,10 +128,13 @@ export default class FormatOptionsService {
 
       return productOptions
     } catch (error) {
-      this.logger.warn('Error obteniendo opciones para producto', {
-        product_id: productId,
-        error: error.message,
-      })
+      this.logger.warn(
+        {
+          product_id: productId,
+          error: error.message,
+        },
+        'Error obteniendo opciones para producto'
+      )
       return []
     }
   }

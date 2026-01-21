@@ -146,15 +146,15 @@ Los channel_id se extraen automáticamente del archivo de configuración:
 
 ```typescript
 const CHANNEL_IDS = [
-  1,           // UF (Ultimate Fitness) - CL, CO, PE
-  1420393,     // FC (First Care) - CL, PE
-  1443267,     // AF (Aqua Force) - CL, CO, PE
-  1461778,     // TS (TSpin) - CL
-  1457601,     // TF (Terra Force) - CL, CO, PE
-  1501686,     // AR (Around) - CL, CO, PE
-  1567036,     // CC (Camillas Chile) - CL
-  1598942,     // SF (Snow Force) - CL, UC (Ultimate Clothing) - CL, CO, PE
-  1724574,     // MK (Muu Kids) - CL
+  1, // UF (Ultimate Fitness) - CL, CO, PE
+  1420393, // FC (First Care) - CL, PE
+  1443267, // AF (Aqua Force) - CL, CO, PE
+  1461778, // TS (TSpin) - CL
+  1457601, // TF (Terra Force) - CL, CO, PE
+  1501686, // AR (Around) - CL, CO, PE
+  1567036, // CC (Camillas Chile) - CL
+  1598942, // SF (Snow Force) - CL, UC (Ultimate Clothing) - CL, CO, PE
+  1724574, // MK (Muu Kids) - CL
 ]
 ```
 
