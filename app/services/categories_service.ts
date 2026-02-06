@@ -1,8 +1,8 @@
-import CategoryProduct from '#models/category_product'
+import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
 import Category from '#models/category'
+import CategoryProduct from '#models/category_product'
 import BigCommerceService from '#services/bigcommerce_service'
 import Logger from '@adonisjs/core/services/logger'
-import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
 import pLimit from 'p-limit'
 
 export default class CategoryService {
@@ -189,11 +189,40 @@ export default class CategoryService {
 
       this.logger.info(`Formateadas ${allRelations.length} relaciones para guardar masivamente`)
 
+      // Filtrar solo relaciones cuya categoría exista en BD (evitar violación de FK)
+      const uniqueCategoryIds = [...new Set(allRelations.map((r) => r.category_id))]
+      const existingCategories = await Category.query()
+        .whereIn('category_id', uniqueCategoryIds)
+        .select('category_id')
+      const existingCategoryIdSet = new Set(existingCategories.map((c) => c.category_id))
+      const validRelations = allRelations.filter((r) => existingCategoryIdSet.has(r.category_id))
+      const skippedCount = allRelations.length - validRelations.length
+      if (skippedCount > 0) {
+        const skippedIds = uniqueCategoryIds.filter((id) => !existingCategoryIdSet.has(id))
+        this.logger.warn(
+          {
+            skipped_relations: skippedCount,
+            missing_category_ids: skippedIds.slice(0, 20),
+            total_missing_categories: skippedIds.length,
+          },
+          'Relaciones omitidas: category_id no existe en tabla categories (sincronizar categorías antes o revisar datos en origen)'
+        )
+      }
+
+      if (validRelations.length === 0) {
+        this.logger.info('No quedan relaciones válidas tras filtrar por categorías existentes')
+        return {
+          success: true,
+          message: 'No hay relaciones con categorías existentes para guardar',
+          data: { processed: 0, skipped: skippedCount },
+        }
+      }
+
       // Procesar en lotes // Límite seguro para PostgreSQL
       const BATCH_SIZE = 1000
       const batches = []
-      for (let i = 0; i < allRelations.length; i += BATCH_SIZE) {
-        batches.push(allRelations.slice(i, i + BATCH_SIZE))
+      for (let i = 0; i < validRelations.length; i += BATCH_SIZE) {
+        batches.push(validRelations.slice(i, i + BATCH_SIZE))
       }
 
       this.logger.info(
@@ -251,6 +280,7 @@ export default class CategoryService {
           total_products: products.length,
           batches: batches.length,
           errors: errors,
+          ...(skippedCount > 0 && { skipped_invalid_category: skippedCount }),
         },
         meta: {
           performance: {
