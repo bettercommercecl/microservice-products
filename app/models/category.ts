@@ -31,6 +31,24 @@ export default class Category extends BaseModel {
   @column()
   declare tree_id: number | null
 
+  @column()
+  declare description: string | null
+
+  @column()
+  declare page_title: string | null
+
+  @column()
+  declare search_keywords: string | null
+
+  @column()
+  declare meta_keywords: string | null
+
+  @column()
+  declare meta_description: string | null
+
+  @column()
+  declare sort_order: number
+
   @hasMany(() => CategoryProduct)
   declare products: HasMany<typeof CategoryProduct>
 

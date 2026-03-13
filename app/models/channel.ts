@@ -12,6 +12,15 @@ export default class Channel extends BaseModel {
   @column()
   declare name: string
 
+  @column()
+  declare tree_id: number | null
+
+  @column()
+  declare parent_category: number | null
+
+  @column()
+  declare country: string | null
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 

@@ -120,8 +120,12 @@ export default class Variant extends BaseModel {
 
   @column()
   declare keywords: string
+
   @column()
   declare is_visible: boolean
+
+  @column()
+  declare reserve: string | null
   // RELACIONES
   @belongsTo(() => Product, {
     foreignKey: 'product_id',

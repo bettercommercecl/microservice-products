@@ -5,7 +5,7 @@ import Product from './product.js'
 import Variant from './variant.js'
 
 export default class CatalogSafeStock extends BaseModel {
-  protected tableName = 'catalog_safe_stock'
+  protected tableName = 'catalog_safe_stocks'
 
   @column({ isPrimary: true })
   declare id: number

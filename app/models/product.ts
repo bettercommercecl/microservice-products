@@ -142,6 +142,9 @@ export default class Product extends BaseModel {
   declare turbo: boolean
 
   @column()
+  declare nextday: boolean
+
+  @column()
   declare meta_description: string
 
   @column()
