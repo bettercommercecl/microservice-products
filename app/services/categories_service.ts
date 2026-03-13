@@ -1,7 +1,7 @@
+import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
 import Category from '#models/category'
 import CategoryProduct from '#models/category_product'
-import BigCommerceService from '#services/bigcommerce_service'
 import Logger from '@adonisjs/core/services/logger'
 import pLimit from 'p-limit'
 

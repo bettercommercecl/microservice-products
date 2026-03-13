@@ -455,6 +455,7 @@ export default class FormatVariantsService {
       related_products: product.related_products ? product.related_products : null,
       option_label: variant.option_values?.[0]?.label || null,
       keywords: keywords,
+      reserve: product.reserve || null,
       is_visible: hasZeroPrices ? false : product.is_visible,
     }
   }

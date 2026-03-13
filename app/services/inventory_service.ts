@@ -1,10 +1,12 @@
-import env from '#start/env'
-import axios from 'axios'
-import Logger from '@adonisjs/core/services/logger'
-import BigCommerceService from '#services/bigcommerce_service'
-import CatalogSafeStock from '#models/catalog.safe.stock'
-import db from '@adonisjs/lucid/services/db'
+import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import { SafeStockItem } from '#interfaces/inventory_interface'
+import CatalogSafeStock from '#models/catalog.safe.stock'
+import InventoryReserve from '#models/inventory_reserve'
+import env from '#start/env'
+import Logger from '@adonisjs/core/services/logger'
+import { getReaderDb } from '#services/db_reader'
+import axios from 'axios'
+import { extractDbError } from '#utils/db_error_extractor'
 
 type FormattedInventoryItem = {
   sku: string
@@ -122,7 +124,14 @@ export default class InventoryService {
           },
         }
       } else if (productInventory && productInventory.status === 'Error') {
-        this.logger.error('Error en respuesta de BigCommerce para stock de seguridad')
+        this.logger.error('Error en respuesta de BigCommerce para stock de seguridad', {
+          code: productInventory.code,
+          title: productInventory.title,
+          detail: productInventory.detail,
+          httpStatus: productInventory.httpStatus,
+          endpoint: productInventory.endpoint,
+          bcResponse: productInventory.bcResponse,
+        })
         return productInventory
       }
 
@@ -131,23 +140,37 @@ export default class InventoryService {
         message: 'No se pudo obtener stock de seguridad de BigCommerce',
         data: null,
       }
-    } catch (error) {
+    } catch (error: any) {
+      const dbError = extractDbError(error)
+      const axiosError = error?.response
+        ? {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            data: error.response?.data,
+            url: error.config?.url,
+          }
+        : null
+
       this.logger.error('Error crítico al sincronizar stock de seguridad', {
-        error: error.message,
+        message: error instanceof Error ? error.message : 'Error desconocido',
+        dbError: Object.keys(dbError).length > 0 ? dbError : undefined,
+        axios: axiosError,
+        stack: error?.stack,
       })
+
       return {
         status: 'Error',
         message: 'Error al sincronizar el stock de seguridad',
         error: error instanceof Error ? error.message : 'Error desconocido',
+        dbError: dbError.code || dbError.detail ? dbError : undefined,
+        httpStatus: axiosError?.status,
+        bcResponse: axiosError?.data,
       }
     }
   }
   async saveInventoryReserve() {
     try {
-      const locationId =
-        env.get('COUNTRY_CODE') === 'PE'
-          ? env.get('INVENTORY_RESERVE_PE_ID')
-          : env.get('INVENTORY_RESERVE_CO_ID')
+      const locationId = env.get(`INVENTORY_RESERVE_ID_${env.get('COUNTRY_CODE')}`)
 
       if (!locationId) {
         throw new Error('Location ID no está configurado en las variables de entorno')
@@ -215,33 +238,107 @@ export default class InventoryService {
         },
       }
     } catch (error: any) {
+      const dbError = extractDbError(error)
       this.logger.error('Error durante la sincronización de inventario de reserva', {
         error: error.message,
+        dbError: dbError.code ? dbError : undefined,
         stack: error.stack,
       })
       return {
         status: 'Error',
         message: 'Error al intentar guardar el inventario de reserva',
         detail: error.message,
-        stack: error.stack,
+        dbError: dbError.code ? dbError : undefined,
       }
     }
   }
   /**
-   * Obtiene estadísticas de stock de seguridad
+   * Cruza inventario de reserva BC con reservas de n8n.
+   * Solo los SKUs presentes en inventory_reserve (n8n) se guardan en catalog_safe_stock.
+   * Los demas SKUs se limpian (bin_picking_number = '').
+   * Si INVENTORY_RESERVE_ID_{COUNTRY_CODE} no esta configurado, se omite automaticamente.
+   */
+  async syncReserveWithN8nCrossRef(): Promise<{
+    success: boolean
+    message: string
+    total: number
+  }> {
+    const locationId = env.get(`INVENTORY_RESERVE_ID_${env.get('COUNTRY_CODE')}`)
+
+    if (!locationId) {
+      this.logger.info('INVENTORY_RESERVE_ID no configurado para este pais, omitiendo cruce de reservas')
+      return { success: true, message: 'Cruce de reservas no configurado para este pais', total: 0 }
+    }
+
+    this.logger.info({ locationId }, 'Iniciando cruce inventario reserva con n8n...')
+
+    let productInventory: any =
+      await this.bigCommerceService.getInventoryGlobalReserve(locationId)
+
+    if (!Array.isArray(productInventory)) {
+      throw new Error('Respuesta invalida de BigCommerce para inventario de reserva')
+    }
+
+    const formatted = productInventory.map((item: SafeStockItem) => ({
+      sku: item.identity.sku.trim(),
+      variant_id: item.identity.variant_id,
+      product_id: item.identity.product_id,
+      safety_stock: item.settings.safety_stock,
+      warning_level: item.settings.warning_level,
+      available_to_sell: item.available_to_sell,
+      bin_picking_number: String(item.settings.bin_picking_number ?? ''),
+    }))
+
+    const allSkus = formatted.map((item) => item.sku)
+
+    const reservedSkus = await InventoryReserve.query()
+      .whereIn('sku', allSkus)
+      .select('sku')
+    const reservedSkuSet = new Set(reservedSkus.map((r) => r.sku))
+
+    const productsInReserve = formatted.filter((item) => reservedSkuSet.has(item.sku))
+
+    if (productsInReserve.length > 0) {
+      await CatalogSafeStock.updateOrCreateMany('variant_id', productsInReserve)
+    }
+
+    const skusNotInReserve = allSkus.filter((sku) => !reservedSkuSet.has(sku))
+    if (skusNotInReserve.length > 0) {
+      await CatalogSafeStock.query()
+        .whereIn('sku', skusNotInReserve)
+        .update({ bin_picking_number: '' })
+    }
+
+    this.logger.info(
+      { inReserve: productsInReserve.length, cleaned: skusNotInReserve.length },
+      'Cruce inventario reserva completado'
+    )
+
+    return {
+      success: true,
+      message: `${productsInReserve.length} productos cruzados con n8n, ${skusNotInReserve.length} limpiados`,
+      total: productsInReserve.length,
+    }
+  }
+
+  /**
+   * Obtiene estadísticas de stock de seguridad (usa replica de lectura si esta configurada).
    */
   async getSafeStockStats() {
     try {
-      const totalRecords = await CatalogSafeStock.query().count('* as total')
-      const lowStock = await CatalogSafeStock.query()
-        .where('available_to_sell', '<=', db.raw('warning_level'))
+      const reader = getReaderDb()
+      const totalResult = await reader.from('catalog_safe_stocks').count('* as total').first()
+      const lowStockResult = await reader
+        .from('catalog_safe_stocks')
+        .whereRaw('available_to_sell <= warning_level')
         .count('* as total')
+        .first()
 
       return {
         success: true,
         data: {
-          total_records: Number(totalRecords[0].$extras.total),
-          low_stock_items: Number(lowStock[0].$extras.total),
+          total_records: Number(totalResult?.total ?? 0),
+          low_stock_items: Number(lowStockResult?.total ?? 0),
         },
       }
     } catch (error) {

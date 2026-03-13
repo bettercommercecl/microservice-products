@@ -1,6 +1,6 @@
-import Logger from '@adonisjs/core/services/logger'
-import BigCommerceService from './bigcommerce_service.js'
 import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
+import Logger from '@adonisjs/core/services/logger'
+import BigCommerceService from '../infrastructure/bigcommerce/bigcommerce_api.js'
 
 /**
  * Interfaz para opciones formateadas listas para guardar en la DB
