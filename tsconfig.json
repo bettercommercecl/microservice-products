@@ -8,6 +8,8 @@
     "paths": {
       "@/*": ["./*"],
       "#controllers/*": ["./app/controllers/*"],
+      "#controllers/synchronizations/v1/*": ["./app/controllers/synchronizations/v1/*"],
+      "#controllers/synchronizations/v2/*": ["./app/controllers/synchronizations/v2/*"],
       "#exceptions/*": ["./app/exceptions/*"],
       "#models/*": ["./app/models/*"],
       "#mails/*": ["./app/mails/*"],
