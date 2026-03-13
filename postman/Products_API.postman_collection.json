@@ -1,0 +1,234 @@
+{
+  "info": {
+    "name": "Products API",
+    "description": "Rutas del microservicio de productos. Cambiar variable `baseUrl` o usar entornos (CL, CO, PE, Local, 127).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3333/api" },
+    { "key": "url_cl", "value": "https://products.bettercommerce.cl/api" },
+    { "key": "url_co", "value": "https://co.products.bettercommerce.cl/api" },
+    { "key": "url_pe", "value": "https://pe.products.bettercommerce.cl/api" },
+    { "key": "url_local", "value": "http://localhost:3333/api" },
+    { "key": "url_127", "value": "http://127.0.0.1:3333/api" }
+  ],
+  "item": [
+    {
+      "name": "Brands",
+      "item": [
+        {
+          "name": "Listar marcas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/brands", "host": ["{{baseUrl}}"], "path": ["brands"] }
+          }
+        },
+        {
+          "name": "Obtener marca por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/brands/1", "host": ["{{baseUrl}}"], "path": ["brands", "1"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "Listar categorias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/categories", "host": ["{{baseUrl}}"], "path": ["categories"] }
+          }
+        },
+        {
+          "name": "Obtener categoria por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/categories/1", "host": ["{{baseUrl}}"], "path": ["categories", "1"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Channels",
+      "item": [
+        {
+          "name": "Listar canales",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels", "host": ["{{baseUrl}}"], "path": ["channels"] } }
+        },
+        {
+          "name": "Canales con productos",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels/with-products", "host": ["{{baseUrl}}"], "path": ["channels", "with-products"] } }
+        },
+        {
+          "name": "Canal por nombre",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels/name/UF", "host": ["{{baseUrl}}"], "path": ["channels", "name", "UF"] } }
+        },
+        {
+          "name": "Obtener canal por ID",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels/1", "host": ["{{baseUrl}}"], "path": ["channels", "1"] } }
+        },
+        {
+          "name": "Crear canal",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"MARCA\"\n}" },
+            "url": { "raw": "{{baseUrl}}/channels", "host": ["{{baseUrl}}"], "path": ["channels"] }
+          }
+        },
+        {
+          "name": "Actualizar canal",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"MARCA\"\n}" },
+            "url": { "raw": "{{baseUrl}}/channels/1", "host": ["{{baseUrl}}"], "path": ["channels", "1"] }
+          }
+        },
+        {
+          "name": "Eliminar canal",
+          "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/channels/1", "host": ["{{baseUrl}}"], "path": ["channels", "1"] } }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Listar productos",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/products", "host": ["{{baseUrl}}"], "path": ["products"] } }
+        },
+        {
+          "name": "Obtener producto por ID",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/products/1", "host": ["{{baseUrl}}"], "path": ["products", "1"] } }
+        },
+        {
+          "name": "Sync stats por canal",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync-stats/1", "host": ["{{baseUrl}}"], "path": ["sync-stats", "1"] } }
+        }
+      ]
+    },
+    {
+      "name": "Variants",
+      "item": [
+        {
+          "name": "Listar variantes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/variants?channel=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["variants"],
+              "query": [{"key": "channel", "value": "1", "description": "ID canal opcional"}]
+            }
+          }
+        },
+        {
+          "name": "Variantes formateadas por IDs",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [1, 2, 3]\n}" },
+            "url": { "raw": "{{baseUrl}}/variants/formatted-by-ids", "host": ["{{baseUrl}}"], "path": ["variants", "formatted-by-ids"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sync (v1 legacy)",
+      "item": [
+        {
+          "name": "Sincronizar productos por canal",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-productos/1", "host": ["{{baseUrl}}"], "path": ["sincronizar-productos", "1"] } }
+        },
+        {
+          "name": "Sincronizar categorias",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-categorias", "host": ["{{baseUrl}}"], "path": ["sincronizar-categorias"] } }
+        },
+        {
+          "name": "Sincronizar marcas",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-marcas", "host": ["{{baseUrl}}"], "path": ["sincronizar-marcas"] } }
+        },
+        {
+          "name": "Sincronizar canales",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-canales", "host": ["{{baseUrl}}"], "path": ["sincronizar-canales"] } }
+        }
+      ]
+    },
+    {
+      "name": "Sync (v2)",
+      "item": [
+        {
+          "name": "Sync completo",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/completo", "host": ["{{baseUrl}}"], "path": ["sync", "completo"] } }
+        },
+        {
+          "name": "Sync marcas",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/marcas", "host": ["{{baseUrl}}"], "path": ["sync", "marcas"] } }
+        },
+        {
+          "name": "Sync categorias",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/categorias", "host": ["{{baseUrl}}"], "path": ["sync", "categorias"] } }
+        },
+        {
+          "name": "Sync productos",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/productos", "host": ["{{baseUrl}}"], "path": ["sync", "productos"] } }
+        },
+        {
+          "name": "Sync packs",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/packs", "host": ["{{baseUrl}}"], "path": ["sync", "packs"] } }
+        },
+        {
+          "name": "Sync packs reserva",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/packs-reserva", "host": ["{{baseUrl}}"], "path": ["sync", "packs-reserva"] } }
+        },
+        {
+          "name": "Sync stock",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/stock", "host": ["{{baseUrl}}"], "path": ["sync", "stock"] } }
+        }
+      ]
+    },
+    {
+      "name": "Sync (alias legacy)",
+      "item": [
+        {
+          "name": "Sincronizar productos (catalogo)",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-productos", "host": ["{{baseUrl}}"], "path": ["sincronizar-productos"] } }
+        },
+        {
+          "name": "Sincronizar packs",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-packs", "host": ["{{baseUrl}}"], "path": ["sincronizar-packs"] } }
+        },
+        {
+          "name": "Sincronizar stock",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-stock", "host": ["{{baseUrl}}"], "path": ["sincronizar-stock"] } }
+        }
+      ]
+    },
+    {
+      "name": "Sync v1",
+      "item": [
+        {
+          "name": "Sync productos",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/v1/productos", "host": ["{{baseUrl}}"], "path": ["sync", "v1", "productos"] } }
+        },
+        {
+          "name": "Sync packs",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/v1/packs", "host": ["{{baseUrl}}"], "path": ["sync", "v1", "packs"] } }
+        },
+        {
+          "name": "Sync stock",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/v1/stock", "host": ["{{baseUrl}}"], "path": ["sync", "v1", "stock"] } }
+        }
+      ]
+    }
+  ]
+}
