@@ -1,42 +1,59 @@
+import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import Product from '#models/product'
-import BigCommerceService from '#services/bigcommerce_service'
+import { READER_CONNECTION } from '#services/db_reader'
+import CacheService from '#services/cache_service'
 
-import pLimit from 'p-limit'
 import Logger from '@adonisjs/core/services/logger'
+import pLimit from 'p-limit'
+
+const CACHE_TTL_PRODUCTS = 60
 
 export default class ProductService {
   private readonly logger = Logger.child({ service: 'ProductService' })
   private readonly bigCommerceService = new BigCommerceService()
+  private readonly cache = new CacheService()
 
   /**
-   * Obtiene todos los productos
+   * Obtiene todos los productos (replica + cache Redis si esta configurado).
    */
   async getAllProducts() {
+    const cacheKey = 'products:list'
     try {
-      const products = await Product.all()
-      return {
-        success: true,
-        data: products,
-      }
+      const cached = await this.cache.get(cacheKey)
+      if (cached) return JSON.parse(cached) as { success: true; data: unknown }
+
+      const products = await (Product.query() as any)
+        .useConnection(READER_CONNECTION)
+        .fetch()
+      const result = { success: true as const, data: products.serialize() }
+      await this.cache.set(cacheKey, JSON.stringify(result), CACHE_TTL_PRODUCTS)
+      return result
     } catch (error) {
-      this.logger.error('Error obteniendo todos los productos', { error: error.message })
+      this.logger.error('Error obteniendo todos los productos', { error: (error as Error).message })
       throw new Error(
         `Error al obtener productos: ${error instanceof Error ? error.message : 'Error desconocido'}`
       )
     }
   }
+
   /**
-   * Obtiene un producto por ID
+   * Obtiene un producto por ID (replica + cache Redis si esta configurado).
    */
   async getProductById(id: number) {
+    const cacheKey = `products:id:${id}`
     try {
-      const product = await Product.findOrFail(id)
-      return {
-        success: true,
-        data: product,
-      }
+      const cached = await this.cache.get(cacheKey)
+      if (cached) return JSON.parse(cached) as { success: true; data: unknown }
+
+      const product = await (Product.query() as any)
+        .useConnection(READER_CONNECTION)
+        .where('id', id)
+        .firstOrFail()
+      const result = { success: true as const, data: product.serialize() }
+      await this.cache.set(cacheKey, JSON.stringify(result), CACHE_TTL_PRODUCTS)
+      return result
     } catch (error) {
-      this.logger.error('Error obteniendo producto por ID', { id, error: error.message })
+      this.logger.error('Error obteniendo producto por ID', { id, error: (error as Error).message })
       throw new Error(
         `Error al obtener producto: ${error instanceof Error ? error.message : 'Error desconocido'}`
       )

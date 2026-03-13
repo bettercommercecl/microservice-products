@@ -6,6 +6,7 @@ import FiltersProduct from '#models/filters_product'
 import CategoryProduct from '#models/category_product'
 import Category from '#models/category'
 import Logger from '@adonisjs/core/services/logger'
+import { READER_CONNECTION } from '#services/db_reader'
 
 export default class VariantService {
   private readonly logger = Logger.child({ service: 'VariantService' })
@@ -15,11 +16,11 @@ export default class VariantService {
   }
 
   /**
-   * Obtiene todas las variantes (Productos)
+   * Obtiene todas las variantes (usa replica de lectura si esta configurada).
    */
   async getAllVariants() {
     try {
-      const variants = await Variant.all()
+      const variants = await Variant.query().useConnection(READER_CONNECTION).fetch()
       return {
         success: true,
         data: variants,
