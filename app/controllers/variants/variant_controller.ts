@@ -1,8 +1,8 @@
-import { HttpContext } from '@adonisjs/core/http'
 import VariantService from '#services/variant_service'
+import { HttpContext } from '@adonisjs/core/http'
 import vine from '@vinejs/vine'
-import { variantsPaginatedSchema } from '../validators/variants_paginated_validator.js'
-import { variantsByIdsSchema } from '../validators/variants_by_ids_validator.js'
+import { variantsByIdsSchema } from '../../validators/variants_by_ids_validator.js'
+import { variantsPaginatedSchema } from '../../validators/variants_paginated_validator.js'
 
 export default class VariantController {
   private variantService: VariantService

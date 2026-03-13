@@ -1,8 +1,8 @@
-import { HttpContext } from '@adonisjs/core/http'
 import ProductService from '#services/product_service'
+import { HttpContext } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
 import vine from '@vinejs/vine'
-import { productShowSchema } from '../validators/product_show_validator.js'
+import { productShowSchema } from '../../validators/product_show_validator.js'
 
 export default class ProductsController {
   private productService: ProductService
