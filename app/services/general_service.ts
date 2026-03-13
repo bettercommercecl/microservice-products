@@ -1,4 +1,4 @@
-// import CatalogSafeStock from '#models/catalog.safe.stock'
+// import CatalogSafeStock from '#models/catalog_safe_stock'
 // import Env from '#start/env'
 // import BigCommerceService from '#services/bigcommerce_service'
 // import PriceService from '#services/price_service'

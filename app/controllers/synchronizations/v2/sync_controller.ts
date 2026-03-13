@@ -1,11 +1,12 @@
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import BrandService from '#services/brands_service'
 import CategoryService from '#services/categories_service'
-import CompleteSyncService from '#services/synchronizations/complete_sync_service'
+import GlobalProductSyncService from '#services/synchronizations/global_product_sync_service'
 import PackReserveSyncService from '#services/synchronizations/pack_reserve_sync_service'
 import PacksSyncService from '#services/synchronizations/packs_sync_service'
 import StockSyncService from '#services/synchronizations/stock_sync_service'
 import CacheService from '#services/cache_service'
+import syncConfig from '#config/sync'
 import { HttpContext } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
 
@@ -42,11 +43,11 @@ export default class SyncControllerV2 {
 
   async syncProducts({ response }: HttpContext) {
     this.logger.info('Sincronizacion global de productos solicitada')
-    const syncService = new CompleteSyncService()
+    const syncService = new GlobalProductSyncService()
     const result = await syncService.syncProductsComplete()
     try {
       const cache = new CacheService()
-      await cache.invalidateByPrefix('products')
+      await cache.invalidateByPrefix(syncConfig.cacheInvalidationPrefixProducts)
     } catch (e: any) {
       this.logger.warn({ err: e }, 'Invalidacion de cache Redis omitida')
     }

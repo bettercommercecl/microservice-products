@@ -1,12 +1,13 @@
+import type { CacheProvider } from '../ports/cache_provider.port'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import Redis from 'ioredis'
 
 /**
- * Cache en Redis para respuestas de lectura (marcas).
+ * Implementacion Redis del puerto de cache.
  * Si REDIS_HOST no esta definido, todas las operaciones son no-op / devuelven null.
  */
-export default class CacheService {
+export default class CacheService implements CacheProvider {
   private static client: Redis | null = null
   private static keyPrefix: string = 'products_ms:'
 

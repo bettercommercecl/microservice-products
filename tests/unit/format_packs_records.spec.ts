@@ -6,9 +6,7 @@ import {
 } from '#utils/format_packs_records'
 
 test.group('formatPacksRecords', () => {
-  test('pack simple: usa variant_id desde inventory cuando item no lo tiene', ({
-    assert,
-  }) => {
+  test('pack simple: usa variant_id desde inventory cuando item no lo tiene', ({ assert }) => {
     const packs: PackInput[] = [
       {
         id: 100,
@@ -66,9 +64,7 @@ test.group('formatPacksRecords', () => {
     assert.isNull(result[1].reserve)
   })
 
-  test('pack variantes: usa variant_id e is_variant desde item', ({
-    assert,
-  }) => {
+  test('pack variantes: usa variant_id e is_variant desde item', ({ assert }) => {
     const packs: PackInput[] = [
       {
         id: 200,
@@ -167,10 +163,7 @@ test.group('formatPacksRecords', () => {
   })
 
   test('retorna array vacio para packs sin items', ({ assert }) => {
-    const packs: PackInput[] = [
-      { id: 500, items_packs: [] },
-      { id: 501 },
-    ]
+    const packs: PackInput[] = [{ id: 500, items_packs: [] }, { id: 501 }]
 
     const result = formatPacksRecords(packs, new Map(), new Map())
 

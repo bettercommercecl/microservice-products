@@ -9,12 +9,12 @@ import type {
   TimerData,
   StockData,
 } from '#interfaces/product-sync/sync.interfaces'
-import CatalogSafeStock from '#models/catalog.safe.stock'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import { parseEnvInt, parseEnvFloat } from '#utils/env_parser'
-import type { PricingStrategy } from './pricing/product_pricing_strategy.js'
-import { PricingStrategyFactory } from './pricing/product_pricing_strategy.js'
+import type { PricingStrategy } from '#services/synchronizations/pricing/product_pricing_strategy'
+import { PricingStrategyFactory } from '#services/synchronizations/pricing/product_pricing_strategy'
 
 interface SpecialCategoryIds {
   sameday: number | null
@@ -35,8 +35,8 @@ interface StoreSizeConfig {
  * Formatea productos de BigCommerce al esquema de la tabla products.
  * Delega precios al PricingStrategy (OCP), recibe datos pre-cargados (no hace N+1).
  */
-export default class FormatProductsService {
-  private readonly logger = Logger.child({ service: 'FormatProductsService' })
+export default class GlobalFormatProductsService {
+  private readonly logger = Logger.child({ service: 'GlobalFormatProductsService' })
 
   private readonly pricingStrategy: PricingStrategy
   private readonly specialCategoryIds: SpecialCategoryIds
@@ -58,7 +58,7 @@ export default class FormatProductsService {
     this.storeSizesConfig = this.parseStoreSizes()
     this.percentDiscount =
       parseEnvFloat('PERCENT_DISCOUNT_TRANSFER_PRICE') ??
-      FormatProductsService.DEFAULT_PERCENT_DISCOUNT
+      GlobalFormatProductsService.DEFAULT_PERCENT_DISCOUNT
   }
 
   async formatProducts(
@@ -137,7 +137,8 @@ export default class FormatProductsService {
     return {
       image: images.find((img) => img.is_thumbnail)?.url_standard || '',
       images: images.length > 0 ? JSON.stringify(images) : null,
-      hover: images.find((img) => img.description?.toLowerCase().includes('hover'))?.url_standard || '',
+      hover:
+        images.find((img) => img.description?.toLowerCase().includes('hover'))?.url_standard || '',
     }
   }
 
@@ -208,9 +209,7 @@ export default class FormatProductsService {
     return JSON.stringify(sizes)
   }
 
-  private async batchLoadInventory(
-    productIds: number[]
-  ): Promise<Map<number, StockData>> {
+  private async batchLoadInventory(productIds: number[]): Promise<Map<number, StockData>> {
     const map = new Map<number, StockData>()
     if (productIds.length === 0) return map
 

@@ -3,7 +3,7 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo, hasOne } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasOne } from '@adonisjs/lucid/types/relations'
 import Product from './product.js'
-import CatalogSafeStock from './catalog.safe.stock.js'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 
 export default class Variant extends BaseModel {
   public static table = 'variants'

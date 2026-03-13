@@ -2,7 +2,7 @@ import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import Product from '#models/product'
 import ProductPack from '#models/product_pack'
 import CategoryProduct from '#models/category_product'
-import CatalogSafeStock from '#models/catalog.safe.stock'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 import Logger from '@adonisjs/core/services/logger'
 import Database from '@adonisjs/lucid/services/db'
 import env from '#start/env'
@@ -135,8 +135,7 @@ export default class PackReserveSyncService {
       const productsPacksData = await this.getProductsPacksDataByPackIds(packIds)
       const groupedPackData = this.groupPackDataByPackAndVariant(productsPacksData)
 
-      const variantsUpdateResult =
-        await this.updateVariantsFromGroupedData(groupedPackData)
+      const variantsUpdateResult = await this.updateVariantsFromGroupedData(groupedPackData)
 
       const [productsUpdateResult, categoryProductsResult] = await Promise.allSettled([
         this.updateProductsCategories(groupedPackData, Number(reserveCategoryId)),
@@ -152,13 +151,10 @@ export default class PackReserveSyncService {
           ? categoryProductsResult.value
           : { added: 0, removed: 0, failed: 0 }
 
-      const catalogSafeStockResult =
-        await this.updateCatalogSafeStock(groupedPackData)
-      const inventoryReserveResult =
-        await this.updateInventoryReserve(groupedPackData)
+      const catalogSafeStockResult = await this.updateCatalogSafeStock(groupedPackData)
+      const inventoryReserveResult = await this.updateInventoryReserve(groupedPackData)
 
-      const formattedInventoryData =
-        await this.formatDataForBigCommerceInventory(groupedPackData)
+      const formattedInventoryData = await this.formatDataForBigCommerceInventory(groupedPackData)
       const inventoryLocationId = env.get('INVENTORY_LOCATION_ID') ?? ''
       const inventoryReservePeId = env.get('INVENTORY_RESERVE_ID_PE') ?? ''
       const inventoryReserveCoId = env.get('INVENTORY_RESERVE_ID_CO') ?? ''
@@ -169,28 +165,18 @@ export default class PackReserveSyncService {
       if (countryCode === 'PE') {
         if (formattedInventoryData.length > 0) {
           inventoryUpdatePromises.push(
-            this.updateInventoryLocationPack(
-              formattedInventoryData,
-              inventoryLocationId,
-              deadline
-            )
+            this.updateInventoryLocationPack(formattedInventoryData, inventoryLocationId, deadline)
           )
           inventoryUpdatePromises.push(
-            this.updateInventoryLocationPack(
-              formattedInventoryData,
-              inventoryReservePeId,
-              deadline
-            )
+            this.updateInventoryLocationPack(formattedInventoryData, inventoryReservePeId, deadline)
           )
         }
       } else if (countryCode === 'CO') {
         const colombiaSpecialItems = formattedInventoryData.filter(
-          (item) =>
-            item.settings?.[0]?.bin_picking_number === 'N22LK-LJJ2025-COL'
+          (item) => item.settings?.[0]?.bin_picking_number === 'N22LK-LJJ2025-COL'
         )
         const colombiaRegularItems = formattedInventoryData.filter(
-          (item) =>
-            item.settings?.[0]?.bin_picking_number !== 'N22LK-LJJ2025-COL'
+          (item) => item.settings?.[0]?.bin_picking_number !== 'N22LK-LJJ2025-COL'
         )
         if (colombiaSpecialItems.length > 0) {
           inventoryUpdatePromises.push(
@@ -199,32 +185,19 @@ export default class PackReserveSyncService {
         }
         if (colombiaRegularItems.length > 0) {
           inventoryUpdatePromises.push(
-            this.updateInventoryLocationPack(
-              colombiaRegularItems,
-              inventoryLocationId,
-              deadline
-            )
+            this.updateInventoryLocationPack(colombiaRegularItems, inventoryLocationId, deadline)
           )
           inventoryUpdatePromises.push(
-            this.updateInventoryLocationPack(
-              colombiaRegularItems,
-              inventoryReserveCoId,
-              deadline
-            )
+            this.updateInventoryLocationPack(colombiaRegularItems, inventoryReserveCoId, deadline)
           )
         }
       } else if (formattedInventoryData.length > 0 && inventoryLocationId) {
         inventoryUpdatePromises.push(
-          this.updateInventoryLocationPack(
-            formattedInventoryData,
-            inventoryLocationId,
-            deadline
-          )
+          this.updateInventoryLocationPack(formattedInventoryData, inventoryLocationId, deadline)
         )
       }
 
-      const inventoryUpdateResults =
-        await Promise.allSettled(inventoryUpdatePromises)
+      const inventoryUpdateResults = await Promise.allSettled(inventoryUpdatePromises)
       const successfulInventoryUpdates = inventoryUpdateResults.filter(
         (r) => r.status === 'fulfilled'
       ).length
@@ -232,8 +205,7 @@ export default class PackReserveSyncService {
         (r) => r.status === 'rejected'
       ).length
 
-      const productDataForBigCommerce =
-        await this.formatDataForBigCommerceProduct(groupedPackData)
+      const productDataForBigCommerce = await this.formatDataForBigCommerceProduct(groupedPackData)
       const productUpdateResults = await this.updateBigCommerceProducts(
         productDataForBigCommerce,
         groupedPackData,
@@ -279,10 +251,7 @@ export default class PackReserveSyncService {
         },
       }
     } catch (error: any) {
-      Logger.error(
-        { error: error.message },
-        'Error en la sincronizacion de packs con reserva'
-      )
+      Logger.error({ error: error.message }, 'Error en la sincronizacion de packs con reserva')
       throw error
     }
   }
@@ -369,9 +338,7 @@ export default class PackReserveSyncService {
     }, new Map<string, GroupedPackData>())
 
     return Array.from(groupedMap.values()).map((group) => {
-      const productsWithReserve = group.products.filter(
-        (p) => p.reserve && p.reserve.trim() !== ''
-      )
+      const productsWithReserve = group.products.filter((p) => p.reserve && p.reserve.trim() !== '')
       if (productsWithReserve.length > 0) {
         const farthest = productsWithReserve.reduce((a, b) =>
           new Date(b.reserve!) > new Date(a.reserve!) ? b : a
@@ -379,9 +346,7 @@ export default class PackReserveSyncService {
         group.reserve = farthest.reserve
         group.serial = farthest.serial?.trim() || null
       } else {
-        const withSerial = group.products.filter(
-          (p) => p.serial && p.serial.trim() !== ''
-        )
+        const withSerial = group.products.filter((p) => p.serial && p.serial.trim() !== '')
         if (withSerial.length > 0) {
           group.reserve = null
           group.serial = withSerial[0].serial?.trim() || null
@@ -399,61 +364,49 @@ export default class PackReserveSyncService {
   ): Promise<{ updated: number; failed: number }> {
     if (!groupedPackData.length) return { updated: 0, failed: 0 }
 
-    const results = await this.processInBatches(
-      groupedPackData,
-      async (group) => {
-        const hasInsufficientStock = group.products.some(
-          (p) => p.stock === 0 || p.stock < p.quantity
-        )
+    const results = await this.processInBatches(groupedPackData, async (group) => {
+      const hasInsufficientStock = group.products.some((p) => p.stock === 0 || p.stock < p.quantity)
 
-        const variantIdToUse =
-          group.variant_id && group.variant_id !== 0 ? group.variant_id : null
+      const variantIdToUse = group.variant_id && group.variant_id !== 0 ? group.variant_id : null
 
-        if (variantIdToUse !== null) {
-          const variant = await Database.from('variants')
-            .select('id', 'product_id', 'stock', 'reserve')
-            .where('id', variantIdToUse)
-            .first()
-          if (!variant) {
-            Logger.warn(`No variant para variant_id ${variantIdToUse}`)
-            return { success: false, type: 'not_found' }
-          }
-          const updateData: Record<string, any> = {
-            stock: hasInsufficientStock ? 0 : variant.stock,
-            updated_at: new Date(),
-          }
-          if (!hasInsufficientStock && group.reserve)
-            updateData.reserve = group.reserve
-          await Database.from('variants').where('id', variant.id).update(updateData)
-          return { success: true, type: 'updated' }
-        }
-
+      if (variantIdToUse !== null) {
         const variant = await Database.from('variants')
           .select('id', 'product_id', 'stock', 'reserve')
-          .where('product_id', group.pack_id)
+          .where('id', variantIdToUse)
           .first()
         if (!variant) {
-          Logger.warn(`No variant para pack_id ${group.pack_id} (pack simple sin variant_id)`)
+          Logger.warn(`No variant para variant_id ${variantIdToUse}`)
           return { success: false, type: 'not_found' }
         }
         const updateData: Record<string, any> = {
           stock: hasInsufficientStock ? 0 : variant.stock,
           updated_at: new Date(),
         }
-        if (!hasInsufficientStock && group.reserve)
-          updateData.reserve = group.reserve
+        if (!hasInsufficientStock && group.reserve) updateData.reserve = group.reserve
         await Database.from('variants').where('id', variant.id).update(updateData)
         return { success: true, type: 'updated' }
       }
-    )
 
-    const resolved = results.map((r) =>
-      r.status === 'fulfilled' ? r.value : { success: false }
-    )
+      const variant = await Database.from('variants')
+        .select('id', 'product_id', 'stock', 'reserve')
+        .where('product_id', group.pack_id)
+        .first()
+      if (!variant) {
+        Logger.warn(`No variant para pack_id ${group.pack_id} (pack simple sin variant_id)`)
+        return { success: false, type: 'not_found' }
+      }
+      const updateData: Record<string, any> = {
+        stock: hasInsufficientStock ? 0 : variant.stock,
+        updated_at: new Date(),
+      }
+      if (!hasInsufficientStock && group.reserve) updateData.reserve = group.reserve
+      await Database.from('variants').where('id', variant.id).update(updateData)
+      return { success: true, type: 'updated' }
+    })
+
+    const resolved = results.map((r) => (r.status === 'fulfilled' ? r.value : { success: false }))
     return {
-      updated: resolved.filter(
-        (x) => x.success && (x as any).type === 'updated'
-      ).length,
+      updated: resolved.filter((x) => x.success && (x as any).type === 'updated').length,
       failed: resolved.filter((x) => !x.success).length,
     }
   }
@@ -494,10 +447,7 @@ export default class PackReserveSyncService {
           : currentCategories
       }
 
-      if (
-        JSON.stringify(newCategories.sort()) !==
-        JSON.stringify([...currentCategories].sort())
-      ) {
+      if (JSON.stringify(newCategories.sort()) !== JSON.stringify([...currentCategories].sort())) {
         product.categories = newCategories
         await product.save()
         return { success: true, type: 'updated' }
@@ -505,13 +455,9 @@ export default class PackReserveSyncService {
       return { success: true, type: 'no_changes' }
     })
 
-    const resolved = results.map((r) =>
-      r.status === 'fulfilled' ? r.value : { success: false }
-    )
+    const resolved = results.map((r) => (r.status === 'fulfilled' ? r.value : { success: false }))
     return {
-      updated: resolved.filter(
-        (x) => x.success && (x as any).type === 'updated'
-      ).length,
+      updated: resolved.filter((x) => x.success && (x as any).type === 'updated').length,
       failed: resolved.filter((x) => !x.success).length,
     }
   }
@@ -522,12 +468,8 @@ export default class PackReserveSyncService {
   ): Promise<{ added: number; removed: number; failed: number }> {
     if (!groupedPackData.length) return { added: 0, removed: 0, failed: 0 }
 
-    const packsWithSerial = groupedPackData.filter(
-      (g) => g.serial && g.serial.trim() !== ''
-    )
-    const packsWithoutSerial = groupedPackData.filter(
-      (g) => !g.serial || g.serial.trim() === ''
-    )
+    const packsWithSerial = groupedPackData.filter((g) => g.serial && g.serial.trim() !== '')
+    const packsWithoutSerial = groupedPackData.filter((g) => !g.serial || g.serial.trim() === '')
 
     let addedCount = 0
     let removedCount = 0
@@ -564,9 +506,7 @@ export default class PackReserveSyncService {
       })
       addedCount = addResults.filter(
         (r) =>
-          r.status === 'fulfilled' &&
-          (r.value as any).success &&
-          (r.value as any).type === 'added'
+          r.status === 'fulfilled' && (r.value as any).success && (r.value as any).type === 'added'
       ).length
       failedCount += addResults.filter(
         (r) => r.status === 'fulfilled' && !(r.value as any).success
@@ -581,11 +521,7 @@ export default class PackReserveSyncService {
           .whereIn('product_id', packIdsToRemove)
           .delete()
         removedCount =
-          typeof deleted === 'number'
-            ? deleted
-            : Array.isArray(deleted)
-              ? deleted.length
-              : 0
+          typeof deleted === 'number' ? deleted : Array.isArray(deleted) ? deleted.length : 0
       } catch (error: any) {
         Logger.error({ err: error }, 'Error eliminando category_products')
         failedCount += 1
@@ -622,12 +558,9 @@ export default class PackReserveSyncService {
       return { success: true, type: 'updated' }
     })
 
-    const resolved = results.map((r) =>
-      r.status === 'fulfilled' ? r.value : { success: false }
-    )
+    const resolved = results.map((r) => (r.status === 'fulfilled' ? r.value : { success: false }))
     return {
-      updated: resolved.filter((x) => x.success && (x as any).type === 'updated')
-        .length,
+      updated: resolved.filter((x) => x.success && (x as any).type === 'updated').length,
       failed: resolved.filter((x) => !x.success).length,
     }
   }
@@ -639,8 +572,7 @@ export default class PackReserveSyncService {
     if (countryCode !== 'PE' && countryCode !== 'CO') {
       return { updated: 0, skipped: 0 }
     }
-    const tableName =
-      countryCode === 'PE' ? 'inventory_reserve_peru' : 'inventory_reserve_colombia'
+    const tableName = countryCode === 'PE' ? 'inventory_reserve_peru' : 'inventory_reserve_colombia'
     try {
       await Database.raw(`SELECT 1 FROM ${tableName} LIMIT 1`)
     } catch {
@@ -669,9 +601,7 @@ export default class PackReserveSyncService {
     }))
   }
 
-  async formatDataForBigCommerceInventory(
-    groupedPackData: GroupedPackData[]
-  ): Promise<
+  async formatDataForBigCommerceInventory(groupedPackData: GroupedPackData[]): Promise<
     Array<{
       settings: Array<{
         identity?: { sku?: string }
@@ -685,16 +615,12 @@ export default class PackReserveSyncService {
     if (!groupedPackData.length) return []
     const variantIds = [
       ...new Set(
-        groupedPackData
-          .filter((g) => g.variant_id && g.variant_id !== 0)
-          .map((g) => g.variant_id)
+        groupedPackData.filter((g) => g.variant_id && g.variant_id !== 0).map((g) => g.variant_id)
       ),
     ]
     const packIds = [
       ...new Set(
-        groupedPackData
-          .filter((g) => !g.variant_id || g.variant_id === 0)
-          .map((g) => g.pack_id)
+        groupedPackData.filter((g) => !g.variant_id || g.variant_id === 0).map((g) => g.pack_id)
       ),
     ]
 
@@ -748,18 +674,15 @@ export default class PackReserveSyncService {
     try {
       const packIdsToRemoveFromReserve = [
         ...new Set(
-          groupedPackData
-            .filter((g) => !g.serial || g.serial.trim() === '')
-            .map((g) => g.pack_id)
+          groupedPackData.filter((g) => !g.serial || g.serial.trim() === '').map((g) => g.pack_id)
         ),
       ]
       if (packIdsToRemoveFromReserve.length > 0) {
         await this.withRetries(
           () =>
-            this.bigcommerceService.deleteCategoryAssignments(
-              packIdsToRemoveFromReserve,
-              [reserveCategoryId]
-            ),
+            this.bigcommerceService.deleteCategoryAssignments(packIdsToRemoveFromReserve, [
+              reserveCategoryId,
+            ]),
           'delete category assignments (reserve)'
         )
       }
@@ -771,12 +694,11 @@ export default class PackReserveSyncService {
         const merged = [...new Set([...existing, ...p.categories])]
         uniqueByProduct.set(p.id, merged)
       })
-      const assignments = Array.from(uniqueByProduct.entries()).flatMap(
-        ([productId, categories]) =>
-          categories.map((categoryId) => ({
-            product_id: productId,
-            category_id: categoryId,
-          }))
+      const assignments = Array.from(uniqueByProduct.entries()).flatMap(([productId, categories]) =>
+        categories.map((categoryId) => ({
+          product_id: productId,
+          category_id: categoryId,
+        }))
       )
       await this.withRetries(
         () => this.bigcommerceService.updateCategoryAssignments(assignments),
@@ -799,11 +721,7 @@ export default class PackReserveSyncService {
     const settings = items.flatMap((i) => i.settings)
     if (!settings.length) return
     await this.withRetries(
-      () =>
-        this.bigcommerceService.updateInventoryLocationItems(
-          inventoryId,
-          settings
-        ),
+      () => this.bigcommerceService.updateInventoryLocationItems(inventoryId, settings),
       `update inventory location ${inventoryId}`
     )
   }

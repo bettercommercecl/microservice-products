@@ -18,10 +18,7 @@ export default class extends BaseSchema {
       table.index(['parent_id'], 'idx_categories_parent_id')
       table.index(['is_visible'], 'idx_categories_is_visible')
       table.index(['parent_id', 'is_visible'], 'idx_categories_parent_visible')
-      table.index(
-        ['parent_id', 'is_visible', 'sort_order'],
-        'idx_categories_parent_visible_order'
-      )
+      table.index(['parent_id', 'is_visible', 'sort_order'], 'idx_categories_parent_visible_order')
       table.index(['sort_order'], 'idx_categories_sort_order')
     })
   }

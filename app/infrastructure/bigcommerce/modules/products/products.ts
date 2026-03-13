@@ -31,7 +31,7 @@ type ProductAvailability = 'available' | 'disabled' | 'preorder'
 type ProductType = 'digital' | 'physical'
 
 export interface ProductQueryParams {
-  id?: number
+  'id'?: number
   'id:in'?: number[] | string
   'id:not_in'?: number[] | string
   'id:min'?: number
@@ -40,50 +40,50 @@ export interface ProductQueryParams {
   'id:less'?: number
   'channel_id:in'?: number[] | string
 
-  include?: ProductInclude[] | string
-  include_fields?: string[] | string
-  exclude_fields?: string[] | string
+  'include'?: ProductInclude[] | string
+  'include_fields'?: string[] | string
+  'exclude_fields'?: string[] | string
 
-  page?: number
-  limit?: number
-  sort?: SortField
-  direction?: 'asc' | 'desc'
+  'page'?: number
+  'limit'?: number
+  'sort'?: SortField
+  'direction'?: 'asc' | 'desc'
 
   'categories:in'?: number[] | string
-  categories?: number
-  name?: string
-  sku?: string
+  'categories'?: number
+  'name'?: string
+  'sku'?: string
   'sku:in'?: string[] | string
-  brand_id?: number
-  type?: ProductType
-  condition?: ProductCondition
-  availability?: ProductAvailability
-  keyword?: string
-  keyword_context?: 'shopper' | 'merchant'
-  mpn?: string
-  upc?: string
-  price?: number
-  weight?: number
+  'brand_id'?: number
+  'type'?: ProductType
+  'condition'?: ProductCondition
+  'availability'?: ProductAvailability
+  'keyword'?: string
+  'keyword_context'?: 'shopper' | 'merchant'
+  'mpn'?: string
+  'upc'?: string
+  'price'?: number
+  'weight'?: number
 
-  is_visible?: boolean | number
-  is_featured?: 0 | 1
-  is_free_shipping?: 0 | 1
+  'is_visible'?: boolean | number
+  'is_featured'?: 0 | 1
+  'is_free_shipping'?: 0 | 1
 
-  inventory_level?: number
+  'inventory_level'?: number
   'inventory_level:in'?: number[] | string
   'inventory_level:not_in'?: number[] | string
   'inventory_level:min'?: number
   'inventory_level:max'?: number
   'inventory_level:greater'?: number
   'inventory_level:less'?: number
-  inventory_low?: 0 | 1
-  out_of_stock?: 0 | 1
-  total_sold?: number
+  'inventory_low'?: 0 | 1
+  'out_of_stock'?: 0 | 1
+  'total_sold'?: number
 
-  date_modified?: string
+  'date_modified'?: string
   'date_modified:min'?: string
   'date_modified:max'?: string
-  date_last_imported?: string
+  'date_last_imported'?: string
   'date_last_imported:not'?: string
   'date_last_imported:min'?: string
   'date_last_imported:max'?: string
@@ -178,11 +178,11 @@ export default class ProductsApi {
   async getDetailedByIds(products: number[], visible = 1, parentCategory: number | null) {
     const filters: ProductQueryParams = {
       'id:in': products,
-      availability: 'available',
-      sort: 'id',
-      direction: 'desc',
-      include: ['images', 'variants'],
-      limit: 250,
+      'availability': 'available',
+      'sort': 'id',
+      'direction': 'desc',
+      'include': ['images', 'variants'],
+      'limit': 250,
     }
 
     if (visible === 1) filters.is_visible = true
@@ -280,10 +280,7 @@ export default class ProductsApi {
    * DELETE /v3/catalog/products/category-assignments (requiere al menos un filtro).
    * @see https://developer.bigcommerce.com/docs/rest-catalog/products/category-assignments#delete-products-category-assignments
    */
-  async deleteCategoryAssignments(
-    productIds: number[],
-    categoryIds: number[]
-  ): Promise<void> {
+  async deleteCategoryAssignments(productIds: number[], categoryIds: number[]): Promise<void> {
     if (productIds.length === 0 || categoryIds.length === 0) return
 
     const BATCH_SIZE = 250

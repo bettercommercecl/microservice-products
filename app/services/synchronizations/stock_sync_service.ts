@@ -1,5 +1,5 @@
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
-import CatalogSafeStock from '#models/catalog.safe.stock'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 import Product from '#models/product'
 import ProductPack from '#models/product_pack'
 import Variant from '#models/variant'
@@ -78,9 +78,7 @@ export default class StockSyncService {
   private getMainLocationId(): string {
     const country = env.get('COUNTRY_CODE')
     return (
-      env.get(`INVENTORY_LOCATION_ID_${country}` as any) ??
-      env.get('INVENTORY_LOCATION_ID') ??
-      ''
+      env.get(`INVENTORY_LOCATION_ID_${country}` as any) ?? env.get('INVENTORY_LOCATION_ID') ?? ''
     )
   }
 
@@ -159,14 +157,11 @@ export default class StockSyncService {
       if (reserveLocationId) {
         this.shouldAbort(deadline)
         const reserveInventory: any = await this.withRetries(
-          () =>
-            this.bigcommerceService.getInventoryGlobalReserve(reserveLocationId),
+          () => this.bigcommerceService.getInventoryGlobalReserve(reserveLocationId),
           'inventario reserva'
         )
         if (Array.isArray(reserveInventory)) {
-          const reserveFormatted = reserveInventory.map((i: SafeStockItem) =>
-            this.formatItem(i)
-          )
+          const reserveFormatted = reserveInventory.map((i: SafeStockItem) => this.formatItem(i))
           merged = this.mergeInventories(mainFormatted, reserveFormatted)
         }
       }
@@ -240,8 +235,7 @@ export default class StockSyncService {
     productsUpdated: number
     packsUpdated: number
   }> {
-    if (!items.length)
-      return { variantsUpdated: 0, productsUpdated: 0, packsUpdated: 0 }
+    if (!items.length) return { variantsUpdated: 0, productsUpdated: 0, packsUpdated: 0 }
 
     const variantIds = items.map((i) => i.variant_id)
     const skus = [...new Set(items.map((i) => i.sku))]
@@ -254,10 +248,7 @@ export default class StockSyncService {
       .select('id', 'stock', 'warning_stock')
     const variantUpdates = variantsToUpdate.filter((v) => {
       const data = byVariantId.get(v.id)
-      return (
-        data &&
-        (v.stock !== data.available_to_sell || v.warning_stock !== data.safety_stock)
-      )
+      return data && (v.stock !== data.available_to_sell || v.warning_stock !== data.safety_stock)
     })
 
     const variantResults = await this.processInBatches(
@@ -282,10 +273,7 @@ export default class StockSyncService {
       .whereIn('product_id', productIds)
       .groupBy('product_id')
 
-    const aggMap = new Map<
-      number,
-      { stock: number; warning_stock: number }
-    >()
+    const aggMap = new Map<number, { stock: number; warning_stock: number }>()
     for (const row of aggregatedFromVariants) {
       aggMap.set(row.product_id, {
         stock: Number(row.stock ?? 0),
@@ -298,10 +286,7 @@ export default class StockSyncService {
       .select('id', 'stock', 'warning_stock')
     const productUpdates = productsToUpdate.filter((p) => {
       const agg = aggMap.get(p.id)
-      return (
-        agg &&
-        (p.stock !== agg.stock || p.warning_stock !== agg.warning_stock)
-      )
+      return agg && (p.stock !== agg.stock || p.warning_stock !== agg.warning_stock)
     })
 
     const productResults = await this.processInBatches(
@@ -326,8 +311,7 @@ export default class StockSyncService {
       const data = bySku.get(p.sku)
       if (!data) return false
       return (
-        p.stock !== data.available_to_sell ||
-        (p.serial ?? '') !== (data.bin_picking_number || '')
+        p.stock !== data.available_to_sell || (p.serial ?? '') !== (data.bin_picking_number || '')
       )
     })
 
@@ -335,10 +319,12 @@ export default class StockSyncService {
       packUpdates,
       async (p) => {
         const data = bySku.get(p.sku)!
-        await ProductPack.query().where('id', p.id).update({
-          stock: data.available_to_sell,
-          serial: data.bin_picking_number || null,
-        })
+        await ProductPack.query()
+          .where('id', p.id)
+          .update({
+            stock: data.available_to_sell,
+            serial: data.bin_picking_number || null,
+          })
       },
       deadline
     )

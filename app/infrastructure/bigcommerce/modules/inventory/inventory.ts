@@ -13,15 +13,18 @@ function extractBigCommerceError(error: AxiosError): Record<string, unknown> {
     status: response?.status,
     statusText: response?.statusText,
     message: error.message,
-    bcTitle: response?.data && typeof response.data === 'object' && 'title' in response.data
-      ? (response.data as { title?: string }).title
-      : undefined,
-    bcDetail: response?.data && typeof response.data === 'object' && 'detail' in response.data
-      ? (response.data as { detail?: string }).detail
-      : undefined,
-    bcErrors: response?.data && typeof response.data === 'object' && 'errors' in response.data
-      ? (response.data as { errors?: unknown }).errors
-      : undefined,
+    bcTitle:
+      response?.data && typeof response.data === 'object' && 'title' in response.data
+        ? (response.data as { title?: string }).title
+        : undefined,
+    bcDetail:
+      response?.data && typeof response.data === 'object' && 'detail' in response.data
+        ? (response.data as { detail?: string }).detail
+        : undefined,
+    bcErrors:
+      response?.data && typeof response.data === 'object' && 'errors' in response.data
+        ? (response.data as { errors?: unknown }).errors
+        : undefined,
     bcRaw: response?.data,
     endpoint: error.config?.url,
     method: error.config?.method,

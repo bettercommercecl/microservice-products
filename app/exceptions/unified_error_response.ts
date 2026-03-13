@@ -23,9 +23,16 @@ export function buildUnifiedErrorResponse(
     overrideMessage?: string
   } = {}
 ): { body: UnifiedErrorResponse; statusCode: number } {
-  const e = error as Error & { bcContext?: ErrorContext; dbError?: Record<string, unknown>; statusCode?: number }
+  const e = error as Error & {
+    bcContext?: ErrorContext
+    dbError?: Record<string, unknown>
+    statusCode?: number
+  }
   const extractedDb = extractDbError(error)
-  const dbError = e?.dbError ?? (extractedDb.code ? extractedDb : undefined) ?? (e?.bcContext?.dbError as Record<string, unknown>)
+  const dbError =
+    e?.dbError ??
+    (extractedDb.code ? extractedDb : undefined) ??
+    (e?.bcContext?.dbError as Record<string, unknown>)
   const bcContext = e?.bcContext
 
   const context: ErrorContext = {
@@ -39,7 +46,7 @@ export function buildUnifiedErrorResponse(
   }
 
   const hasContext = !!(context.httpStatus || context.bcResponse || context.dbError)
-  const message = options.overrideMessage ?? (e?.message ?? 'Error interno del servidor')
+  const message = options.overrideMessage ?? e?.message ?? 'Error interno del servidor'
   const statusCode = e?.statusCode ?? options.statusCode ?? 500
 
   const body: UnifiedErrorResponse = {

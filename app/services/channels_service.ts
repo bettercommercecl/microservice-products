@@ -56,8 +56,7 @@ export default class ChannelsService {
 
     if (payload.name !== undefined) channel.name = payload.name
     if (payload.tree_id !== undefined) channel.tree_id = payload.tree_id
-    if (payload.parent_category !== undefined)
-      channel.parent_category = payload.parent_category
+    if (payload.parent_category !== undefined) channel.parent_category = payload.parent_category
     if (payload.country !== undefined) channel.country = payload.country
 
     await channel.save()

@@ -28,7 +28,8 @@
       "#utils/*": ["./app/utils/*"],
       "#dto/*": ["./app/dto/*"],
       "#interfaces/*": ["./app/interfaces/*"],
-      "#infrastructure/*": ["./app/infrastructure/*"]
+      "#infrastructure/*": ["./app/infrastructure/*"],
+      "#ports/*": ["./app/ports/*"]
     }
   },
   "include": ["**/*"],

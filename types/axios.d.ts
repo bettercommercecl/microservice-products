@@ -17,9 +17,19 @@ declare module 'axios' {
     config?: { url?: string; method?: string }
   }
 
-  export interface AxiosInstance {
-    get<T = unknown>(url: string, config?: unknown): Promise<AxiosResponse<T>>
-    put<T = unknown>(url: string, data?: unknown, config?: unknown): Promise<AxiosResponse<T>>
-    delete<T = unknown>(url: string, config?: unknown): Promise<AxiosResponse<T>>
+  export interface AxiosRequestConfig {
+    headers?: Record<string, string>
+    timeout?: number
+    params?: Record<string, string | number | undefined>
   }
+
+  export interface AxiosInstance {
+    get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>
+    put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>
+    patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>
+    delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>
+  }
+
+  const axios: AxiosInstance
+  export default axios
 }

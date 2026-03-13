@@ -95,9 +95,7 @@ export default class BigCommerceService {
     return this.packs.getAllProductsPacks()
   }
 
-  async updateCategoryAssignments(
-    assignments: Array<{ product_id: number; category_id: number }>
-  ) {
+  async updateCategoryAssignments(assignments: Array<{ product_id: number; category_id: number }>) {
     return this.products.updateCategoryAssignments(assignments)
   }
 
@@ -123,9 +121,7 @@ export default class BigCommerceService {
   ): Promise<Array<{ key: string; value: string }[]>> {
     const key = env.get('PACKS_METAFIELD_KEY', 'packs')
     const results = await Promise.all(
-      variantRefs.map((v) =>
-        this.variants.getMetafieldsByVariant(v.product_id, v.id, key)
-      )
+      variantRefs.map((v) => this.variants.getMetafieldsByVariant(v.product_id, v.id, key))
     )
     return results
   }

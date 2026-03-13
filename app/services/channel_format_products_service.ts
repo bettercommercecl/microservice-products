@@ -1,17 +1,17 @@
 import { BigcommerceProduct } from '#dto/bigcommerce/bigcommerce_product.dto'
 import { ChannelConfigInterface } from '#interfaces/channel_interface'
 import { FormattedProduct } from '#interfaces/formatted_product.interface'
-import CatalogSafeStock from '#models/catalog.safe.stock'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import { DateTime } from 'luxon'
-import BigcommerceService from '../infrastructure/bigcommerce/bigcommerce_api.js'
-import CalculationService from './calculation_service.js'
-import CategoriesService from './categories_service.js'
-import PriceService from './price_service.js'
+import BigcommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
+import CalculationService from '#services/calculation_service'
+import CategoriesService from '#services/categories_service'
+import PriceService from '#services/price_service'
 
-export default class FormatProductsService {
-  private readonly logger = Logger.child({ service: 'FormatProductsService' })
+export default class ChannelFormatProductsService {
+  private readonly logger = Logger.child({ service: 'ChannelFormatProductsService' })
   private readonly country = env.get('COUNTRY_CODE')
   private readonly categoriesService: CategoriesService
   private readonly bigcommerceService: BigcommerceService
@@ -160,7 +160,7 @@ export default class FormatProductsService {
         },
         'Error obteniendo inventario para producto'
       )
-      return [{ ...FormatProductsService.DEFAULT_INVENTORY }]
+      return [{ ...ChannelFormatProductsService.DEFAULT_INVENTORY }]
     }
   }
 
@@ -194,7 +194,7 @@ export default class FormatProductsService {
 
       // Si no hay metafield o está vacío, devolver valores por defecto
       if (!timerMetafield || typeof timerMetafield !== 'object') {
-        return { ...FormatProductsService.DEFAULT_TIMER_METAFIELDS }
+        return { ...ChannelFormatProductsService.DEFAULT_TIMER_METAFIELDS }
       }
 
       // Extraer los valores del timer
@@ -218,7 +218,7 @@ export default class FormatProductsService {
         },
         'Error obteniendo timer metafields para producto'
       )
-      return { ...FormatProductsService.DEFAULT_TIMER_METAFIELDS }
+      return { ...ChannelFormatProductsService.DEFAULT_TIMER_METAFIELDS }
     }
   }
   private async calculatePricesProduct(
@@ -281,7 +281,7 @@ export default class FormatProductsService {
         },
         'Sin datos de precios para producto'
       )
-      return { ...FormatProductsService.DEFAULT_PRICES }
+      return { ...ChannelFormatProductsService.DEFAULT_PRICES }
     }
   }
 
@@ -432,15 +432,15 @@ export default class FormatProductsService {
    */
   private async processProductData(product: BigcommerceProduct, percentDiscount: number | null) {
     let inventoryLevel: Array<{ available_to_sell: number; safety_stock: number }> = []
-    let timerMetafields = { ...FormatProductsService.DEFAULT_TIMER_METAFIELDS }
-    let prices = { ...FormatProductsService.DEFAULT_PRICES }
+    let timerMetafields = { ...ChannelFormatProductsService.DEFAULT_TIMER_METAFIELDS }
+    let prices = { ...ChannelFormatProductsService.DEFAULT_PRICES }
 
     try {
       inventoryLevel = await this.getProductInventoryLevel(product)
       timerMetafields = await this.getProductTimerMetafields(product.id)
       prices = await this.calculatePricesProduct(
         product,
-        percentDiscount || FormatProductsService.DEFAULT_PERCENT_DISCOUNT
+        percentDiscount || ChannelFormatProductsService.DEFAULT_PERCENT_DISCOUNT
       )
     } catch (error) {
       this.logger.warn(

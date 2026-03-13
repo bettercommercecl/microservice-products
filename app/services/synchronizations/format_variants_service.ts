@@ -1,16 +1,20 @@
 import type { BigCommerceProductVariant } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
 import type { FormattedVariantForModel } from '#interfaces/formatted_variant_for_model.interface'
 import type InventoryReserve from '#models/inventory_reserve'
-import type { FormattedProduct, FormattedProductWithVariants, StockData } from '#interfaces/product-sync/sync.interfaces'
-import CatalogSafeStock from '#models/catalog.safe.stock'
+import type {
+  FormattedProduct,
+  FormattedProductWithVariants,
+  StockData,
+} from '#interfaces/product-sync/sync.interfaces'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import pLimit from 'p-limit'
 import { parseEnvFloat } from '#utils/env_parser'
-import type { PricingStrategy } from './pricing/product_pricing_strategy.js'
-import { PricingStrategyFactory } from './pricing/product_pricing_strategy.js'
-import CalculationService from '../calculation_service.js'
-import ImageProcessingService from '../image_processing_service.js'
+import type { PricingStrategy } from '#services/synchronizations/pricing/product_pricing_strategy'
+import { PricingStrategyFactory } from '#services/synchronizations/pricing/product_pricing_strategy'
+import CalculationService from '#services/calculation_service'
+import ImageProcessingService from '#services/image_processing_service'
 
 /**
  * Formatea variantes de BigCommerce al esquema de la tabla variants.
@@ -73,13 +77,18 @@ export default class FormatVariantsService {
 
     const productImages = product.images ? JSON.parse(product.images) : []
     const images = this.imageProcessingService.getImagesByVariation(
-      productImages, variant.sku, variant.image_url
+      productImages,
+      variant.sku,
+      variant.image_url
     )
     const hoverImage = this.imageProcessingService.getHoverImageByVariation(
-      productImages, variant.sku
+      productImages,
+      variant.sku
     )
     const calculatedWeight = this.calculationService.calculateVolumetricWeight(
-      variant.width, variant.depth, variant.height,
+      variant.width,
+      variant.depth,
+      variant.height,
       variant.weight ?? product.weight ?? 0,
       this.country
     )
@@ -153,7 +162,8 @@ export default class FormatVariantsService {
     }
 
     return products.map((product) => {
-      const { _raw_variants, ...productData } = product
+      // Nombre del campo en FormattedProduct (snake_case por contrato)
+      const { _raw_variants: rawVariants, ...productData } = product
       return {
         ...productData,
         variants: variantsByProduct.get(product.id) || [],
@@ -161,9 +171,7 @@ export default class FormatVariantsService {
     })
   }
 
-  private async batchLoadVariantInventory(
-    variantIds: number[]
-  ): Promise<Map<number, StockData>> {
+  private async batchLoadVariantInventory(variantIds: number[]): Promise<Map<number, StockData>> {
     const map = new Map<number, StockData>()
     if (variantIds.length === 0) return map
 

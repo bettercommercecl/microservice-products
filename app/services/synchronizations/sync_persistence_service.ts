@@ -1,5 +1,5 @@
 import type { FormattedProductWithVariants } from '#interfaces/product-sync/sync.interfaces'
-import type { FormattedOption } from '../format_options_service.js'
+import type { FormattedOption } from '#services/format_options_service'
 import CategoryProduct from '#models/category_product'
 import Category from '#models/category'
 import ChannelProduct from '#models/channel_product'
@@ -59,16 +59,11 @@ export default class SyncPersistenceService {
     const allVariants = products.flatMap((p) => p.variants)
     if (allVariants.length === 0) return
 
-    const variantBatches = createBatches(
-      allVariants,
-      SyncPersistenceService.VARIANT_BATCH_SIZE
-    )
+    const variantBatches = createBatches(allVariants, SyncPersistenceService.VARIANT_BATCH_SIZE)
     const limit = pLimit(3)
 
     await Promise.all(
-      variantBatches.map((batch, idx) =>
-        limit(() => this.reconcileVariantBatch(batch, idx, trx))
-      )
+      variantBatches.map((batch, idx) => limit(() => this.reconcileVariantBatch(batch, idx, trx)))
     )
   }
 

@@ -5,7 +5,7 @@ import CategoryService from '#services/categories_service'
 import BrandService from '#services/brands_service'
 import Channel from '#models/channel'
 import { channels as channelsConfig } from '#utils/channels/channels'
-import CompleteSyncService from '#services/complete_sync_service'
+import ChannelProductSyncService from '#services/channel_product_sync_service'
 import { channelIdentifierValidator } from '#validators/channel_identifier_validator'
 import PacksService from '#services/packs_service'
 
@@ -75,10 +75,13 @@ export default class SyncController {
         })
       }
 
-      const completeSyncService = new CompleteSyncService(channelConfig)
-      const syncResult = await completeSyncService.syncProductsComplete()
+      const channelSyncService = new ChannelProductSyncService(channelConfig)
+      const syncResult = await channelSyncService.syncProductsComplete()
       const packsService = new PacksService(channelConfig)
-      await packsService.syncPacks().then(() => this.logger.info('Packs OK')).catch((err) => this.logger.error('Packs fail', err))
+      await packsService
+        .syncPacks()
+        .then(() => this.logger.info('Packs OK'))
+        .catch((err) => this.logger.error('Packs fail', err))
 
       return response.ok({
         success: syncResult?.success,
@@ -88,7 +91,10 @@ export default class SyncController {
       })
     } catch (error: any) {
       if (error.messages) {
-        this.logger.error(`Error de validacion en identificador de canal: ${channelIdentifier}`, error.messages)
+        this.logger.error(
+          `Error de validacion en identificador de canal: ${channelIdentifier}`,
+          error.messages
+        )
         return response.badRequest({
           success: false,
           message: 'Formato de identificador de canal invalido',
@@ -149,10 +155,7 @@ export default class SyncController {
         }
         try {
           const chId = countryConfig.CHANNEL
-          const channel = await Channel.updateOrCreate(
-            { id: chId },
-            { id: chId, name: brandName }
-          )
+          const channel = await Channel.updateOrCreate({ id: chId }, { id: chId, name: brandName })
           channel.$isNew ? results.created++ : results.updated++
         } catch (error: any) {
           results.errors.push(`Error ${brandName}: ${error.message}`)
@@ -164,7 +167,10 @@ export default class SyncController {
         success: true,
         message: 'Sincronizacion de canales completada',
         data: results,
-        meta: { timestamp: new Date().toISOString(), totalProcessed: results.created + results.updated + results.errors.length },
+        meta: {
+          timestamp: new Date().toISOString(),
+          totalProcessed: results.created + results.updated + results.errors.length,
+        },
       })
     } catch (error: any) {
       this.logger.error('Error en sincronizacion de canales:', error)

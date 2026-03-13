@@ -2,11 +2,10 @@ import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import Product from '#models/product'
 import { READER_CONNECTION } from '#services/db_reader'
 import CacheService from '#services/cache_service'
+import syncConfig from '#config/sync'
 
 import Logger from '@adonisjs/core/services/logger'
 import pLimit from 'p-limit'
-
-const CACHE_TTL_PRODUCTS = 60
 
 export default class ProductService {
   private readonly logger = Logger.child({ service: 'ProductService' })
@@ -22,11 +21,9 @@ export default class ProductService {
       const cached = await this.cache.get(cacheKey)
       if (cached) return JSON.parse(cached) as { success: true; data: unknown }
 
-      const products = await (Product.query() as any)
-        .useConnection(READER_CONNECTION)
-        .fetch()
+      const products = await (Product.query() as any).useConnection(READER_CONNECTION).fetch()
       const result = { success: true as const, data: products.serialize() }
-      await this.cache.set(cacheKey, JSON.stringify(result), CACHE_TTL_PRODUCTS)
+      await this.cache.set(cacheKey, JSON.stringify(result), syncConfig.cacheTtlProductsSeconds)
       return result
     } catch (error) {
       this.logger.error('Error obteniendo todos los productos', { error: (error as Error).message })
@@ -50,7 +47,7 @@ export default class ProductService {
         .where('id', id)
         .firstOrFail()
       const result = { success: true as const, data: product.serialize() }
-      await this.cache.set(cacheKey, JSON.stringify(result), CACHE_TTL_PRODUCTS)
+      await this.cache.set(cacheKey, JSON.stringify(result), syncConfig.cacheTtlProductsSeconds)
       return result
     } catch (error) {
       this.logger.error('Error obteniendo producto por ID', { id, error: (error as Error).message })

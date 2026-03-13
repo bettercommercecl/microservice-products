@@ -1,6 +1,6 @@
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import { SafeStockItem } from '#interfaces/inventory_interface'
-import CatalogSafeStock from '#models/catalog.safe.stock'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 import InventoryReserve from '#models/inventory_reserve'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
@@ -86,7 +86,8 @@ export default class InventoryService {
       const productInventory = await this.bigCommerceService.getSafeStockGlobal()
 
       if (Array.isArray(productInventory)) {
-        const formattedInventory = productInventory.map((item: SafeStockItem) => ({
+        const items = productInventory as SafeStockItem[]
+        const formattedInventory = items.map((item) => ({
           sku: item.identity.sku.trim(),
           variant_id: item.identity.variant_id,
           product_id: item.identity.product_id,
@@ -266,14 +267,15 @@ export default class InventoryService {
     const locationId = env.get(`INVENTORY_RESERVE_ID_${env.get('COUNTRY_CODE')}`)
 
     if (!locationId) {
-      this.logger.info('INVENTORY_RESERVE_ID no configurado para este pais, omitiendo cruce de reservas')
+      this.logger.info(
+        'INVENTORY_RESERVE_ID no configurado para este pais, omitiendo cruce de reservas'
+      )
       return { success: true, message: 'Cruce de reservas no configurado para este pais', total: 0 }
     }
 
     this.logger.info({ locationId }, 'Iniciando cruce inventario reserva con n8n...')
 
-    let productInventory: any =
-      await this.bigCommerceService.getInventoryGlobalReserve(locationId)
+    let productInventory: any = await this.bigCommerceService.getInventoryGlobalReserve(locationId)
 
     if (!Array.isArray(productInventory)) {
       throw new Error('Respuesta invalida de BigCommerce para inventario de reserva')
@@ -291,9 +293,7 @@ export default class InventoryService {
 
     const allSkus = formatted.map((item) => item.sku)
 
-    const reservedSkus = await InventoryReserve.query()
-      .whereIn('sku', allSkus)
-      .select('sku')
+    const reservedSkus = await InventoryReserve.query().whereIn('sku', allSkus).select('sku')
     const reservedSkuSet = new Set(reservedSkus.map((r) => r.sku))
 
     const productsInReserve = formatted.filter((item) => reservedSkuSet.has(item.sku))

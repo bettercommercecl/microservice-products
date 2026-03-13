@@ -17,5 +17,8 @@ test.group('Packs Sync', (group) => {
     response.assertBodyContains({ success: true })
     response.assertBodyContains({ meta: { version: 'packs-sync' } })
     assert.property(response.body(), 'data')
-  }).skip(!!env.get('PACKS_CATEGORY_ID'), 'Omite cuando PACKS_CATEGORY_ID definido (evita sync real a BC)')
+  }).skip(
+    !!env.get('PACKS_CATEGORY_ID'),
+    'Omite cuando PACKS_CATEGORY_ID definido (evita sync real a BC)'
+  )
 })

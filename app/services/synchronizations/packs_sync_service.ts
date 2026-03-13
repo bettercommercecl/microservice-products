@@ -1,6 +1,6 @@
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import ProductPack from '#models/product_pack'
-import CatalogSafeStock from '#models/catalog.safe.stock'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 import {
   formatPacksRecords,
   type FormattedPackRecord,
@@ -81,8 +81,7 @@ export default class PacksSyncService {
   } {
     const interceptor = BigcommerceRateLimitInterceptor.getInstance()
     const status = interceptor.getStatus()
-    const percentageAvailable =
-      status.quota > 0 ? (status.requestsLeft / status.quota) * 100 : 0
+    const percentageAvailable = status.quota > 0 ? (status.requestsLeft / status.quota) * 100 : 0
 
     let batchSize: number
     let delay: number
@@ -142,20 +141,14 @@ export default class PacksSyncService {
       )
       this.shouldAbort(deadline)
 
-      const prepareDataPacks = await this.prepareDataPacks(
-        allPacksWithVariants,
-        deadline
-      )
+      const prepareDataPacks = await this.prepareDataPacks(allPacksWithVariants, deadline)
       const filterPacksWithProducts = prepareDataPacks.filter(
         (pack) => (pack?.items_packs?.length ?? 0) > 0
       )
-      const createFormatForDatabase =
-        await this.formatProductsPacks(filterPacksWithProducts)
+      const createFormatForDatabase = await this.formatProductsPacks(filterPacksWithProducts)
 
       if (createFormatForDatabase?.length > 0) {
-        Logger.info(
-          `Sync packs: guardando ${createFormatForDatabase.length} registros en BD`
-        )
+        Logger.info(`Sync packs: guardando ${createFormatForDatabase.length} registros en BD`)
         return await this.saveProductsOfPacksInDatabase(createFormatForDatabase)
       }
 
@@ -176,17 +169,12 @@ export default class PacksSyncService {
         }
         Logger.info('Sync packs: proceso finalizado')
       } catch (error: any) {
-        Logger.error(
-          { err: error },
-          'Sync packs: error en actualizacion de visibilidad'
-        )
+        Logger.error({ err: error }, 'Sync packs: error en actualizacion de visibilidad')
       }
     }
   }
 
-  private async formatProductsPacks(
-    packs: PackWithItems[]
-  ): Promise<FormattedPackRecord[]> {
+  private async formatProductsPacks(packs: PackWithItems[]): Promise<FormattedPackRecord[]> {
     if (!packs.length) return []
 
     const allSkus = new Set<string>()
@@ -206,10 +194,7 @@ export default class PacksSyncService {
     for (let i = 0; i < skuArray.length; i += SKU_BATCH_SIZE) {
       const skuBatch = skuArray.slice(i, i + SKU_BATCH_SIZE)
       try {
-        const inventoryProducts = await CatalogSafeStock.query().whereIn(
-          'sku',
-          skuBatch
-        )
+        const inventoryProducts = await CatalogSafeStock.query().whereIn('sku', skuBatch)
         inventoryProducts.forEach((product) => {
           if (product.sku) {
             inventoryMap.set(product.sku.trim(), {
@@ -232,10 +217,7 @@ export default class PacksSyncService {
           }
         })
       } catch (error: any) {
-        Logger.error(
-          { err: error },
-          'Error obteniendo inventario/variants para lote de SKUs'
-        )
+        Logger.error({ err: error }, 'Error obteniendo inventario/variants para lote de SKUs')
       }
     }
 
@@ -255,11 +237,7 @@ export default class PacksSyncService {
       }
     }
 
-    const formattedPacks = formatPacksRecords(
-      packs,
-      inventoryMap,
-      variantReserveMap
-    )
+    const formattedPacks = formatPacksRecords(packs, inventoryMap, variantReserveMap)
 
     if (missingSkus.size > 0) {
       const sampleSkus = Array.from(missingSkus).slice(0, 10).join(', ')
@@ -287,16 +265,11 @@ export default class PacksSyncService {
       await ProductPack.createMany(packs, { client: trx })
       await trx.commit()
       const totalPacks = await ProductPack.all()
-      Logger.info(
-        `Sync packs: guardado correcto, ${totalPacks.length} packs en BD`
-      )
+      Logger.info(`Sync packs: guardado correcto, ${totalPacks.length} packs en BD`)
       return { status: 201, data: totalPacks }
     } catch (error: any) {
       await trx.rollback()
-      Logger.error(
-        { err: error },
-        'Sync packs: error en guardado, transaccion revertida'
-      )
+      Logger.error({ err: error }, 'Sync packs: error en guardado, transaccion revertida')
       return {
         status: 500,
         message: 'Ocurrio un error al sincronizar los datos de packs.',
@@ -324,8 +297,7 @@ export default class PacksSyncService {
       const batchResults = await Promise.allSettled(
         batch.map(async (item) => {
           try {
-            const isPackOfVariants =
-              item?.variants && item.variants.length > 1
+            const isPackOfVariants = item?.variants && item.variants.length > 1
 
             item.items_packs = item.items_packs ?? []
 
@@ -343,10 +315,7 @@ export default class PacksSyncService {
 
               for (let j = 0; j < (item.variants?.length ?? 0); j += VARIANT_BATCH_SIZE) {
                 this.shouldAbort(deadline)
-                const variantBatch = (item.variants ?? []).slice(
-                  j,
-                  j + VARIANT_BATCH_SIZE
-                )
+                const variantBatch = (item.variants ?? []).slice(j, j + VARIANT_BATCH_SIZE)
 
                 const metafieldsResults =
                   await this.bigcommerceService.getMetafieldsByPacksVariants(
@@ -356,8 +325,7 @@ export default class PacksSyncService {
                     }))
                   )
 
-                for (let k = 0; k < variantBatch.length; k++) {
-                  const variantPack = variantBatch[k]
+                for (const [k, variantPack] of variantBatch.entries()) {
                   const royalProduct = metafieldsResults[k] ?? []
 
                   const formattedMetafieldsVariantsPacks = royalProduct
@@ -394,10 +362,7 @@ export default class PacksSyncService {
 
             return item
           } catch (error: any) {
-            Logger.error(
-              { err: error },
-              `Error procesando pack ${item?.id}`
-            )
+            Logger.error({ err: error }, `Error procesando pack ${item?.id}`)
             item.items_packs = item.items_packs ?? []
             return item
           }
@@ -494,14 +459,9 @@ export default class PacksSyncService {
               error?.message?.includes('429') ||
               error?.message?.includes('rate limit')
             if (is429Error) {
-              Logger.error(
-                `Rate limit (429) obteniendo variantes para pack ${pack.id}`
-              )
+              Logger.error(`Rate limit (429) obteniendo variantes para pack ${pack.id}`)
             } else {
-              Logger.error(
-                { err: error },
-                `Error obteniendo variantes para pack ${pack.id}`
-              )
+              Logger.error({ err: error }, `Error obteniendo variantes para pack ${pack.id}`)
             }
             pack.variants = []
             return pack
@@ -558,8 +518,6 @@ export default class PacksSyncService {
   }
 
   private async updateProductsVisibility(packIds: number[]): Promise<void> {
-    await Product.query()
-      .whereIn('id', packIds)
-      .update({ is_visible: false })
+    await Product.query().whereIn('id', packIds).update({ is_visible: false })
   }
 }

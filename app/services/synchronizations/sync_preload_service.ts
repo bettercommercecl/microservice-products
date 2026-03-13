@@ -1,5 +1,9 @@
 import type { BigCommerceProduct } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
-import type { ReviewData, TimerData, SyncEnrichmentData } from '#interfaces/product-sync/sync.interfaces'
+import type {
+  ReviewData,
+  TimerData,
+  SyncEnrichmentData,
+} from '#interfaces/product-sync/sync.interfaces'
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
@@ -38,9 +42,7 @@ export default class SyncPreloadService {
    * Solo carga reviews para productos que realmente tienen (reviews_count > 0).
    * Evita llamadas innecesarias a la API de BC.
    */
-  private async loadReviews(
-    products: BigCommerceProduct[]
-  ): Promise<Map<number, ReviewData>> {
+  private async loadReviews(products: BigCommerceProduct[]): Promise<Map<number, ReviewData>> {
     const map = new Map<number, ReviewData>()
 
     const withReviews = products.filter((p) => p.reviews_count > 0)
@@ -106,5 +108,4 @@ export default class SyncPreloadService {
 
     return map
   }
-
 }

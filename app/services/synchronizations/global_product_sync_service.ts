@@ -8,30 +8,31 @@ import type {
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import Logger from '@adonisjs/core/services/logger'
 import { createBatches } from '#utils/env_parser'
-import InventoryService from '../inventory_service.js'
-import N8nReserveService from '../n8n_reserve_service.js'
-import FormatOptionsService from '../format_options_service.js'
-import FormatProductsService from './format_products_service.js'
-import FormatVariantsService from './format_variants_service.js'
-import SyncPersistenceService from './sync_persistence_service.js'
-import SyncPreloadService from './sync_preload_service.js'
-import SyncCleanupService from './sync_cleanup_service.js'
-import FiltersService from '../filters_service.js'
-import PacksSyncService from './packs_sync_service.js'
+import InventoryService from '#services/inventory_service'
+import N8nReserveService from '#services/n8n_reserve_service'
+import FormatOptionsService from '#services/format_options_service'
+import GlobalFormatProductsService from '#services/synchronizations/global_format_products_service'
+import FormatVariantsService from '#services/synchronizations/format_variants_service'
+import SyncPersistenceService from '#services/synchronizations/sync_persistence_service'
+import SyncPreloadService from '#services/synchronizations/sync_preload_service'
+import SyncCleanupService from '#services/synchronizations/sync_cleanup_service'
+import FiltersService from '#services/filters_service'
+import PacksSyncService from '#services/synchronizations/packs_sync_service'
 import env from '#start/env'
+import syncConfig from '#config/sync'
 
 /**
  * Orquestador de la sincronizacion global de productos.
  * Responsabilidad unica: coordinar el flujo entre servicios especializados.
  * No contiene logica de formateo, persistencia ni limpieza.
  */
-export default class CompleteSyncService {
-  private readonly logger = Logger.child({ service: 'CompleteSyncService' })
+export default class GlobalProductSyncService {
+  private readonly logger = Logger.child({ service: 'GlobalProductSyncService' })
 
   private readonly bigcommerceService: BigCommerceService
   private readonly inventoryService: InventoryService
   private readonly n8nReserveService: N8nReserveService
-  private readonly formatProductsService: FormatProductsService
+  private readonly formatProductsService: GlobalFormatProductsService
   private readonly formatVariantsService: FormatVariantsService
   private readonly formatOptionsService: FormatOptionsService
   private readonly persistenceService: SyncPersistenceService
@@ -39,13 +40,13 @@ export default class CompleteSyncService {
   private readonly cleanupService: SyncCleanupService
   private readonly filtersService: FiltersService
 
-  private static readonly BATCH_SIZE = 200
+  private static readonly BATCH_SIZE = syncConfig.batchSize
 
   constructor() {
     this.bigcommerceService = new BigCommerceService()
     this.inventoryService = new InventoryService()
     this.n8nReserveService = new N8nReserveService()
-    this.formatProductsService = new FormatProductsService()
+    this.formatProductsService = new GlobalFormatProductsService()
     this.formatVariantsService = new FormatVariantsService()
     this.formatOptionsService = new FormatOptionsService()
     this.persistenceService = new SyncPersistenceService()
@@ -98,7 +99,10 @@ export default class CompleteSyncService {
 
       return this.buildResponse(startTime, stats, stats.batches || 0)
     } catch (error: any) {
-      this.logger.error({ error: error.message, stack: error.stack }, 'Error en sincronizacion de productos')
+      this.logger.error(
+        { error: error.message, stack: error.stack },
+        'Error en sincronizacion de productos'
+      )
       throw error
     }
   }
@@ -121,7 +125,9 @@ export default class CompleteSyncService {
         bcResponse?: unknown
         dbError?: Record<string, unknown>
       }
-      const detail = [err.title, err.detail, err.code, err.dbError?.message].filter(Boolean).join(' | ')
+      const detail = [err.title, err.detail, err.code, err.dbError?.message]
+        .filter(Boolean)
+        .join(' | ')
       const e = new Error(detail || 'Error al sincronizar stock de seguridad')
       ;(e as any).bcContext = {
         httpStatus: err.httpStatus,
@@ -159,7 +165,7 @@ export default class CompleteSyncService {
     enrichment: SyncEnrichmentData
   ): Promise<BatchResult & { batches: number }> {
     // Dividir en lotes de 200 para no saturar memoria ni DB
-    const batches = createBatches(products, CompleteSyncService.BATCH_SIZE)
+    const batches = createBatches(products, GlobalProductSyncService.BATCH_SIZE)
     let totalProducts = 0
     let totalVariants = 0
     let totalHidden = 0
@@ -177,7 +183,12 @@ export default class CompleteSyncService {
       )
     }
 
-    return { products: totalProducts, variants: totalVariants, hidden: totalHidden, batches: batches.length }
+    return {
+      products: totalProducts,
+      variants: totalVariants,
+      hidden: totalHidden,
+      batches: batches.length,
+    }
   }
 
   private async processSingleBatch(
@@ -192,12 +203,16 @@ export default class CompleteSyncService {
 
       // Productos con precios, imagenes, flags de categoria, reviews, timer
       const formattedProducts = await this.formatProductsService.formatProducts(
-        batch, reservesMap, enrichment.reviewsMap, enrichment.timerMap
+        batch,
+        reservesMap,
+        enrichment.reviewsMap,
+        enrichment.timerMap
       )
 
       // Variantes con stock, precios, imagenes
       const productsWithVariants = await this.formatVariantsService.formatVariants(
-        formattedProducts, reservesMap
+        formattedProducts,
+        reservesMap
       )
 
       // Ocultar productos cuyas variantes tienen precio 0
@@ -205,7 +220,11 @@ export default class CompleteSyncService {
 
       // Opciones (talla, color, etc.) por variante
       const options = await this.formatOptionsService.formatOptions(
-        productsWithVariants.map((p) => ({ product_id: p.id, id: p.id, variants: p.variants })) as any
+        productsWithVariants.map((p) => ({
+          product_id: p.id,
+          id: p.id,
+          variants: p.variants,
+        })) as any
       )
 
       // Guardar todo en una transaccion: products, variants, categories, channels, options
@@ -260,17 +279,13 @@ export default class CompleteSyncService {
    * Si TODAS las variantes de un producto tienen precios en 0,
    * el producto padre se oculta.
    */
-  private hideProductsWithoutValidVariants(
-    products: FormattedProductWithVariants[]
-  ): number {
+  private hideProductsWithoutValidVariants(products: FormattedProductWithVariants[]): number {
     let hidden = 0
 
     for (const product of products) {
       if (product.variants.length === 0) continue
 
-      const hasValid = product.variants.some(
-        (v) => v.normal_price > 0 || v.discount_price > 0
-      )
+      const hasValid = product.variants.some((v) => v.normal_price > 0 || v.discount_price > 0)
 
       if (!hasValid) {
         product.is_visible = false

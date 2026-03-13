@@ -29,7 +29,9 @@ export class DomainException extends Error {
 /**
  * Indica si un error tiene contexto adjunto (bcContext, dbError, etc.)
  */
-export function hasErrorContext(error: unknown): error is Error & { bcContext?: ErrorContext; dbError?: Record<string, unknown> } {
+export function hasErrorContext(
+  error: unknown
+): error is Error & { bcContext?: ErrorContext; dbError?: Record<string, unknown> } {
   const e = error as Record<string, unknown>
   return error instanceof Error && (!!e.bcContext || !!e.dbError)
 }

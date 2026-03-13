@@ -5,8 +5,8 @@ import type {
 import type { PriceResult } from '#interfaces/product-sync/sync.interfaces'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
-import CalculationService from '../../calculation_service.js'
-import PriceService from '../../price_service.js'
+import CalculationService from '#services/calculation_service'
+import PriceService from '#services/price_service'
 
 /**
  * Contrato para estrategias de calculo de precios.
@@ -14,7 +14,10 @@ import PriceService from '../../price_service.js'
  */
 export interface PricingStrategy {
   getProductPrices(product: BigCommerceProduct, percentDiscount: number): Promise<PriceResult>
-  getVariantPrices(variant: BigCommerceProductVariant, percentDiscount: number): Promise<PriceResult>
+  getVariantPrices(
+    variant: BigCommerceProductVariant,
+    percentDiscount: number
+  ): Promise<PriceResult>
 }
 
 // ================================================================
@@ -100,7 +103,10 @@ export class InternationalPricingStrategy implements PricingStrategy {
         return PricingStrategyFactory.ZERO_PRICES
       }
 
-      const discount = this.calculationService.calculateDiscount(prices.price, prices.calculatedPrice)
+      const discount = this.calculationService.calculateDiscount(
+        prices.price,
+        prices.calculatedPrice
+      )
       const cashPrice = this.calculationService.calculateTransferPrice(
         prices.price,
         prices.calculatedPrice,
@@ -140,9 +146,7 @@ export class PricingStrategyFactory {
     if (this.instance) return this.instance
 
     const useExternal = env.get('USE_EXTERNAL_PRICING', false)
-    this.instance = useExternal
-      ? new InternationalPricingStrategy()
-      : new ClPricingStrategy()
+    this.instance = useExternal ? new InternationalPricingStrategy() : new ClPricingStrategy()
 
     return this.instance
   }

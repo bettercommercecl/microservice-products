@@ -64,10 +64,7 @@ export default class PriceListsApi {
       return allRecords
     }
 
-    const remainingPages = Array.from(
-      { length: pagination.total_pages - 1 },
-      (_, i) => i + 2
-    )
+    const remainingPages = Array.from({ length: pagination.total_pages - 1 }, (_, i) => i + 2)
 
     const pagesData = await this.fetchPagesWithConcurrency(
       endpoint,

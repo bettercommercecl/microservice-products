@@ -40,9 +40,7 @@ export default class SyncCleanupService {
     this.logger.info({ count: obsoleteIds.length }, 'Limpiando productos descontinuados...')
 
     await db.transaction(async (trx) => {
-      await Product.query({ client: trx })
-        .whereIn('id', obsoleteIds)
-        .update({ is_visible: false })
+      await Product.query({ client: trx }).whereIn('id', obsoleteIds).update({ is_visible: false })
 
       const deletedVariants = await Variant.query({ client: trx })
         .whereIn('product_id', obsoleteIds)

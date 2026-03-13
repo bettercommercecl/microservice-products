@@ -1,10 +1,11 @@
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import BrandService from '#services/brands_service'
 import CategoryService from '#services/categories_service'
-import CompleteSyncService from '#services/synchronizations/complete_sync_service'
+import GlobalProductSyncService from '#services/synchronizations/global_product_sync_service'
 import PackReserveSyncService from '#services/synchronizations/pack_reserve_sync_service'
 import PacksSyncService from '#services/synchronizations/packs_sync_service'
 import CacheService from '#services/cache_service'
+import syncConfig from '#config/sync'
 import { HttpContext } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
 
@@ -15,7 +16,9 @@ export default class FullSyncController {
   private readonly logger = Logger.child({ service: 'FullSyncController' })
 
   async syncFull({ response }: HttpContext) {
-    this.logger.info('Sincronizacion completa solicitada: marcas -> categorias -> productos -> packs -> packs reserva')
+    this.logger.info(
+      'Sincronizacion completa solicitada: marcas -> categorias -> productos -> packs -> packs reserva'
+    )
 
     const results: Record<string, unknown> = {}
     const errors: string[] = []
@@ -43,8 +46,8 @@ export default class FullSyncController {
     }
 
     try {
-      const completeSyncService = new CompleteSyncService()
-      const productResult = await completeSyncService.syncProductsComplete({
+      const globalSyncService = new GlobalProductSyncService()
+      const productResult = await globalSyncService.syncProductsComplete({
         skipPacks: true,
       })
       results.productos = productResult
@@ -83,7 +86,7 @@ export default class FullSyncController {
 
     try {
       const cache = new CacheService()
-      await cache.invalidateByPrefix('products')
+      await cache.invalidateByPrefix(syncConfig.cacheInvalidationPrefixProducts)
     } catch (e: any) {
       this.logger.warn({ err: e }, 'Invalidacion de cache Redis omitida')
     }

@@ -1,10 +1,7 @@
 import { HttpContext } from '@adonisjs/core/http'
 import ChannelsService from '#services/channels_service'
 import Logger from '@adonisjs/core/services/logger'
-import {
-  createChannelValidator,
-  updateChannelValidator,
-} from '#validators/channel_validator'
+import { createChannelValidator, updateChannelValidator } from '#validators/channel_validator'
 import { channelNameValidator } from '#validators/channel_name_validator'
 
 export default class ChannelsController {

@@ -12,19 +12,19 @@ import Logger from '@adonisjs/core/services/logger'
 import db from '@adonisjs/lucid/services/db'
 import type { QueryClientContract, TransactionClientContract } from '@adonisjs/lucid/types/database'
 import pLimit from 'p-limit'
-import CategoryService from './categories_service.js'
-import ChannelsService from './channels_service.js'
-import FiltersService from './filters_service.js'
-import FormatOptionsService from './format_options_service.js'
-import FormatProductsService from './format_products_service.js'
-import FormatVariantsService from './format_variants_service.js'
-import InventoryService from './inventory_service.js'
+import CategoryService from '#services/categories_service'
+import ChannelsService from '#services/channels_service'
+import FiltersService from '#services/filters_service'
+import FormatOptionsService from '#services/format_options_service'
+import ChannelFormatProductsService from '#services/channel_format_products_service'
+import FormatVariantsService from '#services/format_variants_service'
+import InventoryService from '#services/inventory_service'
 
-export default class CompleteSyncService {
-  private readonly logger = Logger.child({ service: 'CompleteSyncService' })
+export default class ChannelProductSyncService {
+  private readonly logger = Logger.child({ service: 'ChannelProductSyncService' })
   private readonly bigcommerceService: BigcommerceService
   private readonly currentChannelConfig: ChannelConfigInterface
-  private readonly formatProductsService: FormatProductsService
+  private readonly formatProductsService: ChannelFormatProductsService
   private readonly inventoryService: InventoryService
   private readonly formatVariantsService: FormatVariantsService
   private readonly formatOptionsService: FormatOptionsService
@@ -34,7 +34,7 @@ export default class CompleteSyncService {
 
   constructor(currentChannelConfig: ChannelConfigInterface) {
     this.bigcommerceService = new BigcommerceService()
-    this.formatProductsService = new FormatProductsService()
+    this.formatProductsService = new ChannelFormatProductsService()
     this.formatVariantsService = new FormatVariantsService()
     this.formatOptionsService = new FormatOptionsService()
     this.filtersService = new FiltersService()

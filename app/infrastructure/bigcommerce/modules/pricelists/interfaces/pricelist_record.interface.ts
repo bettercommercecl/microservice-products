@@ -25,15 +25,15 @@ export interface PriceListRecordsParams {
   'variant_id:in'?: number[]
   'product_id:in'?: number[]
   'sku:in'?: string[]
-  currency?: string
+  'currency'?: string
   'currency:in'?: string[]
-  include?: ('bulk_pricing_tiers' | 'sku')[]
-  page?: number
-  limit?: number
-  price?: number
+  'include'?: ('bulk_pricing_tiers' | 'sku')[]
+  'page'?: number
+  'limit'?: number
+  'price'?: number
   'price:min'?: number
   'price:max'?: number
-  sale_price?: number
+  'sale_price'?: number
   'sale_price:min'?: number
   'sale_price:max'?: number
 }

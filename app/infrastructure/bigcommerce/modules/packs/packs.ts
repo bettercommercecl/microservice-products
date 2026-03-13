@@ -27,7 +27,7 @@ export default class PacksApi {
 
     const { data: products } = await this.products.getAll({
       'categories:in': [categoryId],
-      limit: 250,
+      'limit': 250,
     })
 
     if (!products?.length) {
@@ -44,20 +44,20 @@ export default class PacksApi {
       const results = await Promise.allSettled(
         batch.map(async (p: any) => {
           const metafieldValue = await this.products.getMetafields(p.id, this.metafieldKey)
-          let items_packs = Array.isArray(metafieldValue) ? metafieldValue : []
+          let itemsPacks = Array.isArray(metafieldValue) ? metafieldValue : []
 
           if (typeof metafieldValue === 'string') {
             try {
-              items_packs = JSON.parse(metafieldValue) ?? []
+              itemsPacks = JSON.parse(metafieldValue) ?? []
             } catch {
-              items_packs = []
+              itemsPacks = []
             }
           }
 
           return {
             id: p.id,
-            items_packs: items_packs ?? [],
-            itemsPacks: items_packs ?? [],
+            items_packs: itemsPacks ?? [],
+            itemsPacks: itemsPacks ?? [],
             variants: p.variants?.map((v: any) => ({ id: v.id, product_id: p.id })) ?? [],
           } as PackProduct
         })
@@ -74,7 +74,9 @@ export default class PacksApi {
       }
     }
 
-    this.logger.info(`Packs: ${packsWithItems.length} productos con items_packs de ${products.length} en categoria`)
+    this.logger.info(
+      `Packs: ${packsWithItems.length} productos con items_packs de ${products.length} en categoria`
+    )
     return packsWithItems
   }
 }

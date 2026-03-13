@@ -1,8 +1,8 @@
 import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
-import Product from './product.js'
-import Variant from './variant.js'
+import Product from '#models/product'
+import Variant from '#models/variant'
 
 export default class CatalogSafeStock extends BaseModel {
   protected tableName = 'catalog_safe_stocks'
@@ -31,7 +31,6 @@ export default class CatalogSafeStock extends BaseModel {
   @column()
   declare bin_picking_number: string | null
 
-  // RELACIONES FALTANTES
   @belongsTo(() => Product, {
     foreignKey: 'product_id',
   })
@@ -48,7 +47,6 @@ export default class CatalogSafeStock extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // HELPERS ADICIONALES
   async getProduct() {
     try {
       return await Product.query().where('id', this.product_id).first()
@@ -97,7 +95,6 @@ export default class CatalogSafeStock extends BaseModel {
     }
   }
 
-  // MÉTODOS ESTÁTICOS ADICIONALES
   static async getStockBySku(sku: string) {
     try {
       return await CatalogSafeStock.query().where('sku', sku).first()

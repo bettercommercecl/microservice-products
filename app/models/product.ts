@@ -12,7 +12,7 @@ import ChannelProduct from './channel_product.js'
 import FiltersProduct from './filters_product.js'
 import Option from './option.js'
 import Variant from './variant.js'
-import CatalogSafeStock from './catalog.safe.stock.js'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 
 // Servicio especializado para procesamiento de productos
 

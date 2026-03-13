@@ -11,7 +11,11 @@ router
     router.get('/channels/name/:name', [ChannelsController, 'showByName'])
     router.get('/channels/:id', [ChannelsController, 'show']).where('id', router.matchers.number())
     router.post('/channels', [ChannelsController, 'store'])
-    router.put('/channels/:id', [ChannelsController, 'update']).where('id', router.matchers.number())
-    router.delete('/channels/:id', [ChannelsController, 'destroy']).where('id', router.matchers.number())
+    router
+      .put('/channels/:id', [ChannelsController, 'update'])
+      .where('id', router.matchers.number())
+    router
+      .delete('/channels/:id', [ChannelsController, 'destroy'])
+      .where('id', router.matchers.number())
   })
   .prefix('api')
