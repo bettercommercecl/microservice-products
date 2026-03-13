@@ -1,7 +1,7 @@
 import router from '@adonisjs/core/services/router'
 
 // 🚀 Controlador lazy importado
-const ProductsController = () => import('#controllers/products_controller')
+const ProductsController = () => import('#controllers/products/products_controller')
 
 // Rutas de productos
 router

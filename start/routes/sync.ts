@@ -1,6 +1,6 @@
 import router from '@adonisjs/core/services/router'
 
-const SyncController = () => import('#controllers/sync_controller')
+const SyncController = () => import('#controllers/synchronizations/v1/sync_controller')
 
 router
   .group(() => {

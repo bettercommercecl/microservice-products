@@ -1,8 +1,8 @@
-import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
+import router from '@adonisjs/core/services/router'
 
 // 🚀 Controlador lazy importado
-const VariantController = () => import('#controllers/variant_controller')
+const VariantController = () => import('#controllers/variants/variant_controller')
 
 // Rutas de variantes
 router
