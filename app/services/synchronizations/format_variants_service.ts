@@ -11,28 +11,32 @@ import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import pLimit from 'p-limit'
 import { parseEnvFloat } from '#utils/env_parser'
+import type { CalculationPort } from '#application/ports/calculation.port'
 import type { PricingStrategy } from '#services/synchronizations/pricing/product_pricing_strategy'
 import { PricingStrategyFactory } from '#services/synchronizations/pricing/product_pricing_strategy'
-import CalculationService from '#services/calculation_service'
 import ImageProcessingService from '#services/image_processing_service'
 
 /**
  * Formatea variantes de BigCommerce al esquema de la tabla variants.
  * Delega precios al PricingStrategy compartido con FormatProductsService.
  */
+export interface FormatVariantsServiceDeps {
+  calculation: CalculationPort
+}
+
 export default class FormatVariantsService {
   private readonly logger = Logger.child({ service: 'FormatVariantsService' })
   private readonly country = env.get('COUNTRY_CODE')
   private readonly pricingStrategy: PricingStrategy
-  private readonly calculationService: CalculationService
+  private readonly calculation: CalculationPort
   private readonly imageProcessingService: ImageProcessingService
   private readonly percentDiscount: number
 
   private static readonly DEFAULT_PERCENT_DISCOUNT = 2
 
-  constructor() {
-    this.pricingStrategy = PricingStrategyFactory.create()
-    this.calculationService = new CalculationService()
+  constructor(deps: FormatVariantsServiceDeps) {
+    this.calculation = deps.calculation
+    this.pricingStrategy = PricingStrategyFactory.create(deps.calculation)
     this.imageProcessingService = new ImageProcessingService()
     this.percentDiscount =
       parseEnvFloat('PERCENT_DISCOUNT_TRANSFER_PRICE') ??
@@ -85,7 +89,7 @@ export default class FormatVariantsService {
       productImages,
       variant.sku
     )
-    const calculatedWeight = this.calculationService.calculateVolumetricWeight(
+    const calculatedWeight = this.calculation.calculateVolumetricWeight(
       variant.width,
       variant.depth,
       variant.height,

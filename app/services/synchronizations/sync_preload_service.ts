@@ -87,8 +87,13 @@ export default class SyncPreloadService {
       products.map((p) =>
         limit(async () => {
           try {
-            let metafield = await this.bigcommerceService.getMetafieldsByProduct(p.id, timerKey)
-            metafield = metafield.length ? JSON.parse(metafield) : null
+            let metafieldRaw = await this.bigcommerceService.getMetafieldsByProduct(p.id, timerKey)
+            const metafield =
+              typeof metafieldRaw === 'string'
+                ? (JSON.parse(metafieldRaw) as { timer_status?: boolean; timer_price?: number; timer_datetime?: string } | null)
+                : Array.isArray(metafieldRaw) && metafieldRaw.length
+                  ? (JSON.parse(String(metafieldRaw)) as { timer_status?: boolean; timer_price?: number; timer_datetime?: string } | null)
+                  : null
 
             if (metafield && typeof metafield === 'object' && metafield.timer_status) {
               map.set(p.id, {

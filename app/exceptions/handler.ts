@@ -1,7 +1,7 @@
 import app from '@adonisjs/core/services/app'
 import { HttpContext, ExceptionHandler } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
-import { DomainException, type ErrorContext } from './domain_exception.js'
+import { DomainException, type ErrorContext } from '#domain/exceptions/domain_exception'
 import { buildUnifiedErrorResponse } from './unified_error_response.js'
 import { extractDbError } from '#utils/db_error_extractor'
 

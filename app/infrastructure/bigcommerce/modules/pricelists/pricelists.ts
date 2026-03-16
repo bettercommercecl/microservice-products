@@ -34,7 +34,7 @@ export default class PriceListsApi {
 
     const queryParams = this.buildQueryParams(params)
     const response = await this.client.get(endpoint, { params: queryParams })
-    return response.data
+    return response.data as PriceListRecordsResponse
   }
 
   /**

@@ -73,13 +73,11 @@ export default class StockSyncService {
   }
 
   /**
-   * Ubicacion principal: INVENTORY_LOCATION_ID_{COUNTRY} o INVENTORY_LOCATION_ID
+   * Ubicacion principal segun pais: INVENTORY_LOCATION_ID_CL, _CO, _PE.
    */
   private getMainLocationId(): string {
     const country = env.get('COUNTRY_CODE')
-    return (
-      env.get(`INVENTORY_LOCATION_ID_${country}` as any) ?? env.get('INVENTORY_LOCATION_ID') ?? ''
-    )
+    return env.get(`INVENTORY_LOCATION_ID_${country}` as any) ?? ''
   }
 
   /**
@@ -128,7 +126,9 @@ export default class StockSyncService {
   async syncStock(): Promise<StockSyncReport> {
     const mainLocationId = this.getMainLocationId()
     if (!mainLocationId) {
-      Logger.warn('INVENTORY_LOCATION_ID no configurado, sync de stock omitida')
+      Logger.warn(
+        `INVENTORY_LOCATION_ID_${env.get('COUNTRY_CODE')} no configurado, sync de stock omitida`
+      )
       return this.emptyReport()
     }
 

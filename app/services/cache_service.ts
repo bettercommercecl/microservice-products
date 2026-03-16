@@ -1,17 +1,19 @@
-import type { CacheProvider } from '../ports/cache_provider.port'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
-import Redis from 'ioredis'
+import { Redis } from 'ioredis'
+import type { CacheProvider } from '#ports/cache_provider.port'
 
 /**
  * Implementacion Redis del puerto de cache.
- * Si REDIS_HOST no esta definido, todas las operaciones son no-op / devuelven null.
+ * Si REDIS_HOST no esta definido, todas las devuelven null.
  */
+type RedisClient = InstanceType<typeof Redis>
+
 export default class CacheService implements CacheProvider {
-  private static client: Redis | null = null
+  private static client: RedisClient | null = null
   private static keyPrefix: string = 'products_ms:'
 
-  private static getClient(): Redis | null {
+  private static getClient(): RedisClient | null {
     if (CacheService.client) return CacheService.client
     const host = env.get('REDIS_HOST')
     if (!host) return null
@@ -21,9 +23,9 @@ export default class CacheService implements CacheProvider {
         port: env.get('REDIS_PORT') ?? 6379,
         password: env.get('REDIS_PASSWORD') ?? undefined,
         keyPrefix: env.get('REDIS_KEY_PREFIX') ?? CacheService.keyPrefix,
-        retryStrategy: (times) => (times <= 3 ? Math.min(500 * times, 2000) : null),
+        retryStrategy: (times: number) => (times <= 3 ? Math.min(500 * times, 2000) : null),
       })
-      CacheService.client.on('error', (err) => {
+      CacheService.client.on('error', (err: Error) => {
         Logger.warn({ err: err.message }, 'Redis connection error')
       })
       return CacheService.client
@@ -84,7 +86,7 @@ export default class CacheService implements CacheProvider {
       const keys = await client.keys(`${fullPrefix}*`)
       if (keys.length === 0) return
       const keyPrefix = env.get('REDIS_KEY_PREFIX') ?? CacheService.keyPrefix
-      const keysWithoutPrefix = keys.map((k) =>
+      const keysWithoutPrefix = keys.map((k: string) =>
         k.startsWith(keyPrefix) ? k.slice(keyPrefix.length) : k
       )
       await client.del(...keysWithoutPrefix)

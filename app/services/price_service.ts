@@ -25,8 +25,8 @@ class PriceService {
 
       return response.data
     } catch (error) {
-      const axiosError = error as AxiosError
-      const isTimeout = axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')
+      const axiosError = error as AxiosError & { code?: string }
+      const isTimeout = axiosError.code === 'ECONNABORTED' || axiosError.message?.includes('timeout')
       const isRetryable = isTimeout || (axiosError.response?.status || 0) >= 500
 
       // Reintentar solo si es un error recuperable y no hemos excedido el máximo de reintentos

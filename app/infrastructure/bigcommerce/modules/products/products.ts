@@ -114,7 +114,8 @@ export default class ProductsApi {
           timeout: 30_000,
         })
 
-        const { data, meta } = response.data
+        const body = response.data as { data: unknown[]; meta?: { pagination?: { total_pages?: number } } }
+        const { data, meta } = body
 
         if (!data || data.length === 0) break
 
@@ -141,7 +142,7 @@ export default class ProductsApi {
   async getById(id: number) {
     try {
       const response = await this.client.get(`/v3/catalog/products/${id}`, { timeout: 15_000 })
-      return response.data.data
+      return (response.data as { data: unknown }).data
     } catch (error) {
       this.logger.error('Error al obtener producto de BigCommerce', {
         product_id: id,
@@ -159,7 +160,7 @@ export default class ProductsApi {
         params: { 'channel_id:in': channel, limit, page },
         timeout: 15_000,
       })
-      return response.data
+      return response.data as { data?: unknown[]; meta?: { pagination?: { total_pages?: number } } }
     } catch (error) {
       this.logger.error('Error al obtener productos por canal', {
         channel_id: channel,
@@ -197,8 +198,9 @@ export default class ProductsApi {
         params: { key },
       })
 
-      let data = results.data.data
-      if (data.length > 0) {
+      const body = results.data as { data: Array<{ value?: unknown }> }
+      let data: unknown = body.data
+      if (Array.isArray(data) && data.length > 0) {
         data = data[0].value
       }
 
@@ -219,7 +221,7 @@ export default class ProductsApi {
         params: { status: 1 },
       })
 
-      const data = results.data.data
+      const data = (results.data as { data: Array<{ id?: number; name?: string; title?: string; text?: string; rating?: number; date_reviewed?: string }> }).data
       const arrayReviews: any[] = []
       let totalRating = 0
 
@@ -233,7 +235,7 @@ export default class ProductsApi {
           date: elem.date_reviewed,
           images_url: [],
         })
-        totalRating += elem.rating
+        totalRating += elem.rating ?? 0
       }
 
       return {

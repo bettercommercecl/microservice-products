@@ -1,6 +1,8 @@
 import Channel from '#models/channel'
+import ChannelProduct from '#models/channel_product'
 import Logger from '@adonisjs/core/services/logger'
 import env from '#start/env'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 
 export interface CreateChannelPayload {
   id: number
@@ -75,5 +77,21 @@ export default class ChannelsService {
 
   async getWithProducts(): Promise<Channel[]> {
     return Channel.getChannelsWithProducts()
+  }
+
+  /**
+   * Sincroniza relaciones canal-producto a partir de variantes formateadas (cada una con product_id).
+   */
+  async syncChannelByProduct(
+    formattedVariants: { product_id: number }[],
+    channelId: number,
+    trx: TransactionClientContract
+  ): Promise<void> {
+    const productIds = [...new Set(formattedVariants.map((v) => v.product_id))]
+    const allRelations = productIds.map((product_id) => ({ product_id, channel_id: channelId }))
+    if (allRelations.length === 0) return
+    await ChannelProduct.updateOrCreateMany(['channel_id', 'product_id'], allRelations, {
+      client: trx,
+    })
   }
 }

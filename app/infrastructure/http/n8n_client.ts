@@ -3,6 +3,7 @@ import axios, { type AxiosInstance } from 'axios'
 import http from 'node:http'
 import https from 'node:https'
 
+const axiosCreate = (axios as unknown as { create: (config?: object) => AxiosInstance }).create
 let client: AxiosInstance | null = null
 
 /**
@@ -13,7 +14,7 @@ export function getN8nClient(): AxiosInstance {
     const user = env.get('API_N8N_USER') || ''
     const password = env.get('VALUE_API_N8N') || ''
 
-    client = axios.create({
+    client = axiosCreate({
       timeout: 30_000,
       headers: {
         'Content-Type': 'application/json',

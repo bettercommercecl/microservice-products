@@ -15,7 +15,7 @@ export default class BrandsApi {
           : `/v3/catalog/brands?limit=200`
 
       const response = await this.client.get(endpoint, { timeout: 15_000 })
-      return response.data.data
+      return (response.data as { data: unknown }).data
     } catch (error) {
       this.logger.error('Error al obtener marcas de BigCommerce', {
         ids_count: ids.length,

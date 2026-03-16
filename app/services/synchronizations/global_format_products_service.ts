@@ -13,8 +13,11 @@ import CatalogSafeStock from '#models/catalog_safe_stock'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import { parseEnvInt, parseEnvFloat } from '#utils/env_parser'
+import type { CalculationPort } from '#application/ports/calculation.port'
 import type { PricingStrategy } from '#services/synchronizations/pricing/product_pricing_strategy'
 import { PricingStrategyFactory } from '#services/synchronizations/pricing/product_pricing_strategy'
+import { getSizesByProduct } from '#application/formatters/get_sizes_by_product'
+import { getSizesConfig } from '#config/sizes_config'
 
 interface SpecialCategoryIds {
   sameday: number | null
@@ -25,28 +28,26 @@ interface SpecialCategoryIds {
   nextday: number | null
 }
 
-interface StoreSizeConfig {
-  small: number | null
-  medium: number | null
-  big: number | null
-}
-
 /**
  * Formatea productos de BigCommerce al esquema de la tabla products.
- * Delega precios al PricingStrategy (OCP), recibe datos pre-cargados (no hace N+1).
+ * Delega precios al PricingStrategy (OCP), recibe datos pre-cargados.
  */
+export interface GlobalFormatProductsServiceDeps {
+  calculation: CalculationPort
+}
+
 export default class GlobalFormatProductsService {
   private readonly logger = Logger.child({ service: 'GlobalFormatProductsService' })
 
   private readonly pricingStrategy: PricingStrategy
   private readonly specialCategoryIds: SpecialCategoryIds
-  private readonly storeSizesConfig: Record<string, StoreSizeConfig> | null
+  private readonly idReserve: number | null
   private readonly percentDiscount: number
 
   private static readonly DEFAULT_PERCENT_DISCOUNT = 2
 
-  constructor() {
-    this.pricingStrategy = PricingStrategyFactory.create()
+  constructor(deps: GlobalFormatProductsServiceDeps) {
+    this.pricingStrategy = PricingStrategyFactory.create(deps.calculation)
     this.specialCategoryIds = {
       sameday: parseEnvInt('ID_SAMEDAY'),
       despacho24horas: parseEnvInt('ID_24HORAS'),
@@ -55,7 +56,7 @@ export default class GlobalFormatProductsService {
       turbo: parseEnvInt('ID_TURBO'),
       nextday: parseEnvInt('ID_NEXTDAY'),
     }
-    this.storeSizesConfig = this.parseStoreSizes()
+    this.idReserve = parseEnvInt('ID_RESERVE')
     this.percentDiscount =
       parseEnvFloat('PERCENT_DISCOUNT_TRANSFER_PRICE') ??
       GlobalFormatProductsService.DEFAULT_PERCENT_DISCOUNT
@@ -153,13 +154,18 @@ export default class GlobalFormatProductsService {
 
   private buildCategoryFlags(categories: number[]) {
     const has = (id: number | null) => (id !== null ? categories.includes(id) : false)
+    const nextday =
+      this.specialCategoryIds.nextday !== null &&
+      this.idReserve !== null &&
+      !categories.includes(this.idReserve) &&
+      categories.includes(this.specialCategoryIds.nextday)
 
     return {
       sameday: has(this.specialCategoryIds.sameday),
       free_shipping: has(this.specialCategoryIds.freeShipping),
       despacho24horas: has(this.specialCategoryIds.despacho24horas),
       pickup_in_store: has(this.specialCategoryIds.pickupInStore),
-      nextday: has(this.specialCategoryIds.nextday),
+      nextday,
       turbo: has(this.specialCategoryIds.turbo),
     }
   }
@@ -194,19 +200,8 @@ export default class GlobalFormatProductsService {
     return review ? JSON.stringify(review) : null
   }
 
-  private serializeSizes(categories: number[]): string | null {
-    if (!this.storeSizesConfig) return null
-
-    const sizes: Record<string, Record<string, boolean>> = {}
-    for (const [store, config] of Object.entries(this.storeSizesConfig)) {
-      sizes[store] = {
-        small: config.small ? categories.includes(config.small) : false,
-        medium: config.medium ? categories.includes(config.medium) : false,
-        big: config.big ? categories.includes(config.big) : false,
-      }
-    }
-
-    return JSON.stringify(sizes)
+  private serializeSizes(categories: number[]): string {
+    return JSON.stringify(getSizesByProduct(categories, getSizesConfig()))
   }
 
   private async batchLoadInventory(productIds: number[]): Promise<Map<number, StockData>> {
@@ -226,19 +221,5 @@ export default class GlobalFormatProductsService {
     }
 
     return map
-  }
-
-  private parseStoreSizes(): Record<string, StoreSizeConfig> | null {
-    const raw = env.get('STORE_SIZES')
-    if (!raw) return null
-
-    try {
-      const parsed = JSON.parse(raw)
-      if (typeof parsed !== 'object' || parsed === null) return null
-      return parsed
-    } catch {
-      this.logger.warn('STORE_SIZES no es JSON valido, sizes deshabilitados')
-      return null
-    }
   }
 }

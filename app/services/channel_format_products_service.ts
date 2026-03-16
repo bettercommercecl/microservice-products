@@ -5,10 +5,14 @@ import CatalogSafeStock from '#models/catalog_safe_stock'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import { DateTime } from 'luxon'
+import type { CalculationPort } from '#application/ports/calculation.port'
 import BigcommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
-import CalculationService from '#services/calculation_service'
 import CategoriesService from '#services/categories_service'
 import PriceService from '#services/price_service'
+
+export interface ChannelFormatProductsServiceDeps {
+  calculation: CalculationPort
+}
 
 export default class ChannelFormatProductsService {
   private readonly logger = Logger.child({ service: 'ChannelFormatProductsService' })
@@ -16,7 +20,7 @@ export default class ChannelFormatProductsService {
   private readonly categoriesService: CategoriesService
   private readonly bigcommerceService: BigcommerceService
   private readonly priceService: PriceService
-  private readonly calculationService: CalculationService
+  private readonly calculation: CalculationPort
 
   // Constantes para valores por defecto
   private static readonly DEFAULT_PERCENT_DISCOUNT = 2
@@ -33,11 +37,11 @@ export default class ChannelFormatProductsService {
     percent: '0%',
   }
 
-  constructor() {
+  constructor(deps: ChannelFormatProductsServiceDeps) {
     this.categoriesService = new CategoriesService()
     this.bigcommerceService = new BigcommerceService()
     this.priceService = new PriceService()
-    this.calculationService = new CalculationService()
+    this.calculation = deps.calculation
   }
   async formatProducts(
     productsList: BigcommerceProduct[],
@@ -189,19 +193,23 @@ export default class ChannelFormatProductsService {
         titleMetafieldTimerByCountry
       )
 
-      // Parsear el JSON si existe
-      timerMetafield = timerMetafield.length ? JSON.parse(timerMetafield) : null
+      // Parsear el JSON si existe (getMetafieldsByProduct puede devolver string o array)
+      const rawTimer = Array.isArray(timerMetafield) ? timerMetafield : timerMetafield
+      const parsed =
+        typeof rawTimer === 'string'
+          ? (JSON.parse(rawTimer) as { timer_price?: number; timer_status?: boolean; timer_datetime?: string } | null)
+          : rawTimer && typeof rawTimer === 'object'
+            ? (rawTimer as { timer_price?: number; timer_status?: boolean; timer_datetime?: string })
+            : null
 
-      // Si no hay metafield o está vacío, devolver valores por defecto
-      if (!timerMetafield || typeof timerMetafield !== 'object') {
+      if (!parsed) {
         return { ...ChannelFormatProductsService.DEFAULT_TIMER_METAFIELDS }
       }
 
-      // Extraer los valores del timer
-      const timerPrice = timerMetafield.timer_price || 0
-      const timerStatus = Boolean(timerMetafield.timer_status)
-      const timerDatetime = timerMetafield.timer_datetime
-        ? DateTime.fromJSDate(new Date(timerMetafield.timer_datetime))
+      const timerPrice = parsed.timer_price || 0
+      const timerStatus = Boolean(parsed.timer_status)
+      const timerDatetime = parsed.timer_datetime
+        ? DateTime.fromJSDate(new Date(parsed.timer_datetime))
         : null
 
       return {
@@ -227,11 +235,11 @@ export default class ChannelFormatProductsService {
   ) {
     try {
       if (this.country === 'CL') {
-        const discount = this.calculationService.calculateDiscount(
+        const discount = this.calculation.calculateDiscount(
           product.price,
           product.sale_price
         )
-        const percentDiscount = this.calculationService.calculateTransferPrice(
+        const percentDiscount = this.calculation.calculateTransferPrice(
           product.price,
           product.sale_price,
           PERCENT_DISCOUNT_TRANSFER_PRICE
@@ -257,11 +265,11 @@ export default class ChannelFormatProductsService {
         }
 
         // Usar precios de PriceService si están disponibles
-        const discount = this.calculationService.calculateDiscount(
+        const discount = this.calculation.calculateDiscount(
           prices.price,
           prices.calculatedPrice
         )
-        const percentDiscount = this.calculationService.calculateTransferPrice(
+        const percentDiscount = this.calculation.calculateTransferPrice(
           prices.price,
           prices.calculatedPrice,
           PERCENT_DISCOUNT_TRANSFER_PRICE

@@ -4,11 +4,11 @@ import axios, { type AxiosInstance } from 'axios'
 import http from 'node:http'
 import https from 'node:https'
 
+const axiosCreate = (axios as unknown as { create: (config?: object) => AxiosInstance }).create
 let client: AxiosInstance | null = null
 
 /**
  * Cliente HTTP dedicado a BigCommerce con keepAlive para reutilizar conexiones TLS
-
  * Incluye interceptor de rate limit integrado.
  */
 export function getBigcommerceClient(): AxiosInstance {
@@ -16,7 +16,7 @@ export function getBigcommerceClient(): AxiosInstance {
     const storeHash = env.get('BIGCOMMERCE_API_STORE_ID') || ''
     const baseURL = `${env.get('BIGCOMMERCE_API_URL') || ''}${storeHash}`
 
-    client = axios.create({
+    const instance = axiosCreate({
       baseURL,
       timeout: 30_000,
       headers: {
@@ -29,7 +29,8 @@ export function getBigcommerceClient(): AxiosInstance {
       httpsAgent: new https.Agent({ keepAlive: true, maxSockets: 25 }),
     })
 
-    BigcommerceRateLimitInterceptor.getInstance().setup(client)
+    BigcommerceRateLimitInterceptor.getInstance().setup(instance)
+    client = instance
   }
 
   return client

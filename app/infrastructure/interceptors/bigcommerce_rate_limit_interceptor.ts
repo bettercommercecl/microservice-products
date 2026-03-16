@@ -30,22 +30,27 @@ export default class BigcommerceRateLimitInterceptor {
    * solo se usa para eso.
    */
   public setup(client: AxiosInstance): void {
-    client.interceptors.request.use(
+    const clientWithInterceptors = client as AxiosInstance & {
+      interceptors: { request: { use: (onFulfilled?: (c: unknown) => unknown, onRejected?: (e: unknown) => unknown) => number }; response: { use: (onFulfilled?: (r: AxiosResponse) => AxiosResponse | Promise<AxiosResponse>, onRejected?: (e: unknown) => unknown) => number } }
+      request: (config: AxiosRequestConfig) => Promise<unknown>
+    }
+    clientWithInterceptors.interceptors.request.use(
       async (config: any) => {
         await this.handlePreRequest(config)
         return config
       },
-      (error) => Promise.reject(error)
+      (error: unknown) => Promise.reject(error)
     )
 
-    client.interceptors.response.use(
+    clientWithInterceptors.interceptors.response.use(
       (response: AxiosResponse) => {
         this.handleSuccessResponse(response)
         return response
       },
-      async (error: AxiosError) => {
-        if (error.config) {
-          return await this.handleErrorResponse(error, client)
+      async (error: unknown) => {
+        const axiosError = error as AxiosError
+        if (axiosError.config) {
+          return await this.handleErrorResponse(axiosError, clientWithInterceptors)
         }
         return Promise.reject(error)
       }
@@ -125,7 +130,7 @@ export default class BigcommerceRateLimitInterceptor {
     const config = error.config as AxiosRequestConfigWithRetry
 
     if (status === 429) {
-      const headers = error.response?.headers || {}
+      const headers = (error.response as AxiosResponse | undefined)?.headers ?? {}
       const timeResetMsHeader = this.getHeaderValue(headers, 'x-rate-limit-time-reset-ms')
       const timeResetMs = this.parseIntHeader(timeResetMsHeader, 30000)
 
@@ -139,7 +144,7 @@ export default class BigcommerceRateLimitInterceptor {
         this.requestsLeft = this.quota
         this.timeResetMs = 0
 
-        return client.request(config)
+        return (client as unknown as { request(config: AxiosRequestConfig): Promise<unknown> }).request(config)
       } else {
         Logger.error(`Rate limit excedido después de ${this.MAX_RETRIES} reintentos`)
         throw new Error(`Rate limit excedido después de ${this.MAX_RETRIES} intentos`)

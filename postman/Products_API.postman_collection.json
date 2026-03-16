@@ -106,6 +106,40 @@
           "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/products", "host": ["{{baseUrl}}"], "path": ["products"] } }
         },
         {
+          "name": "Productos paginados (estructura tabla)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/paginated?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "paginated"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Pagina" },
+                { "key": "limit", "value": "50", "description": "Registros por pagina (max 200)" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Productos por canal (channel_id o brand)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/by-channel?channel_id=1&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "by-channel"],
+              "query": [
+                { "key": "channel_id", "value": "1", "description": "ID del canal (numero)" },
+                { "key": "brand", "value": "UF", "description": "Nombre del canal (alternativa a channel_id)" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
           "name": "Obtener producto por ID",
           "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/products/1", "host": ["{{baseUrl}}"], "path": ["products", "1"] } }
         },
@@ -132,12 +166,163 @@
           }
         },
         {
+          "name": "Variantes paginadas (estructura tabla)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/variants/paginated?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["variants", "paginated"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50", "description": "Max 200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Variantes por canal (channel_id o brand)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/variants/by-channel?channel_id=1&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["variants", "by-channel"],
+              "query": [
+                { "key": "channel_id", "value": "1", "description": "ID del canal" },
+                { "key": "brand", "value": "UF", "description": "Nombre del canal (alternativa)" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
           "name": "Variantes formateadas por IDs",
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": { "mode": "raw", "raw": "{\n  \"ids\": [1, 2, 3]\n}" },
             "url": { "raw": "{{baseUrl}}/variants/formatted-by-ids", "host": ["{{baseUrl}}"], "path": ["variants", "formatted-by-ids"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Packs (estructura tabla)",
+      "item": [
+        {
+          "name": "Packs paginados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/packs/paginated?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["packs", "paginated"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50", "description": "Max 200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Packs por canal (channel_id o brand)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/packs/by-channel?channel_id=1&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["packs", "by-channel"],
+              "query": [
+                { "key": "channel_id", "value": "1" },
+                { "key": "brand", "value": "UF" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Options (estructura tabla)",
+      "item": [
+        {
+          "name": "Options paginados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/options/paginated?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["options", "paginated"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50", "description": "Max 200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Options por canal (channel_id o brand)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/options/by-channel?channel_id=1&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["options", "by-channel"],
+              "query": [
+                { "key": "channel_id", "value": "1" },
+                { "key": "brand", "value": "UF" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Category products (estructura tabla)",
+      "item": [
+        {
+          "name": "Category products paginados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/category-products/paginated?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["category-products", "paginated"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50", "description": "Max 200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Category products por canal (channel_id o brand)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/category-products/by-channel?channel_id=1&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["category-products", "by-channel"],
+              "query": [
+                { "key": "channel_id", "value": "1" },
+                { "key": "brand", "value": "UF" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
           }
         }
       ]

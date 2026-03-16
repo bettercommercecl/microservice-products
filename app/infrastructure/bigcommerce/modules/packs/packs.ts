@@ -15,13 +15,13 @@ export default class PacksApi {
 
   /**
    * Obtiene todos los productos pack desde BigCommerce.
-   * Requiere PACKS_CATEGORY_ID en env para filtrar por categoria.
+   * Requiere ID_PACKS en env para filtrar por categoria.
    * Para cada producto obtiene el metafield de packs y adjunta items_packs.
    */
   async getAllProductsPacks(): Promise<PackProduct[]> {
-    const categoryId = env.get('PACKS_CATEGORY_ID')
+    const categoryId = env.get('ID_PACKS')
     if (!categoryId) {
-      this.logger.warn('PACKS_CATEGORY_ID no configurado. Sync de packs omitida.')
+      this.logger.warn('ID_PACKS no configurado. Sync de packs omitida.')
       return []
     }
 

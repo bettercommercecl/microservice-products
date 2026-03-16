@@ -17,6 +17,9 @@ import './routes/products.js'
 import './routes/sync.js'
 import './routes/product_sync.js'
 import './routes/variants.js'
+import './routes/packs.js'
+import './routes/options.js'
+import './routes/category_products.js'
 
 // Ruta principal
 router.get('/', async () => {

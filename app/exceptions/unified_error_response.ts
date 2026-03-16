@@ -1,4 +1,4 @@
-import type { ErrorContext } from './domain_exception.js'
+import type { ErrorContext } from '#domain/exceptions/domain_exception'
 import { extractDbError } from '#utils/db_error_extractor'
 
 export interface UnifiedErrorResponse {

@@ -1,3 +1,4 @@
+import type { CalculationPort } from '#application/ports/calculation.port'
 import type {
   BigCommerceProduct,
   BigCommerceProductVariant,
@@ -5,7 +6,6 @@ import type {
 import type { PriceResult } from '#interfaces/product-sync/sync.interfaces'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
-import CalculationService from '#services/calculation_service'
 import PriceService from '#services/price_service'
 
 /**
@@ -25,14 +25,14 @@ export interface PricingStrategy {
 // ================================================================
 
 export class ClPricingStrategy implements PricingStrategy {
-  private readonly calculationService = new CalculationService()
+  constructor(private readonly calculation: CalculationPort) {}
 
   async getProductPrices(
     product: BigCommerceProduct,
     percentDiscount: number
   ): Promise<PriceResult> {
-    const discount = this.calculationService.calculateDiscount(product.price, product.sale_price)
-    const cashPrice = this.calculationService.calculateTransferPrice(
+    const discount = this.calculation.calculateDiscount(product.price, product.sale_price)
+    const cashPrice = this.calculation.calculateTransferPrice(
       product.price,
       product.sale_price,
       percentDiscount
@@ -51,8 +51,8 @@ export class ClPricingStrategy implements PricingStrategy {
     percentDiscount: number
   ): Promise<PriceResult> {
     const salePrice = variant.sale_price || variant.calculated_price
-    const discount = this.calculationService.calculateDiscount(variant.price, salePrice)
-    const cashPrice = this.calculationService.calculateTransferPrice(
+    const discount = this.calculation.calculateDiscount(variant.price, salePrice)
+    const cashPrice = this.calculation.calculateTransferPrice(
       variant.price,
       salePrice,
       percentDiscount
@@ -73,8 +73,10 @@ export class ClPricingStrategy implements PricingStrategy {
 
 export class InternationalPricingStrategy implements PricingStrategy {
   private readonly logger = Logger.child({ service: 'InternationalPricing' })
-  private readonly calculationService = new CalculationService()
-  private readonly priceService = new PriceService()
+  constructor(
+    private readonly calculation: CalculationPort,
+    private readonly priceService: PriceService
+  ) {}
 
   async getProductPrices(
     product: BigCommerceProduct,
@@ -103,11 +105,11 @@ export class InternationalPricingStrategy implements PricingStrategy {
         return PricingStrategyFactory.ZERO_PRICES
       }
 
-      const discount = this.calculationService.calculateDiscount(
+      const discount = this.calculation.calculateDiscount(
         prices.price,
         prices.calculatedPrice
       )
-      const cashPrice = this.calculationService.calculateTransferPrice(
+      const cashPrice = this.calculation.calculateTransferPrice(
         prices.price,
         prices.calculatedPrice,
         percentDiscount
@@ -142,11 +144,13 @@ export class PricingStrategyFactory {
 
   private static instance: PricingStrategy | null = null
 
-  static create(): PricingStrategy {
+  static create(calculation: CalculationPort): PricingStrategy {
     if (this.instance) return this.instance
 
     const useExternal = env.get('USE_EXTERNAL_PRICING', false)
-    this.instance = useExternal ? new InternationalPricingStrategy() : new ClPricingStrategy()
+    this.instance = useExternal
+      ? new InternationalPricingStrategy(calculation, new PriceService())
+      : new ClPricingStrategy(calculation)
 
     return this.instance
   }

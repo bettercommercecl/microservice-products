@@ -116,9 +116,9 @@ export default class PacksSyncService {
     message?: string
     data?: any
   }> {
-    if (!env.get('PACKS_CATEGORY_ID')) {
-      Logger.info('Sync packs: PACKS_CATEGORY_ID no configurado, omitiendo')
-      return { status: 200, message: 'PACKS_CATEGORY_ID no configurado', data: [] }
+    if (!env.get('ID_PACKS')) {
+      Logger.info('Sync packs: ID_PACKS no configurado, omitiendo')
+      return { status: 200, message: 'ID_PACKS no configurado', data: [] }
     }
 
     const deadline = Date.now() + this.MAX_SYNC_MS

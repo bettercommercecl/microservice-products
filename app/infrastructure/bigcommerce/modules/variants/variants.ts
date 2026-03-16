@@ -41,7 +41,7 @@ export default class VariantsApi {
       const response = await this.client.get(`/v3/catalog/products/${productId}/variants`, {
         timeout: 15_000,
       })
-      return response.data.data
+      return (response.data as { data: ProductVariant[] }).data
     } catch (error) {
       this.logger.error('Error al obtener variantes de producto', {
         product_id: productId,
@@ -58,7 +58,7 @@ export default class VariantsApi {
       const response = await this.client.get(`/v3/catalog/products/${productId}/options`, {
         timeout: 15_000,
       })
-      return response.data.data
+      return (response.data as { data: ProductOption[] }).data
     } catch (error) {
       this.logger.error('Error al obtener opciones de variantes', {
         product_id: productId,
@@ -87,7 +87,7 @@ export default class VariantsApi {
           timeout: 15_000,
         }
       )
-      return response.data.data ?? []
+      return ((response.data as { data?: unknown[] })?.data ?? []) as Array<{ key: string; value: string; namespace?: string }>
     } catch (error: any) {
       this.logger.error('Error obteniendo metafields de variante', {
         product_id: productId,

@@ -1,5 +1,8 @@
 import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
+import Option from '#models/option'
 import Logger from '@adonisjs/core/services/logger'
+import pLimit from 'p-limit'
+import type { QueryClientContract } from '@adonisjs/lucid/types/database'
 import BigCommerceService from '../infrastructure/bigcommerce/bigcommerce_api.js'
 
 /**
@@ -92,6 +95,57 @@ export default class FormatOptionsService {
     )
 
     return batchResults.flat()
+  }
+
+  /**
+   * Sincroniza opciones de productos por lotes: formatea y persiste con Option.updateOrCreateMany.
+   */
+  async syncOptionsForProducts(
+    productsWithVariants: FormattedProductWithModelVariants[],
+    trx?: QueryClientContract
+  ): Promise<void> {
+    this.logger.info(
+      `Iniciando sincronización de opciones para ${productsWithVariants.length} productos...`
+    )
+
+    const BATCH_SIZE = 500
+    const batches: FormattedProductWithModelVariants[][] = []
+    for (let i = 0; i < productsWithVariants.length; i += BATCH_SIZE) {
+      batches.push(productsWithVariants.slice(i, i + BATCH_SIZE))
+    }
+
+    this.logger.info(`Procesando ${batches.length} lotes de opciones en paralelo...`)
+
+    const limit = pLimit(12)
+    const batchResults = await Promise.all(
+      batches.map((batch, batchIndex) =>
+        limit(async () => {
+          try {
+            const batchOptions = await this.formatOptions(batch)
+            if (batchOptions.length === 0) {
+              return { processed: 0, batch: batchIndex + 1 }
+            }
+            await Option.updateOrCreateMany(
+              ['option_id', 'product_id'],
+              batchOptions,
+              trx ? { client: trx } : undefined
+            )
+            this.logger.info(`Lote ${batchIndex + 1}: ${batchOptions.length} opciones guardadas`)
+            return { processed: batchOptions.length, batch: batchIndex + 1 }
+          } catch (error) {
+            this.logger.error({ error }, `Error en lote ${batchIndex + 1}`)
+            return { processed: 0, batch: batchIndex + 1, error: (error as Error).message }
+          }
+        })
+      )
+    )
+
+    const totalProcessed = batchResults.reduce((sum, result) => sum + result.processed, 0)
+    const errors = batchResults.filter((r) => (r as { error?: string }).error)
+    this.logger.info(`Sincronización de opciones completada: ${totalProcessed} registros guardados`)
+    if (errors.length > 0) {
+      this.logger.warn(`${errors.length} lotes tuvieron errores`)
+    }
   }
 
   /**

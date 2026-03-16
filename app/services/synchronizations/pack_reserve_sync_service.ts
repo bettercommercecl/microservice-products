@@ -119,7 +119,7 @@ export default class PackReserveSyncService {
   }
 
   async syncPacksReserve(): Promise<PackReserveSyncReport> {
-    const packsCategoryId = env.get('ID_PACKS') ?? env.get('PACKS_CATEGORY_ID')
+    const packsCategoryId = env.get('ID_PACKS')
     const reserveCategoryId = env.get('ID_RESERVE')
 
     if (!packsCategoryId || !reserveCategoryId) {
@@ -155,12 +155,13 @@ export default class PackReserveSyncService {
       const inventoryReserveResult = await this.updateInventoryReserve(groupedPackData)
 
       const formattedInventoryData = await this.formatDataForBigCommerceInventory(groupedPackData)
-      const inventoryLocationId = env.get('INVENTORY_LOCATION_ID') ?? ''
+      const countryCode = env.get('COUNTRY_CODE')
+      const inventoryLocationId =
+        (env.get(`INVENTORY_LOCATION_ID_${countryCode}` as any) as string) ?? ''
       const inventoryReservePeId = env.get('INVENTORY_RESERVE_ID_PE') ?? ''
       const inventoryReserveCoId = env.get('INVENTORY_RESERVE_ID_CO') ?? ''
 
       const inventoryUpdatePromises: Promise<void>[] = []
-      const countryCode = env.get('COUNTRY_CODE')
 
       if (countryCode === 'PE') {
         if (formattedInventoryData.length > 0) {

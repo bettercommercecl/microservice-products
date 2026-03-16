@@ -2,9 +2,7 @@ import type { BigcommerceProduct } from '#dto/bigcommerce/bigcommerce_product.dt
 import BigcommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import { ChannelConfigInterface } from '#interfaces/channel_interface'
 import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
-import CategoryProduct from '#models/category_product'
 import ChannelProduct from '#models/channel_product'
-import Option from '#models/option'
 import Product from '#models/product'
 import Variant from '#models/variant'
 import env from '#start/env'
@@ -14,15 +12,29 @@ import type { QueryClientContract, TransactionClientContract } from '@adonisjs/l
 import pLimit from 'p-limit'
 import CategoryService from '#services/categories_service'
 import ChannelsService from '#services/channels_service'
-import FiltersService from '#services/filters_service'
-import FormatOptionsService from '#services/format_options_service'
 import ChannelFormatProductsService from '#services/channel_format_products_service'
+import FormatOptionsService from '#services/format_options_service'
 import FormatVariantsService from '#services/format_variants_service'
+import FiltersService from '#services/filters_service'
 import InventoryService from '#services/inventory_service'
+import ProductService from '#services/product_service'
+
+export interface ChannelProductSyncServiceDeps {
+  bigcommerceService: BigcommerceService
+  productService: ProductService
+  formatProductsService: ChannelFormatProductsService
+  formatVariantsService: FormatVariantsService
+  formatOptionsService: FormatOptionsService
+  filtersService: FiltersService
+  categoryService: CategoryService
+  inventoryService: InventoryService
+  channelsService: ChannelsService
+}
 
 export default class ChannelProductSyncService {
   private readonly logger = Logger.child({ service: 'ChannelProductSyncService' })
   private readonly bigcommerceService: BigcommerceService
+  private readonly productService: ProductService
   private readonly currentChannelConfig: ChannelConfigInterface
   private readonly formatProductsService: ChannelFormatProductsService
   private readonly inventoryService: InventoryService
@@ -32,16 +44,20 @@ export default class ChannelProductSyncService {
   private readonly categoryService: CategoryService
   private readonly channelsService: ChannelsService
 
-  constructor(currentChannelConfig: ChannelConfigInterface) {
-    this.bigcommerceService = new BigcommerceService()
-    this.formatProductsService = new ChannelFormatProductsService()
-    this.formatVariantsService = new FormatVariantsService()
-    this.formatOptionsService = new FormatOptionsService()
-    this.filtersService = new FiltersService()
-    this.categoryService = new CategoryService()
-    this.inventoryService = new InventoryService()
+  constructor(
+    currentChannelConfig: ChannelConfigInterface,
+    deps: ChannelProductSyncServiceDeps
+  ) {
     this.currentChannelConfig = currentChannelConfig
-    this.channelsService = new ChannelsService()
+    this.bigcommerceService = deps.bigcommerceService
+    this.productService = deps.productService
+    this.formatProductsService = deps.formatProductsService
+    this.formatVariantsService = deps.formatVariantsService
+    this.formatOptionsService = deps.formatOptionsService
+    this.filtersService = deps.filtersService
+    this.categoryService = deps.categoryService
+    this.inventoryService = deps.inventoryService
+    this.channelsService = deps.channelsService
   }
 
   /**
@@ -270,7 +286,7 @@ export default class ChannelProductSyncService {
             // ========================================
             // SUB-PASO 3.6: SINCRONIZAR OPCIONES DEL LOTE
             // ========================================
-            await this.syncOptions(formattedVariants, batchTrx)
+            await this.formatOptionsService.syncOptionsForProducts(formattedVariants, batchTrx)
 
             // ========================================
             // SUB-PASO 3.7: COMMIT AUTOMÁTICO DEL LOTE
@@ -407,7 +423,7 @@ export default class ChannelProductSyncService {
       // ============================================================================
       this.logger.info(`Obteniendo todos los productos por canal con paginación...`)
 
-      const productIds = await this.getAllProductIdsByChannel(channelId)
+      const productIds = await this.productService.getAllProductIdsByChannel(channelId)
       const totalProducts = productIds.length
 
       this.logger.info(`Total de productos en API: ${totalProducts}`)
@@ -492,142 +508,6 @@ export default class ChannelProductSyncService {
       return uniqueProducts
     } catch (error) {
       this.logger.error({ error }, 'Error obteniendo productos de Bigcommerce')
-      throw error
-    }
-  }
-
-  /**
-   * Obtiene todos los IDs de productos asignados a un canal, recorriendo todas las páginas
-   */
-  private async getAllProductIdsByChannel(channelId: number, limit = 200): Promise<number[]> {
-    this.logger.info(`Obteniendo todos los IDs de productos para canal ${channelId}...`)
-
-    let allIds: number[] = []
-
-    // 1. Primera petición para saber cuántas páginas hay
-    const firstResponse = await this.bigcommerceService.getProductsByChannel(channelId, 1, limit)
-
-    if (!firstResponse.data || !Array.isArray(firstResponse.data)) {
-      this.logger.warn(`No se encontraron datos en la primera página para canal ${channelId}`)
-      return []
-    }
-
-    const ids = firstResponse.data.map((item: any) => item.product_id || item.id)
-    allIds.push(...ids)
-
-    // 2. Calcular total de páginas
-    const totalPages =
-      firstResponse.meta && firstResponse.meta.pagination
-        ? firstResponse.meta.pagination.total_pages
-        : 1
-    this.logger.info(`Total de páginas a procesar: ${totalPages}`)
-
-    if (totalPages === 1) {
-      this.logger.info(`Solo una página encontrada. Total productos: ${allIds.length}`)
-      return allIds.filter(Boolean)
-    }
-
-    // 3. Lanzar el resto de páginas en paralelo (con límite de concurrencia optimizado)
-    const limitConcurrency = pLimit(25) // Aumentado para máximo rendimiento
-    const pagePromises = []
-
-    for (let page = 2; page <= totalPages; page++) {
-      pagePromises.push(
-        limitConcurrency(async () => {
-          const response = await this.bigcommerceService.getProductsByChannel(
-            channelId,
-            page,
-            limit
-          )
-
-          if (!response.data || !Array.isArray(response.data)) {
-            this.logger.warn(`No se encontraron datos en la página ${page}`)
-            return []
-          }
-
-          return response.data.map((item: any) => item.product_id || item.id)
-        })
-      )
-    }
-
-    const results = await Promise.all(pagePromises)
-    results.forEach((pageIds: number[]) => allIds.push(...pageIds))
-
-    const finalIds = allIds.filter(Boolean)
-    this.logger.info(`Obtenidos ${finalIds.length} IDs de productos de ${totalPages} páginas`)
-
-    return finalIds
-  }
-
-  /**
-   * Sincroniza opciones de productos por lotes
-   * @param productsWithVariants - Lista de productos con variantes formateadas
-   * @param trx - Transacción de base de datos (opcional)
-   */
-  private async syncOptions(
-    productsWithVariants: FormattedProductWithModelVariants[],
-    trx?: QueryClientContract
-  ): Promise<void> {
-    this.logger.info(
-      `Iniciando sincronización de opciones para ${productsWithVariants.length} productos...`
-    )
-
-    try {
-      // OPTIMIZACIÓN EXTREMA: Procesar todo en paralelo
-      const BATCH_SIZE = 500 // Lotes más grandes para mejor rendimiento
-      const batches = []
-
-      // Crear lotes
-      for (let i = 0; i < productsWithVariants.length; i += BATCH_SIZE) {
-        batches.push(productsWithVariants.slice(i, i + BATCH_SIZE))
-      }
-
-      this.logger.info(`Procesando ${batches.length} lotes de opciones en paralelo...`)
-
-      // Procesar todos los lotes en paralelo con pLimit para control de concurrencia
-      const limit = pLimit(12) // Aumentado para mejor rendimiento
-      const batchResults = await Promise.all(
-        batches.map((batch, batchIndex) =>
-          limit(async () => {
-            try {
-              // Formatear opciones del lote
-              const batchOptions = await this.formatOptionsService.formatOptions(batch)
-
-              if (batchOptions.length === 0) {
-                return { processed: 0, batch: batchIndex + 1 }
-              }
-
-              // 💾 Guardar lote inmediatamente con transacción
-              await Option.updateOrCreateMany(
-                ['option_id', 'product_id'],
-                batchOptions,
-                trx ? { client: trx } : undefined
-              )
-
-              this.logger.info(`Lote ${batchIndex + 1}: ${batchOptions.length} opciones guardadas`)
-              return { processed: batchOptions.length, batch: batchIndex + 1 }
-            } catch (error) {
-              this.logger.error({ error }, `Error en lote ${batchIndex + 1}`)
-              console.log(error)
-              return { processed: 0, batch: batchIndex + 1, error: error.message }
-            }
-          })
-        )
-      )
-
-      // Consolidar resultados
-      const totalProcessed = batchResults.reduce((sum, result) => sum + result.processed, 0)
-      const errors = batchResults.filter((result) => result.error)
-
-      this.logger.info(
-        `Sincronización de opciones completada: ${totalProcessed} registros guardados`
-      )
-
-      if (errors.length > 0) {
-        this.logger.warn(`${errors.length} lotes tuvieron errores`)
-      }
-    } catch (error) {
-      this.logger.error({ error }, 'Error al sincronizar opciones')
       throw error
     }
   }
@@ -724,99 +604,17 @@ export default class ChannelProductSyncService {
   // ============================================================================
 
   /**
-   * Limpieza de categorías huérfanas ANTES de guardar el lote nuevo
-   * Elimina las relaciones existentes que NO están en el lote que se va a guardar
-   * @param productIds - IDs de productos que se van a sincronizar
-   * @param newRelationsToSave - Lote de relaciones que se van a guardar
-   * @param trx - Transacción de base de datos (opcional)
-   * @returns Número de categorías eliminadas
+   * Limpieza de categorías huérfanas antes de guardar el lote nuevo; delega en CategoryService.
    */
   private async cleanupOrphanedCategoriesBeforeSave(
     productIds: number[],
     newRelationsToSave: { product_id: number; category_id: number }[],
     trx: TransactionClientContract
   ): Promise<number> {
-    try {
-      this.logger.info(`Limpieza de categorías huérfanas antes de guardar...`)
-
-      if (newRelationsToSave.length === 0) {
-        this.logger.info(`No hay relaciones nuevas para guardar, eliminando todas las existentes`)
-        // Si no hay relaciones nuevas, eliminar todas las existentes para estos productos
-        const deleted = await CategoryProduct.query({ client: trx })
-          .whereIn('product_id', productIds)
-          .delete()
-        const totalDeleted = Array.isArray(deleted) ? deleted.length : deleted
-        this.logger.info(`Categorías eliminadas: ${totalDeleted}`)
-        return totalDeleted
-      }
-
-      // Crear un Set de las relaciones que se van a guardar para búsqueda rápida
-      const newRelationsSet = new Set(
-        newRelationsToSave.map((rel) => `${rel.product_id}-${rel.category_id}`)
-      )
-
-      this.logger.info(`Relaciones que se van a guardar: ${newRelationsToSave.length}`)
-
-      // Obtener todas las relaciones existentes para estos productos
-      const existingRelations = await CategoryProduct.query({ client: trx })
-        .whereIn('product_id', productIds)
-        .select('product_id', 'category_id')
-
-      this.logger.info(`Relaciones existentes en BD: ${existingRelations.length}`)
-
-      // Identificar relaciones que existen en BD pero NO están en el lote nuevo
-      const orphanedRelations = existingRelations.filter((rel) => {
-        const key = `${rel.product_id}-${rel.category_id}`
-        return !newRelationsSet.has(key)
-      })
-
-      if (orphanedRelations.length === 0) {
-        this.logger.info(`No hay categorías huérfanas para eliminar`)
-        return 0
-      }
-
-      this.logger.info(`🗑️ Categorías huérfanas detectadas: ${orphanedRelations.length}`)
-
-      // Eliminar relaciones huérfanas con pLimit para máximo rendimiento
-      const limit = pLimit(20) // Aumentado para mejor rendimiento
-      const batchSize = 1000 // Lotes más grandes
-      const batches: { product_id: number; category_id: number }[][] = []
-
-      for (let i = 0; i < orphanedRelations.length; i += batchSize) {
-        batches.push(orphanedRelations.slice(i, i + batchSize))
-      }
-
-      this.logger.info(`Procesando ${batches.length} lotes de categorías huérfanas...`)
-
-      const batchPromises = batches.map((batch) =>
-        limit(async () => {
-          let deleted = 0
-          for (const relation of batch) {
-            try {
-              const result = await CategoryProduct.query({ client: trx })
-                .where('product_id', relation.product_id)
-                .where('category_id', relation.category_id)
-                .delete()
-              deleted += Array.isArray(result) ? result.length : result
-            } catch (error) {
-              this.logger.error(
-                { error },
-                `Error eliminando categoría huérfana ${relation.product_id}-${relation.category_id}`
-              )
-            }
-          }
-          return deleted
-        })
-      )
-
-      const results = await Promise.all(batchPromises)
-      const totalDeleted = results.reduce((sum, count) => sum + count, 0)
-
-      this.logger.info(`Categorías huérfanas eliminadas: ${totalDeleted}`)
-      return totalDeleted
-    } catch (error) {
-      this.logger.error({ error }, 'Error en limpieza de categorías antes de guardar')
-      return 0
-    }
+    return this.categoryService.cleanupOrphanedCategoryProducts(
+      productIds,
+      newRelationsToSave,
+      trx
+    )
   }
 }

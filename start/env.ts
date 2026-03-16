@@ -70,8 +70,8 @@ export default await Env.create(new URL('../', import.meta.url), {
 
   /*
   |----------------------------------------------------------
-  | Inventario principal por pais (INVENTORY_LOCATION_ID_CL, _CO, _PE, etc.)
-  | Si no definido, usa INVENTORY_LOCATION_ID
+  | Inventario principal por pais (INVENTORY_LOCATION_ID_CL, _CO, _PE).
+  | Requerido para sync de stock, pack reserve e inventario BigCommerce.
   |----------------------------------------------------------
   */
   INVENTORY_LOCATION_ID_CL: Env.schema.string.optional(),
@@ -114,27 +114,11 @@ export default await Env.create(new URL('../', import.meta.url), {
 
   /*
   |----------------------------------------------------------
-  | Store sizes config (JSON con IDs de categorias por tienda)
-  | Formato: {"store_name":{"small":id,"medium":id,"big":id},...}
-  |----------------------------------------------------------
-  */
-  STORE_SIZES: Env.schema.string.optional(),
-
-  /*
-  |----------------------------------------------------------
   | ID de la categoria raiz "Filtros" para sincronizar filters_products.
   | Si no esta definido, la sync de filtros se omite.
   |----------------------------------------------------------
   */
   ID_ADVANCED: Env.schema.string.optional(),
-
-  /*
-  |----------------------------------------------------------
-  | Packs: ID de categoria con productos pack en BigCommerce.
-  | Si no esta definido, la sync de packs se omite.
-  |----------------------------------------------------------
-  */
-  PACKS_CATEGORY_ID: Env.schema.number.optional(),
 
   /*
   |----------------------------------------------------------
@@ -146,8 +130,9 @@ export default await Env.create(new URL('../', import.meta.url), {
 
   /*
   |----------------------------------------------------------
-  | Packs Reserve: ID categoria packs (productos en category_products).
-  | Si no definido, usa PACKS_CATEGORY_ID.
+  | Packs: ID de categoria con productos pack en BigCommerce.
+  | Usado en sync de packs, pack reserve y formateo (reserve en packs).
+  | Si no esta definido, la sync de packs se omite.
   |----------------------------------------------------------
   */
   ID_PACKS: Env.schema.number.optional(),
@@ -155,15 +140,90 @@ export default await Env.create(new URL('../', import.meta.url), {
   /*
   |----------------------------------------------------------
   | Packs Reserve: ID categoria reserva para asignar packs con serial.
+  | Tambien usado en logica nextday y condicion de reserve (formato marcas).
   |----------------------------------------------------------
   */
   ID_RESERVE: Env.schema.number.optional(),
 
   /*
   |----------------------------------------------------------
-  | Packs Reserve: ubicacion principal de inventario en BigCommerce.
-  | Reserva por pais usa INVENTORY_RESERVE_ID_PE / INVENTORY_RESERVE_ID_CO.
+  | Categorias por canal (IDs para booleanos en formateo tipo marcas).
+  | Si el producto tiene la categoria, el flag es true.
   |----------------------------------------------------------
   */
-  INVENTORY_LOCATION_ID: Env.schema.string.optional(),
+  ID_SAMEDAY: Env.schema.number.optional(),
+  ID_NEXTDAY: Env.schema.number.optional(),
+  ID_24HORAS: Env.schema.number.optional(),
+  ID_FREE_SHIPPING: Env.schema.number.optional(),
+  ID_PICKUP_IN_STORE: Env.schema.number.optional(),
+  ID_TURBO: Env.schema.number.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | Precio transferencia: porcentaje de descuento para cash_price.
+  | Usado en formateo productos por canal (marcas).
+  |----------------------------------------------------------
+  */
+  PERCENT_DISCOUNT_TRANSFER_PRICE: Env.schema.number.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | Sizes por tienda (getSizesByProduct): IDs de categorias small/medium/big.
+  | Por pais: CL (napoleon, vitacura, condor, quilicura, vina, concon, concepcion,
+  | retirocondes, condes), PE (buenaventura, urbano, surco, miraflores, sanmiguel, sanjuan),
+  | CO (fulppi, bogota). Sin definir = false en ese tamano.
+  |----------------------------------------------------------
+  */
+  ID_SMALL_NAPOLEON: Env.schema.number.optional(),
+  ID_MEDIUM_NAPOLEON: Env.schema.number.optional(),
+  ID_BIG_NAPOLEON: Env.schema.number.optional(),
+  ID_SMALL_VITACURA: Env.schema.number.optional(),
+  ID_MEDIUM_VITACURA: Env.schema.number.optional(),
+  ID_BIG_VITACURA: Env.schema.number.optional(),
+  ID_SMALL_CONDOR: Env.schema.number.optional(),
+  ID_MEDIUM_CONDOR: Env.schema.number.optional(),
+  ID_BIG_CONDOR: Env.schema.number.optional(),
+  ID_SMALL_QUILICURA: Env.schema.number.optional(),
+  ID_MEDIUM_QUILICURA: Env.schema.number.optional(),
+  ID_BIG_QUILICURA: Env.schema.number.optional(),
+  ID_SMALL_VINA: Env.schema.number.optional(),
+  ID_MEDIUM_VINA: Env.schema.number.optional(),
+  ID_BIG_VINA: Env.schema.number.optional(),
+  ID_SMALL_CONCON: Env.schema.number.optional(),
+  ID_MEDIUM_CONCON: Env.schema.number.optional(),
+  ID_BIG_CONCON: Env.schema.number.optional(),
+  ID_SMALL_CONCEPCION: Env.schema.number.optional(),
+  ID_MEDIUM_CONCEPCION: Env.schema.number.optional(),
+  ID_BIG_CONCEPCION: Env.schema.number.optional(),
+  ID_SMALL_RETIROCONDES: Env.schema.number.optional(),
+  ID_MEDIUM_RETIROCONDES: Env.schema.number.optional(),
+  ID_BIG_RETIROCONDES: Env.schema.number.optional(),
+  ID_SMALL_CONDES: Env.schema.number.optional(),
+  ID_MEDIUM_CONDES: Env.schema.number.optional(),
+  ID_BIG_CONDES: Env.schema.number.optional(),
+  ID_SMALL_BUENAVENTURA: Env.schema.number.optional(),
+  ID_MEDIUM_BUENAVENTURA: Env.schema.number.optional(),
+  ID_BIG_BUENAVENTURA: Env.schema.number.optional(),
+  ID_SMALL_URBANO: Env.schema.number.optional(),
+  ID_MEDIUM_URBANO: Env.schema.number.optional(),
+  ID_BIG_URBANO: Env.schema.number.optional(),
+  ID_SMALL_SURCO: Env.schema.number.optional(),
+  ID_MEDIUM_SURCO: Env.schema.number.optional(),
+  ID_BIG_SURCO: Env.schema.number.optional(),
+  ID_SMALL_MIRAFLORES: Env.schema.number.optional(),
+  ID_MEDIUM_MIRAFLORES: Env.schema.number.optional(),
+  ID_BIG_MIRAFLORES: Env.schema.number.optional(),
+  ID_SMALL_SANMIGUEL: Env.schema.number.optional(),
+  ID_MEDIUM_SANMIGUEL: Env.schema.number.optional(),
+  ID_BIG_SANMIGUEL: Env.schema.number.optional(),
+  ID_SMALL_SANJUAN: Env.schema.number.optional(),
+  ID_MEDIUM_SANJUAN: Env.schema.number.optional(),
+  ID_BIG_SANJUAN: Env.schema.number.optional(),
+  ID_SMALL_FULPPI: Env.schema.number.optional(),
+  ID_MEDIUM_FULPPI: Env.schema.number.optional(),
+  ID_BIG_FULPPI: Env.schema.number.optional(),
+  ID_SMALL_BOGOTA: Env.schema.number.optional(),
+  ID_MEDIUM_BOGOTA: Env.schema.number.optional(),
+  ID_BIG_BOGOTA: Env.schema.number.optional(),
+
 })

@@ -1,3 +1,4 @@
+import type { CalculationPort } from '#application/ports/calculation.port'
 import type { BigCommerceProduct } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
 import type {
   FormattedProductWithVariants,
@@ -42,12 +43,16 @@ export default class GlobalProductSyncService {
 
   private static readonly BATCH_SIZE = syncConfig.batchSize
 
-  constructor() {
+  constructor(deps: { calculation: CalculationPort }) {
     this.bigcommerceService = new BigCommerceService()
     this.inventoryService = new InventoryService()
     this.n8nReserveService = new N8nReserveService()
-    this.formatProductsService = new GlobalFormatProductsService()
-    this.formatVariantsService = new FormatVariantsService()
+    this.formatProductsService = new GlobalFormatProductsService({
+      calculation: deps.calculation,
+    })
+    this.formatVariantsService = new FormatVariantsService({
+      calculation: deps.calculation,
+    })
     this.formatOptionsService = new FormatOptionsService()
     this.persistenceService = new SyncPersistenceService()
     this.preloadService = new SyncPreloadService()
@@ -63,7 +68,7 @@ export default class GlobalProductSyncService {
    * 4. Formatear y persistir por lotes
    * 5. Limpiar productos descontinuados
    * 6. Sincronizar filtros (ID_ADVANCED debe estar configurado)
-   * 7. Sincronizar packs (PACKS_CATEGORY_ID debe estar configurado) si skipPacks es false
+   * 7. Sincronizar packs (ID_PACKS debe estar configurado) si skipPacks es false
    */
   async syncProductsComplete(options?: { skipPacks?: boolean }): Promise<SyncResult> {
     const startTime = Date.now()
@@ -92,7 +97,7 @@ export default class GlobalProductSyncService {
       await this.syncFilters()
 
       // 7. Sincronizar packs (omitir si skipPacks o sin config)
-      if (!options?.skipPacks && env.get('PACKS_CATEGORY_ID')) {
+      if (!options?.skipPacks && env.get('ID_PACKS')) {
         const packsSyncService = new PacksSyncService(this.bigcommerceService)
         await packsSyncService.syncPacksFromBigcommerce()
       }
