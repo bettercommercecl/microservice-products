@@ -7,6 +7,9 @@ import type {
   StockData,
 } from '#interfaces/product-sync/sync.interfaces'
 import CatalogSafeStock from '#models/catalog_safe_stock'
+import Category from '#models/category'
+import CategoryService from '#services/categories_service'
+import ProductTagsCampaignsService from '#services/product_tags_campaigns_service'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import pLimit from 'p-limit'
@@ -31,6 +34,7 @@ export default class FormatVariantsService {
   private readonly calculation: CalculationPort
   private readonly imageProcessingService: ImageProcessingService
   private readonly percentDiscount: number
+  private readonly productTagsCampaignsService: ProductTagsCampaignsService
 
   private static readonly DEFAULT_PERCENT_DISCOUNT = 2
 
@@ -38,6 +42,9 @@ export default class FormatVariantsService {
     this.calculation = deps.calculation
     this.pricingStrategy = PricingStrategyFactory.create(deps.calculation)
     this.imageProcessingService = new ImageProcessingService()
+    this.productTagsCampaignsService = new ProductTagsCampaignsService({
+      categoryService: new CategoryService(),
+    })
     this.percentDiscount =
       parseEnvFloat('PERCENT_DISCOUNT_TRANSFER_PRICE') ??
       FormatVariantsService.DEFAULT_PERCENT_DISCOUNT
@@ -97,6 +104,8 @@ export default class FormatVariantsService {
       this.country
     )
 
+    const keywords = await this.generateKeywords(product)
+
     return {
       id: variant.id,
       product_id: product.id,
@@ -123,7 +132,7 @@ export default class FormatVariantsService {
       options: variant.option_values?.length ? JSON.stringify(variant.option_values) : null,
       related_products: product.related_products,
       option_label: variant.option_values?.[0]?.label || null,
-      keywords: '',
+      keywords,
       reserve: reserve?.fecha_reserva || null,
       is_visible: hasZeroPrices ? false : product.is_visible,
     }
@@ -192,5 +201,32 @@ export default class FormatVariantsService {
     }
 
     return map
+  }
+
+  /**
+   * Genera keywords combinando títulos de categorías, tags y campañas del producto.
+   */
+  private async generateKeywords(product: FormattedProduct): Promise<string> {
+    try {
+      const { tags, campaigns } =
+        await this.productTagsCampaignsService.getTagsAndCampaignsForProduct(product.id)
+
+      let categoryTitles: string[] = []
+      if (Array.isArray(product._raw_categories) && product._raw_categories.length > 0) {
+        const categories = await Category.query()
+          .whereIn('category_id', product._raw_categories)
+          .select('title')
+        categoryTitles = categories.map((c) => c.title)
+      }
+
+      const allKeywords = [...categoryTitles, ...tags, ...campaigns].filter(Boolean)
+      return [...new Set(allKeywords)].join(', ')
+    } catch (error: any) {
+      this.logger.warn(
+        { product_id: product.id, error: error.message },
+        'Error generando keywords para producto'
+      )
+      return ''
+    }
   }
 }
