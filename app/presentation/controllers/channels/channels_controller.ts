@@ -101,6 +101,27 @@ export default class ChannelsController {
     }
   }
 
+  /**
+   * Reporte de canales agrupados por pais (country) para debug de configuracion.
+   */
+  async byCountry({ response }: HttpContext) {
+    try {
+      const grouped = await this.channelsService.getByCountry()
+      return response.ok({
+        success: true,
+        data: grouped,
+        meta: {
+          timestamp: new Date().toISOString(),
+          totalCountries: grouped.length,
+          totalChannels: grouped.reduce((sum, g) => sum + g.channels.length, 0),
+        },
+      })
+    } catch (error) {
+      this.logger.error('Error obteniendo canales agrupados por pais:', error)
+      throw error
+    }
+  }
+
   async store({ request, response }: HttpContext) {
     try {
       const payload = await request.validateUsing(createChannelValidator)

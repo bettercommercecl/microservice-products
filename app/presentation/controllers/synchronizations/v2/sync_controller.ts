@@ -8,6 +8,9 @@ import PacksSyncService from '#services/synchronizations/packs_sync_service'
 import StockSyncService from '#services/synchronizations/stock_sync_service'
 import CacheService from '#services/cache_service'
 import syncConfig from '#config/sync'
+import env from '#start/env'
+import ChannelRepository from '#infrastructure/persistence/repositories/channel_repository'
+import SyncChannelsFromConfigUseCase from '#application/use_cases/channels/sync_channels_from_config_use_case'
 import { HttpContext } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
 
@@ -39,6 +42,19 @@ export default class SyncControllerV2 {
       message: result.message,
       data: result.data,
       meta: { timestamp: new Date().toISOString(), version: 'categories-sync' },
+    })
+  }
+
+  async syncChannels({ response }: HttpContext) {
+    this.logger.info('Sincronizacion de canales solicitada (v2)')
+    const countryCode = env.get('COUNTRY_CODE')
+    const useCase = new SyncChannelsFromConfigUseCase(new ChannelRepository())
+    const result = await useCase.execute(countryCode)
+    return response.ok({
+      success: true,
+      message: 'Sincronizacion de canales completada',
+      data: result,
+      meta: { timestamp: new Date().toISOString(), version: 'channels-sync', countryCode },
     })
   }
 

@@ -8,6 +8,7 @@ router
     router.get('/completo', [FullSyncController, 'syncFull'])
     router.get('/marcas', [SyncControllerV2, 'syncBrands'])
     router.get('/categorias', [SyncControllerV2, 'syncCategories'])
+    router.get('/canales', [SyncControllerV2, 'syncChannels'])
     router.get('/productos', [SyncControllerV2, 'syncProducts'])
     router.get('/packs', [SyncControllerV2, 'syncPacks'])
     router.get('/packs-reserva', [SyncControllerV2, 'syncPacksReserve'])

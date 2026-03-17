@@ -80,6 +80,37 @@ export default class ChannelsService {
   }
 
   /**
+   * Devuelve canales agrupados por pais para debug/monitoreo de configuracion.
+   */
+  async getByCountry(): Promise<
+    { country: string | null; channels: { id: number; name: string; parent_category: number | null }[] }[]
+  > {
+    const channels = await Channel.query().orderBy('country', 'asc').orderBy('id', 'asc')
+
+    const groups = new Map<
+      string | null,
+      { id: number; name: string; parent_category: number | null }[]
+    >()
+
+    for (const ch of channels) {
+      const key = ch.country ?? null
+      if (!groups.has(key)) {
+        groups.set(key, [])
+      }
+      groups.get(key)!.push({
+        id: ch.id,
+        name: ch.name,
+        parent_category: ch.parent_category,
+      })
+    }
+
+    return Array.from(groups.entries()).map(([country, list]) => ({
+      country,
+      channels: list,
+    }))
+  }
+
+  /**
    * Sincroniza relaciones canal-producto a partir de variantes formateadas (cada una con product_id).
    */
   async syncChannelByProduct(

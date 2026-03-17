@@ -19,6 +19,8 @@ import CalculationAdapter from '#infrastructure/adapters/calculation_adapter'
 import ProductRepository from '#infrastructure/persistence/repositories/product_repository'
 import { channelIdentifierValidator } from '#validators/channel_identifier_validator'
 import PacksService from '#services/packs_service'
+import ChannelRepository from '#infrastructure/persistence/repositories/channel_repository'
+import SyncChannelsFromConfigUseCase from '#application/use_cases/channels/sync_channels_from_config_use_case'
 
 /**
  * Sincronizaciones v1 (legacy): sync por canal, categorias, marcas, canales.
@@ -176,31 +178,16 @@ export default class SyncController {
   async syncChannels({ response }: HttpContext) {
     try {
       const countryCode = env.get('COUNTRY_CODE')
-      const results = { created: 0, updated: 0, errors: [] as string[], countryCode }
-
-      for (const [brandName, countries] of Object.entries(channelsConfig)) {
-        const countryConfig = (countries as Record<string, any>)[countryCode]
-        if (!countryConfig) {
-          this.logger.error(`No hay configuracion para ${brandName} en ${countryCode}`)
-          continue
-        }
-        try {
-          const chId = countryConfig.CHANNEL
-          const channel = await Channel.updateOrCreate({ id: chId }, { id: chId, name: brandName })
-          channel.$isNew ? results.created++ : results.updated++
-        } catch (error: any) {
-          results.errors.push(`Error ${brandName}: ${error.message}`)
-          this.logger.error(`Error procesando ${brandName}`, error)
-        }
-      }
+      const useCase = new SyncChannelsFromConfigUseCase(new ChannelRepository())
+      const result = await useCase.execute(countryCode)
 
       return response.ok({
         success: true,
         message: 'Sincronizacion de canales completada',
-        data: results,
+        data: result,
         meta: {
           timestamp: new Date().toISOString(),
-          totalProcessed: results.created + results.updated + results.errors.length,
+          totalProcessed: result.createdOrUpdated + result.skipped,
         },
       })
     } catch (error: any) {

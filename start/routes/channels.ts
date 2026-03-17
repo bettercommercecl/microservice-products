@@ -8,6 +8,7 @@ router
   .group(() => {
     router.get('/channels', [ChannelsController, 'index'])
     router.get('/channels/with-products', [ChannelsController, 'withProducts'])
+    router.get('/channels/by-country', [ChannelsController, 'byCountry'])
     router.get('/channels/name/:name', [ChannelsController, 'showByName'])
     router.get('/channels/:id', [ChannelsController, 'show']).where('id', router.matchers.number())
     router.post('/channels', [ChannelsController, 'store'])

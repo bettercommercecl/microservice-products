@@ -67,6 +67,10 @@
           "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels/with-products", "host": ["{{baseUrl}}"], "path": ["channels", "with-products"] } }
         },
         {
+          "name": "Canales por pais",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels/by-country", "host": ["{{baseUrl}}"], "path": ["channels", "by-country"] } }
+        },
+        {
           "name": "Canal por nombre",
           "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels/name/UF", "host": ["{{baseUrl}}"], "path": ["channels", "name", "UF"] } }
         },
@@ -362,6 +366,10 @@
         {
           "name": "Sync categorias",
           "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/categorias", "host": ["{{baseUrl}}"], "path": ["sync", "categorias"] } }
+        },
+        {
+          "name": "Sync canales",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/canales", "host": ["{{baseUrl}}"], "path": ["sync", "canales"] } }
         },
         {
           "name": "Sync productos",
