@@ -223,7 +223,12 @@ export default class VariantService {
     return { data, meta }
   }
 
-  public async getAllVariantsPaginated(page = 1, limit = 100, channelId?: number) {
+  public async getAllVariantsPaginated(
+    page = 1,
+    limit = 100,
+    channelId?: number,
+    options?: { parentCategoryId?: number }
+  ) {
     try {
       let paginated: any
       let productIds: number[] = []
@@ -276,7 +281,7 @@ export default class VariantService {
       const ID_RESERVE =
         env.get('COUNTRY_CODE') === 'CL' ? 1487 : env.get('COUNTRY_CODE') === 'CO' ? 3053 : 1472
       // Procesar variantes
-      const variantsWithFilters = paginated.all().map((variant: any) => {
+      let variantsWithFilters = paginated.all().map((variant: any) => {
         const filters = filtersMap.get(variant.product_id) || []
         const product = productsMap.get(variant.product_id)
         let tags = tagsCampaignsMap.get(variant.product_id)?.tags ?? []
@@ -341,6 +346,28 @@ export default class VariantService {
 
         return processedVariant
       })
+
+      const parentCategoryId = options?.parentCategoryId
+      if (parentCategoryId) {
+        const allowedProductIds = new Set<number>()
+
+        for (const [productId, product] of productsMap.entries()) {
+          const hasParentCategory =
+            product?.categoryProducts?.some((cp: any) => cp.category_id === parentCategoryId) ??
+            false
+          if (hasParentCategory) {
+            allowedProductIds.add(productId)
+          }
+        }
+
+        if (allowedProductIds.size > 0) {
+          variantsWithFilters = variantsWithFilters.filter((variant: any) =>
+            allowedProductIds.has(variant.product_id)
+          )
+        } else {
+          variantsWithFilters = []
+        }
+      }
 
       const filteredVariants = this.filterVariantsBySizeAndColor(variantsWithFilters)
       return { data: filteredVariants, meta: paginated.getMeta() }

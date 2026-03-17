@@ -96,7 +96,21 @@ export default class VariantController {
     const page = validatedData.page ?? 1
     const limit = validatedData.limit ?? 100
     const channelId = validatedData.channel
-    const variants = await this.variantService.getAllVariantsPaginated(page, limit, channelId)
+    let parentCategoryId: number | undefined
+
+    if (channelId) {
+      const channel = await Channel.find(channelId)
+      if (channel?.parent_category != null) {
+        parentCategoryId = channel.parent_category
+      }
+    }
+
+    const variants = await this.variantService.getAllVariantsPaginated(
+      page,
+      limit,
+      channelId,
+      parentCategoryId ? { parentCategoryId } : undefined
+    )
 
     return response.ok(variants)
   }
