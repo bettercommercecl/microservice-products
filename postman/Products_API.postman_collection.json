@@ -11,11 +11,11 @@
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3333/api" },
     { "key": "M2M_API_KEY_CURRENT", "value": "" },
-    { "key": "url_cl", "value": "https://products.bettercommerce.cl/api" },
-    { "key": "url_co", "value": "https://co.products.bettercommerce.cl/api" },
-    { "key": "url_pe", "value": "https://pe.products.bettercommerce.cl/api" },
-    { "key": "url_local", "value": "http://localhost:3333/api" },
-    { "key": "url_127", "value": "http://127.0.0.1:3333/api" }
+    { "key": "baseUrlcl", "value": "https://products.bettercommerce.cl/api" },
+    { "key": "baseUrlco", "value": "https://co.products.bettercommerce.cl/api" },
+    { "key": "baseUrlpe", "value": "https://pe.products.bettercommerce.cl/api" },
+    { "key": "baseUrllocal", "value": "http://localhost:3333/api" },
+    { "key": "baseUrl127", "value": "http://127.0.0.1:3333/api" }
   ],
   "item": [
     {
