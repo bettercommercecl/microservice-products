@@ -60,13 +60,22 @@ export default class TableShapeService {
     const totalResult = await Database.from('options').count('* as total').first()
     const total = Number(totalResult?.total ?? 0)
     const rows = await Database.from('options')
-      .select('*')
+      .select([
+        // Orden intencional para compatibilidad con el consumidor (marca).
+        'option_id',
+        'label',
+        'product_id',
+        'options',
+        'created_at',
+        'updated_at',
+        'id',
+      ])
       .orderBy('id', 'asc')
       .limit(limit)
       .offset((page - 1) * limit)
-    const data = omitTimestampKeysFromRows(
-      serializeTableRows(rows as Record<string, unknown>[], DATE_KEYS)
-    )
+    // Para este endpoint la marca espera timestamps en formato ISO.
+    // Además, normalizamos la columna JSON `options` si viniera como string.
+    const data = serializeTableRows(rows as Record<string, unknown>[], DATE_KEYS, ['options'])
     return { data, meta: buildMeta(total, page, limit) }
   }
 
@@ -82,14 +91,23 @@ export default class TableShapeService {
       .first()
     const total = Number(totalResult?.total ?? 0)
     const rows = await Database.from('options')
-      .select('*')
+      .select([
+        // Orden intencional para compatibilidad con el consumidor (marca).
+        'option_id',
+        'label',
+        'product_id',
+        'options',
+        'created_at',
+        'updated_at',
+        'id',
+      ])
       .whereIn('product_id', productIdsSubquery())
       .orderBy('id', 'asc')
       .limit(limit)
       .offset((page - 1) * limit)
-    const data = omitTimestampKeysFromRows(
-      serializeTableRows(rows as Record<string, unknown>[], DATE_KEYS)
-    )
+    // Para este endpoint la marca espera timestamps en formato ISO.
+
+    const data = serializeTableRows(rows as Record<string, unknown>[], DATE_KEYS, ['options'])
     return { data, meta: buildMeta(total, page, limit) }
   }
 
@@ -100,13 +118,12 @@ export default class TableShapeService {
     const totalResult = await Database.from('category_products').count('* as total').first()
     const total = Number(totalResult?.total ?? 0)
     const rows = await Database.from('category_products')
-      .select('*')
+      .select(['id', 'category_id', 'product_id', 'created_at', 'updated_at'])
       .orderBy('id', 'asc')
       .limit(limit)
       .offset((page - 1) * limit)
-    const data = omitTimestampKeysFromRows(
-      serializeTableRows(rows as Record<string, unknown>[], DATE_KEYS)
-    )
+    // Para este endpoint la marca espera timestamps en formato ISO.
+    const data = serializeTableRows(rows as Record<string, unknown>[], DATE_KEYS)
     return { data, meta: buildMeta(total, page, limit) }
   }
 
@@ -122,14 +139,13 @@ export default class TableShapeService {
       .first()
     const total = Number(totalResult?.total ?? 0)
     const rows = await Database.from('category_products')
-      .select('*')
+      .select(['id', 'category_id', 'product_id', 'created_at', 'updated_at'])
       .whereIn('product_id', productIdsSubquery())
       .orderBy('id', 'asc')
       .limit(limit)
       .offset((page - 1) * limit)
-    const data = omitTimestampKeysFromRows(
-      serializeTableRows(rows as Record<string, unknown>[], DATE_KEYS)
-    )
+    // Para este endpoint la marca espera timestamps en formato ISO.
+    const data = serializeTableRows(rows as Record<string, unknown>[], DATE_KEYS)
     return { data, meta: buildMeta(total, page, limit) }
   }
 }
