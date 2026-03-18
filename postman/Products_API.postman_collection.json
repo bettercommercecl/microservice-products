@@ -14,6 +14,7 @@
     { "key": "baseUrlcl", "value": "https://products.bettercommerce.cl/api" },
     { "key": "baseUrlco", "value": "https://co.products.bettercommerce.cl/api" },
     { "key": "baseUrlpe", "value": "https://pe.products.bettercommerce.cl/api" },
+    { "key": "baseUrltest", "value": "http://test.products.bettercommerce.cl/api" },
     { "key": "baseUrl127", "value": "http://127.0.0.1:3333/api" }
   ],
   "item": [
@@ -342,6 +343,27 @@
                 { "key": "brand", "value": "UF" },
                 { "key": "page", "value": "1" },
                 { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalog safe stocks",
+      "item": [
+        {
+          "name": "Catalog safe stocks (paginado sin timestamps)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalog-safe-stocks?page=1&limit=1000",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog-safe-stocks"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Página" },
+                { "key": "limit", "value": "1000", "description": "Registros por página (max 2000)" }
               ]
             }
           }

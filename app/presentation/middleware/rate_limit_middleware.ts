@@ -88,19 +88,6 @@ export default class RateLimitMiddleware {
       return
     }
 
-    this.logger.info(
-      {
-        bucketKey,
-        count: bucket.count,
-        max,
-        key: opts.key,
-        identifier: key === 'ip' ? identifier : 'global',
-        method: ctx.request.method(),
-        url: ctx.request.url(),
-      },
-      'Rate limit request allowed'
-    )
-
     await next()
   }
 }
