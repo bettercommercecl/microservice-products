@@ -177,12 +177,14 @@ export default class VariantService {
   async getVariantsByChannelForMarcas(
     channelId: number,
     page: number,
-    limit: number
+    limit: number,
+    parentCategoryId?: number
   ): Promise<{ data: unknown[]; meta: { total: number; perPage: number; currentPage: number; lastPage: number } }> {
     const { data: variants, meta } = await this.variantRepository.findPaginatedByChannelWithProduct(
       channelId,
       page,
-      limit
+      limit,
+      parentCategoryId
     )
     if (variants.length === 0) {
       return { data: [], meta }

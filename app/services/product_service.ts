@@ -213,12 +213,14 @@ export default class ProductService {
   async getProductsByChannel(
     channelId: number,
     page: number,
-    limit: number
+    limit: number,
+    parentCategoryId?: number
   ): Promise<{ success: true; data: unknown[]; meta: ProductsPaginatedMeta }> {
     const { data: items, meta } = await this.productRepository.findPaginatedByChannel(
       channelId,
       page,
-      limit
+      limit,
+      parentCategoryId
     )
     const { formatProductForMarcas } = await import('#application/formatters/products_by_channel_formatter')
     const options = {

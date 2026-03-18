@@ -4,8 +4,13 @@
     "description": "Rutas del microservicio de productos. Cambiar variable `baseUrl` o usar entornos (CL, CO, PE, Local, 127).\n\nNotas:\n- Sync v2 oficial vive bajo /api/sync/*\n- Sync v1 legacy se mantiene bajo /api/sincronizar-* (por compatibilidad con producción)\n- Se eliminaron aliases v2 antiguos (/api/sync/v1/* y /api/sincronizar-*) para reducir ambigüedad.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{M2M_API_KEY_CURRENT}}", "type": "string" }]
+  },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3333/api" },
+    { "key": "M2M_API_KEY_CURRENT", "value": "" },
     { "key": "url_cl", "value": "https://products.bettercommerce.cl/api" },
     { "key": "url_co", "value": "https://co.products.bettercommerce.cl/api" },
     { "key": "url_pe", "value": "https://pe.products.bettercommerce.cl/api" },

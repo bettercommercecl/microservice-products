@@ -28,7 +28,8 @@ export interface ProductCatalogPort {
   getProductsByChannel(
     channelId: number,
     page: number,
-    limit: number
+    limit: number,
+    parentCategoryId?: number
   ): Promise<{ success: true; data: unknown[]; meta: ProductsPaginatedMeta }>
 
   getProductById(id: number): Promise<{ success: true; data: unknown }>

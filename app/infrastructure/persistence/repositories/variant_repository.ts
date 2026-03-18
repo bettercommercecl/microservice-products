@@ -61,15 +61,26 @@ export default class VariantRepository implements VariantRepositoryPort {
   async findPaginatedByChannelWithProduct(
     channelId: number,
     page: number,
-    limit: number
+    limit: number,
+    parentCategoryId?: number
   ): Promise<{ data: unknown[]; meta: VariantPaginatedMeta }> {
-    const paginated = await Variant.query()
+    const query = Variant.query()
       .join('channel_product', 'variants.product_id', 'channel_product.product_id')
       .where('channel_product.channel_id', channelId)
       .select('variants.*')
       .preload('product')
       .orderBy('variants.id', 'asc')
-      .paginate(page, limit)
+    if (parentCategoryId != null) {
+      query.whereExists((sub) => {
+        sub
+          .from('category_products')
+          .select('id')
+          .where('category_id', parentCategoryId)
+          .whereRaw('category_products.product_id = variants.product_id')
+      })
+    }
+
+    const paginated = await query.paginate(page, limit)
     const data = paginated.all()
     const lastPage = Math.max(1, Math.ceil(paginated.total / limit))
     const meta: VariantPaginatedMeta = {

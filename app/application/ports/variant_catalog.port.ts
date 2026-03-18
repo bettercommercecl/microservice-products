@@ -21,7 +21,8 @@ export interface VariantCatalogPort {
   getVariantsByChannelForMarcas(
     channelId: number,
     page: number,
-    limit: number
+    limit: number,
+    parentCategoryId?: number
   ): Promise<{
     data: unknown[]
     meta: VariantsPaginatedMeta

@@ -29,6 +29,7 @@ export interface ProductRepositoryPort {
   findPaginatedByChannel(
     channelId: number,
     page: number,
-    limit: number
+    limit: number,
+    parentCategoryId?: number
   ): Promise<ProductPaginatedResult>
 }

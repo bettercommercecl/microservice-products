@@ -7,6 +7,7 @@ import GetProductByIdUseCase from '#application/use_cases/products/get_product_b
 import GetAllProductsUseCase from '#application/use_cases/products/get_all_products_use_case'
 import GetProductReviewsPaginatedUseCase from '#application/use_cases/products/get_product_reviews_paginated_use_case'
 import ProductCatalogAdapter from '#infrastructure/adapters/product_catalog_adapter'
+import ChannelLookupAdapter from '#infrastructure/adapters/channel_lookup_adapter'
 import { HttpContext } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
 import vine from '@vinejs/vine'
@@ -27,7 +28,10 @@ export default class ProductsController {
     const productCatalog = new ProductCatalogAdapter()
     this.getProductsPaginatedUseCase = new GetProductsPaginatedUseCase(productCatalog)
     this.getProductReviewsPaginatedUseCase = new GetProductReviewsPaginatedUseCase(productCatalog)
-    this.getProductsByChannelUseCase = new GetProductsByChannelUseCase(productCatalog)
+    this.getProductsByChannelUseCase = new GetProductsByChannelUseCase(
+      productCatalog,
+      new ChannelLookupAdapter()
+    )
     this.getProductByIdUseCase = new GetProductByIdUseCase(productCatalog)
     this.getAllProductsUseCase = new GetAllProductsUseCase(productCatalog)
   }

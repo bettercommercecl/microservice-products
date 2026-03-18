@@ -41,13 +41,25 @@ export default class ProductRepository implements ProductRepositoryPort {
   async findPaginatedByChannel(
     channelId: number,
     page: number,
-    limit: number
+    limit: number,
+    parentCategoryId?: number
   ): Promise<ProductPaginatedResult> {
     const productIdsSubquery = ChannelProduct.query()
       .select('product_id')
       .where('channel_id', channelId)
-    const paginated = await Product.query()
-      .whereIn('id', productIdsSubquery)
+    const query = Product.query().whereIn('id', productIdsSubquery)
+
+    if (parentCategoryId != null) {
+      query.whereExists((sub) => {
+        sub
+          .from('category_products')
+          .select('id')
+          .where('category_id', parentCategoryId)
+          .whereRaw('category_products.product_id = products.id')
+      })
+    }
+
+    const paginated = await query
       .preload('variants')
       .orderBy('id', 'asc')
       .paginate(page, limit)

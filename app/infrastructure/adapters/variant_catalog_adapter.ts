@@ -33,8 +33,14 @@ export default class VariantCatalogAdapter implements VariantCatalogPort {
   async getVariantsByChannelForMarcas(
     channelId: number,
     page: number,
-    limit: number
+    limit: number,
+    parentCategoryId?: number
   ): Promise<{ data: unknown[]; meta: VariantsPaginatedMeta }> {
-    return this.variantService.getVariantsByChannelForMarcas(channelId, page, limit)
+    return this.variantService.getVariantsByChannelForMarcas(
+      channelId,
+      page,
+      limit,
+      parentCategoryId
+    )
   }
 }

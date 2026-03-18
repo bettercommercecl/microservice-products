@@ -8,6 +8,7 @@ import VariantRepository from '#infrastructure/persistence/repositories/variant_
 import GetVariantsPaginatedUseCase from '#application/use_cases/variants/get_variants_paginated_use_case'
 import GetVariantsByChannelUseCase from '#application/use_cases/variants/get_variants_by_channel_use_case'
 import VariantCatalogAdapter from '#infrastructure/adapters/variant_catalog_adapter'
+import ChannelLookupAdapter from '#infrastructure/adapters/channel_lookup_adapter'
 import { HttpContext } from '@adonisjs/core/http'
 import vine from '@vinejs/vine'
 import { variantsByIdsSchema } from '#validators/variants_by_ids_validator'
@@ -30,7 +31,10 @@ export default class VariantController {
     })
     const variantCatalog = new VariantCatalogAdapter()
     this.getVariantsPaginatedUseCase = new GetVariantsPaginatedUseCase(variantCatalog)
-    this.getVariantsByChannelUseCase = new GetVariantsByChannelUseCase(variantCatalog)
+    this.getVariantsByChannelUseCase = new GetVariantsByChannelUseCase(
+      variantCatalog,
+      new ChannelLookupAdapter()
+    )
   }
 
   /**

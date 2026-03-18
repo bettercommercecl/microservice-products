@@ -23,6 +23,7 @@ export interface VariantRepositoryPort {
   findPaginatedByChannelWithProduct(
     channelId: number,
     page: number,
-    limit: number
+    limit: number,
+    parentCategoryId?: number
   ): Promise<{ data: unknown[]; meta: VariantPaginatedMeta }>
 }
