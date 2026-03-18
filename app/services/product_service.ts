@@ -155,11 +155,55 @@ export default class ProductService {
   }
 
   /**
-   * Lista productos paginados para marcas. Usa el modelo para serializacion por defecto (JSON y fechas).
+   * Lista productos paginados para marcas
    */
   async getProductsPaginated(page: number, limit: number) {
     const { data: items, meta } = await this.productRepository.findPaginated(page, limit)
     const data = (items as { serialize: () => unknown }[]).map((p) => p.serialize())
+    return { success: true as const, data, meta }
+  }
+
+  /**
+   * Lista reseñas de productos paginadas (50 por página)
+   */
+  async getProductReviewsPaginated(page: number, limit: number) {
+    const { data: items, meta } = await this.productRepository.findReviewsPaginated(page, limit)
+    const rows = (items as { serialize: () => unknown }[]).map((p) => p.serialize()) as Array<{
+      product_id?: number
+      reviews?: unknown
+    }>
+
+    const data = rows
+      .map((row) => {
+        const productId = typeof row.product_id === 'number' ? row.product_id : undefined
+        const reviewsValue = row.reviews
+
+        if (reviewsValue && typeof reviewsValue === 'object' && !Array.isArray(reviewsValue)) {
+          const obj = reviewsValue as Record<string, unknown>
+          const list = Array.isArray(obj.reviews) ? obj.reviews : []
+          if (list.length === 0) return null
+          return {
+            product_id: productId ?? (typeof obj.product_id === 'number' ? (obj.product_id as number) : undefined),
+            quantity: typeof obj.quantity === 'number' ? obj.quantity : undefined,
+            rating: typeof obj.rating === 'number' ? obj.rating : undefined,
+            reviews: list,
+          }
+        }
+
+        if (Array.isArray(reviewsValue)) {
+          if (reviewsValue.length === 0) return null
+          return {
+            product_id: productId,
+            quantity: reviewsValue.length,
+            rating: undefined,
+            reviews: reviewsValue,
+          }
+        }
+
+        return null
+      })
+      .filter(Boolean)
+
     return { success: true as const, data, meta }
   }
 

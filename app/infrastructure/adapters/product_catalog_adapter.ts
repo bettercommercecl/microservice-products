@@ -32,6 +32,13 @@ export default class ProductCatalogAdapter implements ProductCatalogPort {
     return this.productService.getProductsPaginated(page, limit)
   }
 
+  async getProductReviewsPaginated(
+    page: number,
+    limit: number
+  ): Promise<{ success: true; data: unknown[]; meta: ProductsPaginatedMeta }> {
+    return this.productService.getProductReviewsPaginated(page, limit)
+  }
+
   async getProductsByChannel(
     channelId: number,
     page: number,

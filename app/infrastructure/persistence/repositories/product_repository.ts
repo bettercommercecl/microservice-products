@@ -6,7 +6,7 @@ import ChannelProduct from '#models/channel_product'
 import Product from '#models/product'
 
 /**
- * Implementacion del port de lectura de productos usando modelos Lucid.
+ * Implementacion  de lectura de productos
  */
 export default class ProductRepository implements ProductRepositoryPort {
   async findAll(): Promise<unknown[]> {
@@ -21,6 +21,18 @@ export default class ProductRepository implements ProductRepositoryPort {
 
   async findPaginated(page: number, limit: number): Promise<ProductPaginatedResult> {
     const paginated = await Product.query().orderBy('id', 'asc').paginate(page, limit)
+    const data = paginated.all()
+    const meta = paginated.getMeta()
+    return { data, meta }
+  }
+
+  async findReviewsPaginated(page: number, limit: number): Promise<ProductPaginatedResult> {
+    const paginated = await Product.query()
+      .select(['id', 'product_id', 'reviews'])
+      .whereNotNull('reviews')
+      .whereRaw("reviews::jsonb <> '[]'::jsonb")
+      .orderBy('id', 'asc')
+      .paginate(page, limit)
     const data = paginated.all()
     const meta = paginated.getMeta()
     return { data, meta }

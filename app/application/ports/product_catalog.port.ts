@@ -20,6 +20,11 @@ export interface ProductCatalogPort {
     limit: number
   ): Promise<{ success: true; data: unknown[]; meta: unknown }>
 
+  getProductReviewsPaginated(
+    page: number,
+    limit: number
+  ): Promise<{ success: true; data: unknown[]; meta: ProductsPaginatedMeta }>
+
   getProductsByChannel(
     channelId: number,
     page: number,

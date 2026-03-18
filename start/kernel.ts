@@ -45,4 +45,5 @@ router.use([
 export const middleware = router.named({
   auth: () => import('#middleware/auth_middleware'),
   readCommitted: () => import('#middleware/read_committed_middleware'),
+  rateLimit: () => import('#middleware/rate_limit_middleware'),
 })

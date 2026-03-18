@@ -5,6 +5,7 @@ import GetProductsPaginatedUseCase from '#application/use_cases/products/get_pro
 import GetProductsByChannelUseCase from '#application/use_cases/products/get_products_by_channel_use_case'
 import GetProductByIdUseCase from '#application/use_cases/products/get_product_by_id_use_case'
 import GetAllProductsUseCase from '#application/use_cases/products/get_all_products_use_case'
+import GetProductReviewsPaginatedUseCase from '#application/use_cases/products/get_product_reviews_paginated_use_case'
 import ProductCatalogAdapter from '#infrastructure/adapters/product_catalog_adapter'
 import { HttpContext } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
@@ -12,9 +13,11 @@ import vine from '@vinejs/vine'
 import { productShowSchema } from '#validators/product_show_validator'
 import { productsByChannelSchema } from '#validators/products_by_channel_validator'
 import { productsPaginatedSchema } from '#validators/products_paginated_validator'
+import { reviewsPaginatedSchema } from '#validators/reviews_paginated_validator'
 
 export default class ProductsController {
   private readonly getProductsPaginatedUseCase: GetProductsPaginatedUseCase
+  private readonly getProductReviewsPaginatedUseCase: GetProductReviewsPaginatedUseCase
   private readonly getProductsByChannelUseCase: GetProductsByChannelUseCase
   private readonly getProductByIdUseCase: GetProductByIdUseCase
   private readonly getAllProductsUseCase: GetAllProductsUseCase
@@ -23,6 +26,7 @@ export default class ProductsController {
   constructor() {
     const productCatalog = new ProductCatalogAdapter()
     this.getProductsPaginatedUseCase = new GetProductsPaginatedUseCase(productCatalog)
+    this.getProductReviewsPaginatedUseCase = new GetProductReviewsPaginatedUseCase(productCatalog)
     this.getProductsByChannelUseCase = new GetProductsByChannelUseCase(productCatalog)
     this.getProductByIdUseCase = new GetProductByIdUseCase(productCatalog)
     this.getAllProductsUseCase = new GetAllProductsUseCase(productCatalog)
@@ -40,6 +44,21 @@ export default class ProductsController {
     const page = validated.page ?? 1
     const limit = validated.limit ?? 50
     const result = await this.getProductsPaginatedUseCase.execute(page, limit)
+    return response.ok(result)
+  }
+
+  /**
+   * Lista reseñas de productos paginadas (50 por página).
+   * GET /api/products/reviews/paginated?page=1
+   */
+  async reviewsPaginated({ request, response }: HttpContext) {
+    const validated = await vine.validate({
+      schema: reviewsPaginatedSchema,
+      data: request.qs(),
+    })
+    const page = validated.page ?? 1
+    const limit = 50
+    const result = await this.getProductReviewsPaginatedUseCase.execute(page, limit)
     return response.ok(result)
   }
 

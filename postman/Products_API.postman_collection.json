@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Products API",
-    "description": "Rutas del microservicio de productos. Cambiar variable `baseUrl` o usar entornos (CL, CO, PE, Local, 127).",
+    "description": "Rutas del microservicio de productos. Cambiar variable `baseUrl` o usar entornos (CL, CO, PE, Local, 127).\n\nNotas:\n- Sync v2 oficial vive bajo /api/sync/*\n- Sync v1 legacy se mantiene bajo /api/sincronizar-* (por compatibilidad con producción)\n- Se eliminaron aliases v2 antiguos (/api/sync/v1/* y /api/sincronizar-*) para reducir ambigüedad.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -108,6 +108,19 @@
         {
           "name": "Listar productos",
           "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/products", "host": ["{{baseUrl}}"], "path": ["products"] } }
+        },
+        {
+          "name": "Reseñas de productos (paginado 50)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/reviews/paginated?page=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "reviews", "paginated"],
+              "query": [{ "key": "page", "value": "1", "description": "Página (50 registros por página)" }]
+            }
+          }
         },
         {
           "name": "Productos paginados (estructura tabla)",
@@ -333,6 +346,7 @@
     },
     {
       "name": "Sync (v1 legacy)",
+      "description": "Legacy (v1). Mantener para no romper flujos en producción. Productos se sincroniza por canal: /sincronizar-productos/:channel_id.",
       "item": [
         {
           "name": "Sincronizar productos por canal",
@@ -353,7 +367,8 @@
       ]
     },
     {
-      "name": "Sync (v2)",
+      "name": "Sync (v2 oficial)",
+      "description": "Superficie oficial v2. Usar estos endpoints para sincronizaciones globales y tareas individuales.",
       "item": [
         {
           "name": "Sync completo",
@@ -386,40 +401,6 @@
         {
           "name": "Sync stock",
           "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/stock", "host": ["{{baseUrl}}"], "path": ["sync", "stock"] } }
-        }
-      ]
-    },
-    {
-      "name": "Sync (alias legacy)",
-      "item": [
-        {
-          "name": "Sincronizar productos (catalogo)",
-          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-productos", "host": ["{{baseUrl}}"], "path": ["sincronizar-productos"] } }
-        },
-        {
-          "name": "Sincronizar packs",
-          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-packs", "host": ["{{baseUrl}}"], "path": ["sincronizar-packs"] } }
-        },
-        {
-          "name": "Sincronizar stock",
-          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-stock", "host": ["{{baseUrl}}"], "path": ["sincronizar-stock"] } }
-        }
-      ]
-    },
-    {
-      "name": "Sync v1",
-      "item": [
-        {
-          "name": "Sync productos",
-          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/v1/productos", "host": ["{{baseUrl}}"], "path": ["sync", "v1", "productos"] } }
-        },
-        {
-          "name": "Sync packs",
-          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/v1/packs", "host": ["{{baseUrl}}"], "path": ["sync", "v1", "packs"] } }
-        },
-        {
-          "name": "Sync stock",
-          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/v1/stock", "host": ["{{baseUrl}}"], "path": ["sync", "v1", "stock"] } }
         }
       ]
     }

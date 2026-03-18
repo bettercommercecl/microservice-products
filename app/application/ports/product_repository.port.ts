@@ -24,6 +24,8 @@ export interface ProductRepositoryPort {
 
   findPaginated(page: number, limit: number): Promise<ProductPaginatedResult>
 
+  findReviewsPaginated(page: number, limit: number): Promise<ProductPaginatedResult>
+
   findPaginatedByChannel(
     channelId: number,
     page: number,

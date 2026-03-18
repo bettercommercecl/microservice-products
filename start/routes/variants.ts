@@ -18,4 +18,5 @@ router
       .post('/variants/formatted-by-ids', [VariantController, 'getFormattedByIds'])
       .use(middleware.readCommitted())
   })
+  .use(middleware.rateLimit({ max: 120, windowMs: 60_000, key: 'ip' }))
   .prefix('api')

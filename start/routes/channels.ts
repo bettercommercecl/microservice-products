@@ -1,3 +1,4 @@
+import { middleware } from '#start/kernel'
 import router from '@adonisjs/core/services/router'
 
 // 🚀 Controlador lazy importado
@@ -19,4 +20,5 @@ router
       .delete('/channels/:id', [ChannelsController, 'destroy'])
       .where('id', router.matchers.number())
   })
+  .use(middleware.rateLimit({ max: 60, windowMs: 60_000, key: 'ip' }))
   .prefix('api')
