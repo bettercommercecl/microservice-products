@@ -43,7 +43,7 @@ router.use([
  * the routes or the routes group.
  */
 export const middleware = router.named({
-  auth: () => import('#middleware/auth_middleware'),
+  m2mAuth: () => import('#middleware/m2m_auth_middleware'),
   readCommitted: () => import('#middleware/read_committed_middleware'),
   rateLimit: () => import('#middleware/rate_limit_middleware'),
 })

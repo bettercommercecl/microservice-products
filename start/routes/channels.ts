@@ -20,5 +20,6 @@ router
       .delete('/channels/:id', [ChannelsController, 'destroy'])
       .where('id', router.matchers.number())
   })
+  .use(middleware.m2mAuth())
   .use(middleware.rateLimit({ max: 60, windowMs: 60_000, key: 'ip' }))
   .prefix('api')

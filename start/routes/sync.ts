@@ -18,4 +18,5 @@ router
       .get('/sincronizar-canales', [SyncController, 'syncChannels'])
       .use(middleware.rateLimit({ max: 10, windowMs: 60_000, key: 'global' }))
   })
+  .use(middleware.m2mAuth())
   .prefix('api')

@@ -14,5 +14,6 @@ router
     router.get('/products/:id', [ProductsController, 'show'])
     router.get('/sync-stats/:channel_id', [ProductsController, 'getSyncStats'])
   })
+  .use(middleware.m2mAuth())
   .use(middleware.rateLimit({ max: 120, windowMs: 60_000, key: 'ip' }))
   .prefix('api')

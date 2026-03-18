@@ -70,6 +70,21 @@ export default await Env.create(new URL('../', import.meta.url), {
 
   /*
   |----------------------------------------------------------
+  | M2M auth: API key enviada en Authorization
+  |----------------------------------------------------------
+  */
+  M2M_API_KEY_CURRENT: Env.schema.string(),
+  M2M_API_KEY_PREVIOUS: Env.schema.string.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | Legacy: API key para integraciones externas
+  |----------------------------------------------------------
+  */
+  X_API_KEY: Env.schema.string.optional(),
+
+  /*
+  |----------------------------------------------------------
   | Inventario principal por pais (INVENTORY_LOCATION_ID_CL, _CO, _PE).
   | Requerido para sync de stock, pack reserve e inventario BigCommerce.
   |----------------------------------------------------------
@@ -225,5 +240,4 @@ export default await Env.create(new URL('../', import.meta.url), {
   ID_SMALL_BOGOTA: Env.schema.number.optional(),
   ID_MEDIUM_BOGOTA: Env.schema.number.optional(),
   ID_BIG_BOGOTA: Env.schema.number.optional(),
-
 })

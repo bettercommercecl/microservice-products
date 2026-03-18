@@ -8,5 +8,6 @@ router
     router.get('/packs/paginated', [PacksController, 'indexPaginated'])
     router.get('/packs/by-channel', [PacksController, 'byChannel'])
   })
+  .use(middleware.m2mAuth())
   .use(middleware.rateLimit({ max: 120, windowMs: 60_000, key: 'ip' }))
   .prefix('api')

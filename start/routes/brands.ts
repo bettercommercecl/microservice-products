@@ -11,5 +11,6 @@ router
     router.get('/brands', [BrandsController, 'index'])
     router.get('/brands/:id', [BrandsController, 'show'])
   })
+  .use(middleware.m2mAuth())
   .use(middleware.rateLimit({ max: 60, windowMs: 60_000, key: 'ip' }))
   .prefix('api')

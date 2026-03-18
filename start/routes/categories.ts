@@ -10,5 +10,6 @@ router
     router.get('/categories', [CategoriesController, 'index'])
     router.get('/categories/:id', [CategoriesController, 'show'])
   })
+  .use(middleware.m2mAuth())
   .use(middleware.rateLimit({ max: 60, windowMs: 60_000, key: 'ip' }))
   .prefix('api')

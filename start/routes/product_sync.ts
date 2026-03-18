@@ -31,4 +31,5 @@ router
       .get('/stock', [SyncControllerV2, 'syncStock'])
       .use(middleware.rateLimit({ max: 1, windowMs: 10_000, key: 'global' }))
   })
+  .use(middleware.m2mAuth())
   .prefix('api/sync')
