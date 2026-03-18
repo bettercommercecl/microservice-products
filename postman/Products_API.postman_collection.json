@@ -14,7 +14,6 @@
     { "key": "baseUrlcl", "value": "https://products.bettercommerce.cl/api" },
     { "key": "baseUrlco", "value": "https://co.products.bettercommerce.cl/api" },
     { "key": "baseUrlpe", "value": "https://pe.products.bettercommerce.cl/api" },
-    { "key": "baseUrllocal", "value": "http://localhost:3333/api" },
     { "key": "baseUrl127", "value": "http://127.0.0.1:3333/api" }
   ],
   "item": [
