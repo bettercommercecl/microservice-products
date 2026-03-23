@@ -253,19 +253,56 @@ export default class PacksSyncService {
     return formattedPacks
   }
 
+  /** Clave de linea en snapshot: (pack_id, line_index). Permite misma variante en varias lineas. */
+  private snapshotKeyFromRecord(row: FormattedPackRecord): string {
+    return `${row.pack_id}\0${row.line_index}`
+  }
+
+  private snapshotKeyFromModel(row: ProductPack): string {
+    return `${row.pack_id}\0${row.line_index}`
+  }
+
+  /**
+   * Upsert por (pack_id, line_index) + borrado de huerfanos, sin vaciar la tabla.
+   * Preserva id (table_id) cuando la linea en esa posicion sigue existiendo.
+   */
   private async saveProductsOfPacksInDatabase(
     packs: FormattedPackRecord[]
   ): Promise<{ status: number; message?: string; data?: any }> {
     const trx = await Database.transaction()
 
     try {
-      Logger.info('Sync packs: eliminando registros anteriores de products_packs')
-      await ProductPack.query().useTransaction(trx).delete()
-      Logger.info(`Sync packs: insertando ${packs.length} registros`)
-      await ProductPack.createMany(packs, { client: trx })
+      const newPackIds = [...new Set(packs.map((p) => p.pack_id))]
+      const keySet = new Set(packs.map((p) => this.snapshotKeyFromRecord(p)))
+
+      Logger.info(`Sync packs: upsert ${packs.length} lineas en ${newPackIds.length} packs (sin truncate)`)
+
+      if (newPackIds.length > 0) {
+        await ProductPack.query({ client: trx }).whereNotIn('pack_id', newPackIds).delete()
+      }
+
+      if (packs.length > 0) {
+        await ProductPack.updateOrCreateMany(['pack_id', 'line_index'], packs, { client: trx })
+      }
+
+      const existingRows = await ProductPack.query({ client: trx }).whereIn('pack_id', newPackIds)
+      const orphanIds = existingRows
+        .filter((row) => !keySet.has(this.snapshotKeyFromModel(row)))
+        .map((row) => row.id)
+
+      const CHUNK = 500
+      for (let i = 0; i < orphanIds.length; i += CHUNK) {
+        const chunk = orphanIds.slice(i, i + CHUNK)
+        await ProductPack.query({ client: trx }).whereIn('id', chunk).delete()
+      }
+
+      if (orphanIds.length > 0) {
+        Logger.info(`Sync packs: eliminadas ${orphanIds.length} lineas huerfanas`)
+      }
+
       await trx.commit()
       const totalPacks = await ProductPack.all()
-      Logger.info(`Sync packs: guardado correcto, ${totalPacks.length} packs en BD`)
+      Logger.info(`Sync packs: guardado correcto, ${totalPacks.length} filas en BD`)
       return { status: 201, data: totalPacks }
     } catch (error: any) {
       await trx.rollback()

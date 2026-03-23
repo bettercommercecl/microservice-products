@@ -50,6 +50,8 @@ test.group('formatPacksRecords', () => {
     const result = formatPacksRecords(packs, inventoryMap, variantReserveMap)
 
     assert.lengthOf(result, 2)
+    assert.equal(result[0].line_index, 0)
+    assert.equal(result[1].line_index, 1)
     assert.equal(result[0].pack_id, 100)
     assert.equal(result[0].product_id, 10)
     assert.equal(result[0].sku, 'SKU-A')
@@ -100,8 +102,42 @@ test.group('formatPacksRecords', () => {
     const result = formatPacksRecords(packs, inventoryMap, variantReserveMap)
 
     assert.lengthOf(result, 1)
+    assert.equal(result[0].line_index, 0)
     assert.isTrue(result[0].is_variant)
     assert.equal(result[0].variant_id, 88)
+  })
+
+  test('misma variante en dos lineas: line_index distinto, mismo variant_id', ({ assert }) => {
+    const packs: PackInput[] = [
+      {
+        id: 600,
+        items_packs: [
+          { product: 'SKU-DUP', quantity: 1 },
+          { product: 'SKU-DUP', quantity: 3 },
+        ],
+      },
+    ]
+    const inventoryMap = new Map<string, InventoryEntry>([
+      [
+        'SKU-DUP',
+        {
+          product_id: 60,
+          sku: 'SKU-DUP',
+          safety_stock: 0,
+          available_to_sell: 10,
+          variant_id: 6001,
+          bin_picking_number: null,
+        },
+      ],
+    ])
+    const result = formatPacksRecords(packs, inventoryMap, new Map())
+    assert.lengthOf(result, 2)
+    assert.equal(result[0].line_index, 0)
+    assert.equal(result[1].line_index, 1)
+    assert.equal(result[0].variant_id, 6001)
+    assert.equal(result[1].variant_id, 6001)
+    assert.equal(result[0].quantity, 1)
+    assert.equal(result[1].quantity, 3)
   })
 
   test('stock 0 cuando quantity supera available_to_sell', ({ assert }) => {
@@ -129,6 +165,7 @@ test.group('formatPacksRecords', () => {
     const result = formatPacksRecords(packs, inventoryMap, new Map())
 
     assert.lengthOf(result, 1)
+    assert.equal(result[0].line_index, 0)
     assert.equal(result[0].stock, 0)
   })
 
@@ -161,6 +198,7 @@ test.group('formatPacksRecords', () => {
     const result = formatPacksRecords(packs, inventoryMap, new Map())
 
     assert.lengthOf(result, 1)
+    assert.equal(result[0].line_index, 0)
     assert.equal(result[0].sku, 'SKU-OK')
   })
 

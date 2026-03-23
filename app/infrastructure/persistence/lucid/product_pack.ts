@@ -1,9 +1,13 @@
-import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
+import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import { DateTime } from 'luxon'
 import Product from './product.js'
 import Variant from './variant.js'
 
+/**
+ * Una fila = una linea del pack. Unicidad logica (pack_id, line_index).
+ * id es table_id estable para integraciones; upsert de sync usa pack_id + line_index.
+ */
 export default class ProductPack extends BaseModel {
   public static table = 'products_packs'
 
@@ -12,6 +16,9 @@ export default class ProductPack extends BaseModel {
 
   @column()
   declare pack_id: number
+
+  @column()
+  declare line_index: number
 
   @column()
   declare product_id: number

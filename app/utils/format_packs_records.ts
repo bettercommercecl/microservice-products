@@ -25,6 +25,8 @@ export interface InventoryEntry {
 }
 
 export interface FormattedPackRecord {
+  /** Posicion 0-based de la linea dentro del pack (metafield). Identidad logica junto a pack_id. */
+  line_index: number
   pack_id: number
   product_id: number
   sku: string
@@ -39,6 +41,7 @@ export interface FormattedPackRecord {
 /**
  * Formatea packs con items usando mapas de inventario y reserve.
  * variant_id siempre es el de la variante del componente (SKU hijo), desde inventario.
+ * line_index: orden denso de lineas persistidas por pack (permite mismo variant_id repetido).
  */
 export function formatPacksRecords(
   packs: PackInput[],
@@ -49,6 +52,7 @@ export function formatPacksRecords(
 
   for (const pack of packs) {
     const packId = pack.id
+    let lineIndex = 0
 
     for (const item of pack.items_packs ?? []) {
       if (!item?.product || typeof item.product !== 'string') {
@@ -69,6 +73,7 @@ export function formatPacksRecords(
       const isVariant = item?.is_variant ?? false
 
       formattedPacks.push({
+        line_index: lineIndex,
         pack_id: packId,
         product_id: inventoryProduct.product_id,
         sku: inventoryProduct.sku.trim(),
@@ -83,6 +88,7 @@ export function formatPacksRecords(
         serial: inventoryProduct.bin_picking_number ?? null,
         reserve: reserveFromVariant,
       })
+      lineIndex += 1
     }
   }
 

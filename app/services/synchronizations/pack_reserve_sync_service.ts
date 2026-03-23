@@ -1,11 +1,11 @@
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
+import CatalogSafeStock from '#models/catalog_safe_stock'
+import CategoryProduct from '#models/category_product'
 import Product from '#models/product'
 import ProductPack from '#models/product_pack'
-import CategoryProduct from '#models/category_product'
-import CatalogSafeStock from '#models/catalog_safe_stock'
+import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import Database from '@adonisjs/lucid/services/db'
-import env from '#start/env'
 
 interface GroupedPackProduct {
   product_id: number
@@ -133,13 +133,15 @@ export default class PackReserveSyncService {
       const productsInPacks = await this.getProductsInPacksCategory(packsCategoryId)
       const packIds = await this.getPackIdsFromProductsPacks(productsInPacks)
       const productsPacksData = await this.getProductsPacksDataByPackIds(packIds)
-      const groupedPackData = this.groupPackDataByPackAndVariant(productsPacksData)
+      const lineGroups = this.groupPackDataByPackLine(productsPacksData)
+      const variantMerged = this.mergeGroupsForVariantScopedOperations(lineGroups)
+      const packCategoryGroups = this.mergeGroupsByPackForCategories(lineGroups)
 
-      const variantsUpdateResult = await this.updateVariantsFromGroupedData(groupedPackData)
+      const variantsUpdateResult = await this.updateVariantsFromGroupedData(variantMerged)
 
       const [productsUpdateResult, categoryProductsResult] = await Promise.allSettled([
-        this.updateProductsCategories(groupedPackData, Number(reserveCategoryId)),
-        this.updateCategoryProducts(groupedPackData, Number(reserveCategoryId)),
+        this.updateProductsCategories(packCategoryGroups, Number(reserveCategoryId)),
+        this.updateCategoryProducts(packCategoryGroups, Number(reserveCategoryId)),
       ])
 
       const productsData =
@@ -151,10 +153,10 @@ export default class PackReserveSyncService {
           ? categoryProductsResult.value
           : { added: 0, removed: 0, failed: 0 }
 
-      const catalogSafeStockResult = await this.updateCatalogSafeStock(groupedPackData)
-      const inventoryReserveResult = await this.updateInventoryReserve(groupedPackData)
+      const catalogSafeStockResult = await this.updateCatalogSafeStock(variantMerged)
+      const inventoryReserveResult = await this.updateInventoryReserve(variantMerged)
 
-      const formattedInventoryData = await this.formatDataForBigCommerceInventory(groupedPackData)
+      const formattedInventoryData = await this.formatDataForBigCommerceInventory(variantMerged)
       const countryCode = env.get('COUNTRY_CODE')
       const inventoryLocationId =
         (env.get(`INVENTORY_LOCATION_ID_${countryCode}` as any) as string) ?? ''
@@ -206,10 +208,10 @@ export default class PackReserveSyncService {
         (r) => r.status === 'rejected'
       ).length
 
-      const productDataForBigCommerce = await this.formatDataForBigCommerceProduct(groupedPackData)
+      const productDataForBigCommerce = await this.formatDataForBigCommerceProduct(packCategoryGroups)
       const productUpdateResults = await this.updateBigCommerceProducts(
         productDataForBigCommerce,
-        groupedPackData,
+        packCategoryGroups,
         Number(reserveCategoryId),
         deadline
       )
@@ -245,7 +247,7 @@ export default class PackReserveSyncService {
           fallidos: productUpdateResults.faileds,
         },
         resumen: {
-          total_grupos_procesados: groupedPackData.length,
+          total_grupos_procesados: variantMerged.length,
           total_productos_en_packs: productsInPacks.length,
           total_packs_con_productos: packIds.length,
           total_registros_products_packs: productsPacksData.length,
@@ -307,13 +309,15 @@ export default class PackReserveSyncService {
     }))
   }
 
-  groupPackDataByPackAndVariant(packItems: PackItemInput[]): GroupedPackData[] {
+  /**
+   * Una fila de products_packs = una línea del pack; table_id (id de la fila) es la identidad estable.
+   * (pack_id, variant_id) no basta si la misma variante aparece en varias líneas con cantidades distintas.
+   */
+  groupPackDataByPackLine(packItems: PackItemInput[]): GroupedPackData[] {
     if (!packItems.length) return []
 
-    const groupedMap = packItems.reduce((map, item) => {
-      const groupKey = `${item.pack_id}-${item.variant_id}`
-      const existing = map.get(groupKey)
-      const productEntry = {
+    return packItems.map((item) => {
+      const productEntry: GroupedPackProduct = {
         product_id: item.product_id,
         sku: item.sku,
         stock: item.stock,
@@ -322,40 +326,109 @@ export default class PackReserveSyncService {
         serial: item.serial,
         reserve: item.reserve,
       }
-      if (existing) {
-        existing.products.push(productEntry)
-      } else {
-        map.set(groupKey, {
-          table_id: item.table_id,
-          pack_id: item.pack_id,
-          variant_id: item.variant_id,
-          is_variant: item.is_variant,
+      const group: GroupedPackData = {
+        table_id: item.table_id,
+        pack_id: item.pack_id,
+        variant_id: item.variant_id,
+        is_variant: item.is_variant,
+        reserve: null,
+        serial: null,
+        products: [productEntry],
+      }
+      const { reserve, serial } = this.computeReserveSerialFromProducts(group.products)
+      group.reserve = reserve
+      group.serial = serial
+      return group
+    })
+  }
+
+  private computeReserveSerialFromProducts(products: GroupedPackProduct[]): {
+    reserve: string | null
+    serial: string | null
+  } {
+    const productsWithReserve = products.filter((p) => p.reserve && p.reserve.trim() !== '')
+    if (productsWithReserve.length > 0) {
+      const farthest = productsWithReserve.reduce((a, b) =>
+        new Date(b.reserve!) > new Date(a.reserve!) ? b : a
+      )
+      return {
+        reserve: farthest.reserve ?? null,
+        serial: farthest.serial?.trim() || null,
+      }
+    }
+    const withSerial = products.filter((p) => p.serial && p.serial.trim() !== '')
+    if (withSerial.length > 0) {
+      return { reserve: null, serial: withSerial[0].serial?.trim() || null }
+    }
+    return { reserve: null, serial: null }
+  }
+
+  /**
+   * BigCommerce y variants tienen un solo registro por variant_id: combina líneas que comparten pack + variante hijo
+   * para stock insuficiente, reserva y catalog_safe_stock sin perder ninguna cantidad en el some().
+   */
+  private mergeGroupsForVariantScopedOperations(lineGroups: GroupedPackData[]): GroupedPackData[] {
+    if (!lineGroups.length) return []
+
+    const map = new Map<string, GroupedPackData>()
+    for (const line of lineGroups) {
+      const key =
+        line.variant_id && line.variant_id !== 0
+          ? `${line.pack_id}-${line.variant_id}`
+          : `simple-${line.pack_id}`
+
+      const existing = map.get(key)
+      if (!existing) {
+        map.set(key, {
+          table_id: line.table_id,
+          pack_id: line.pack_id,
+          variant_id: line.variant_id,
+          is_variant: line.is_variant,
           reserve: null,
           serial: null,
-          products: [productEntry],
+          products: [...line.products],
         })
-      }
-      return map
-    }, new Map<string, GroupedPackData>())
-
-    return Array.from(groupedMap.values()).map((group) => {
-      const productsWithReserve = group.products.filter((p) => p.reserve && p.reserve.trim() !== '')
-      if (productsWithReserve.length > 0) {
-        const farthest = productsWithReserve.reduce((a, b) =>
-          new Date(b.reserve!) > new Date(a.reserve!) ? b : a
-        )
-        group.reserve = farthest.reserve
-        group.serial = farthest.serial?.trim() || null
       } else {
-        const withSerial = group.products.filter((p) => p.serial && p.serial.trim() !== '')
-        if (withSerial.length > 0) {
-          group.reserve = null
-          group.serial = withSerial[0].serial?.trim() || null
-        } else {
-          group.reserve = null
-          group.serial = null
-        }
+        existing.products.push(...line.products)
       }
+    }
+
+    return Array.from(map.values()).map((group) => {
+      const { reserve, serial } = this.computeReserveSerialFromProducts(group.products)
+      group.reserve = reserve
+      group.serial = serial
+      return group
+    })
+  }
+
+  /**
+   * Categorías de reserva van al producto pack: una decisión por pack_id usando todas las líneas (serial / reserva).
+   */
+  private mergeGroupsByPackForCategories(lineGroups: GroupedPackData[]): GroupedPackData[] {
+    if (!lineGroups.length) return []
+
+    const map = new Map<number, GroupedPackData>()
+    for (const line of lineGroups) {
+      const existing = map.get(line.pack_id)
+      if (!existing) {
+        map.set(line.pack_id, {
+          table_id: line.table_id,
+          pack_id: line.pack_id,
+          variant_id: 0,
+          is_variant: false,
+          reserve: null,
+          serial: null,
+          products: [...line.products],
+        })
+      } else {
+        existing.products.push(...line.products)
+      }
+    }
+
+    return Array.from(map.values()).map((group) => {
+      const { reserve, serial } = this.computeReserveSerialFromProducts(group.products)
+      group.reserve = reserve
+      group.serial = serial
       return group
     })
   }
