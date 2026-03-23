@@ -1,16 +1,16 @@
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
-import ProductPack from '#models/product_pack'
+import BigcommerceRateLimitInterceptor from '#infrastructure/interceptors/bigcommerce_rate_limit_interceptor'
 import CatalogSafeStock from '#models/catalog_safe_stock'
+import Product from '#models/product'
+import ProductPack from '#models/product_pack'
+import env from '#start/env'
 import {
   formatPacksRecords,
   type FormattedPackRecord,
   type InventoryEntry,
 } from '#utils/format_packs_records'
-import Product from '#models/product'
-import BigcommerceRateLimitInterceptor from '#infrastructure/interceptors/bigcommerce_rate_limit_interceptor'
 import Logger from '@adonisjs/core/services/logger'
 import Database from '@adonisjs/lucid/services/db'
-import env from '#start/env'
 
 interface PackItem {
   product?: string
@@ -301,13 +301,12 @@ export default class PacksSyncService {
 
             item.items_packs = item.items_packs ?? []
 
+            // variant_id en products_packs es siempre el de la variante del componente (hijo), no del pack.
             if (!isPackOfVariants && item.variants?.length === 1) {
-              const singleVariantId = item.variants[0].id
-              item.items_packs = item.items_packs.map((it: PackItem) => ({
-                ...it,
-                variant_id: it.variant_id ?? singleVariantId,
-                is_variant: false,
-              }))
+              item.items_packs = item.items_packs.map((it: PackItem) => {
+                const { variant_id: _packVariantIgnored, ...rest } = it
+                return { ...rest, is_variant: false }
+              })
             }
 
             if (isPackOfVariants) {
@@ -325,7 +324,7 @@ export default class PacksSyncService {
                     }))
                   )
 
-                for (const [k, variantPack] of variantBatch.entries()) {
+                for (let k = 0; k < variantBatch.length; k++) {
                   const royalProduct = metafieldsResults[k] ?? []
 
                   const formattedMetafieldsVariantsPacks = royalProduct
@@ -337,11 +336,10 @@ export default class PacksSyncService {
                       } catch {
                         metafields = []
                       }
-                      return metafields.map((it: PackItem) => ({
-                        ...it,
-                        variant_id: variantPack.id,
-                        is_variant: true,
-                      }))
+                      return metafields.map((it: PackItem) => {
+                        const { variant_id: _packVariantIgnored, ...rest } = it
+                        return { ...rest, is_variant: true }
+                      })
                     })
 
                   allVariants.push(...formattedMetafieldsVariantsPacks)
@@ -410,13 +408,10 @@ export default class PacksSyncService {
       if (pack.items_packs?.length) {
         const updatedItemsPacks = pack.items_packs.map((variantGroup: PackItem | PackItem[]) => {
           if (Array.isArray(variantGroup)) {
-            const variantWithId = variantGroup.find((v) => v.is_variant === true)
-            const variantId = variantWithId?.variant_id ?? undefined
-            return variantGroup.map((v) => ({
-              ...v,
-              is_variant: true,
-              variant_id: v.variant_id ?? variantId,
-            }))
+            return variantGroup.map((v) => {
+              const { variant_id: _ignored, ...rest } = v
+              return { ...rest, is_variant: true }
+            })
           }
           return variantGroup
         })

@@ -1,9 +1,9 @@
-import { test } from '@japa/runner'
 import {
-  formatPacksRecords,
-  type PackInput,
-  type InventoryEntry,
+    formatPacksRecords,
+    type InventoryEntry,
+    type PackInput,
 } from '#utils/format_packs_records'
+import { test } from '@japa/runner'
 
 test.group('formatPacksRecords', () => {
   test('pack simple: usa variant_id desde inventory cuando item no lo tiene', ({ assert }) => {
@@ -64,7 +64,9 @@ test.group('formatPacksRecords', () => {
     assert.isNull(result[1].reserve)
   })
 
-  test('pack variantes: usa variant_id e is_variant desde item', ({ assert }) => {
+  test('pack variantes: is_variant desde item, variant_id siempre desde inventario (hijo)', ({
+    assert,
+  }) => {
     const packs: PackInput[] = [
       {
         id: 200,
@@ -99,7 +101,7 @@ test.group('formatPacksRecords', () => {
 
     assert.lengthOf(result, 1)
     assert.isTrue(result[0].is_variant)
-    assert.equal(result[0].variant_id, 999)
+    assert.equal(result[0].variant_id, 88)
   })
 
   test('stock 0 cuando quantity supera available_to_sell', ({ assert }) => {

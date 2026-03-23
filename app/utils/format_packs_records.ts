@@ -38,8 +38,7 @@ export interface FormattedPackRecord {
 
 /**
  * Formatea packs con items usando mapas de inventario y reserve.
- * Packs simples: variant_id desde inventoryEntry.
- * Packs variantes: variant_id desde item.
+ * variant_id siempre es el de la variante del componente (SKU hijo), desde inventario.
  */
 export function formatPacksRecords(
   packs: PackInput[],
@@ -66,7 +65,7 @@ export function formatPacksRecords(
       const stockSecurity = inventoryProduct.safety_stock || 0
       const reserveFromVariant = variantReserveMap.get(sku) ?? null
 
-      const variantId = item?.variant_id ?? inventoryProduct?.variant_id ?? null
+      const variantId = inventoryProduct.variant_id ?? null
       const isVariant = item?.is_variant ?? false
 
       formattedPacks.push({
