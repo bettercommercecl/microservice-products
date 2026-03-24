@@ -17,6 +17,8 @@ interface PackItem {
   quantity?: number
   is_variant?: boolean
   variant_id?: number
+  /** variants.id del producto pack (product_id = pack_id) */
+  pack_variant_id?: number
 }
 
 interface PackWithItems {
@@ -159,13 +161,23 @@ export default class PacksSyncService {
       throw error
     } finally {
       try {
-        Logger.info('Sync packs: finalizando, obteniendo packs con stock cero')
-        const packIds = await this.getPackIdsWithZeroStock()
-        if (packIds.length > 0) {
+        Logger.info('Sync packs: finalizando, lineas hijo en 0 -> variants del pack + visibilidad')
+        const packIdsAnyZero = await this.getPackIdsWithAnyZeroLineStock()
+        const variantTargets = await this.getDistinctPackVariantTargetsWithZeroStock()
+        const packsMissingPv = await this.getDistinctPackIdsWithZeroStockMissingPackVariant()
+        const fallbackTargets = await this.resolveDefaultPackVariantTargets(packsMissingPv)
+        const mergedTargets = this.mergePackVariantTargets(variantTargets, fallbackTargets)
+        if (mergedTargets.length > 0) {
           Logger.info(
-            `Sync packs: actualizando visibilidad (is_visible=false) para ${packIds.length} packs`
+            `Sync packs: variants.stock=0 para ${mergedTargets.length} variantes de pack (product_id=pack_id)`
           )
-          await this.updateProductsVisibility(packIds)
+          await this.updatePackVariantsStockToZero(mergedTargets)
+        }
+        if (packIdsAnyZero.length > 0) {
+          Logger.info(
+            `Sync packs: is_visible=false para ${packIdsAnyZero.length} packs con alguna linea en stock 0`
+          )
+          await this.updateProductsVisibility(packIdsAnyZero)
         }
         Logger.info('Sync packs: proceso finalizado')
       } catch (error: any) {
@@ -338,11 +350,12 @@ export default class PacksSyncService {
 
             item.items_packs = item.items_packs ?? []
 
-            // variant_id en products_packs es siempre el de la variante del componente (hijo), no del pack.
+            // variant_id del item BC no se usa para hijo; pack_variant_id = variante del pack en BC.
             if (!isPackOfVariants && item.variants?.length === 1) {
+              const packVariantId = item.variants[0].id
               item.items_packs = item.items_packs.map((it: PackItem) => {
                 const { variant_id: _packVariantIgnored, ...rest } = it
-                return { ...rest, is_variant: false }
+                return { ...rest, is_variant: false, pack_variant_id: packVariantId }
               })
             }
 
@@ -363,6 +376,7 @@ export default class PacksSyncService {
 
                 for (let k = 0; k < variantBatch.length; k++) {
                   const royalProduct = metafieldsResults[k] ?? []
+                  const linePackVariantId = variantBatch[k].id
 
                   const formattedMetafieldsVariantsPacks = royalProduct
                     .filter((m: { key: string }) => m.key === 'packs')
@@ -375,7 +389,11 @@ export default class PacksSyncService {
                       }
                       return metafields.map((it: PackItem) => {
                         const { variant_id: _packVariantIgnored, ...rest } = it
-                        return { ...rest, is_variant: true }
+                        return {
+                          ...rest,
+                          is_variant: true,
+                          pack_variant_id: linePackVariantId,
+                        }
                       })
                     })
 
@@ -539,14 +557,90 @@ export default class PacksSyncService {
     return results
   }
 
-  private async getPackIdsWithZeroStock(): Promise<number[]> {
-    const packs = await Database.from('products_packs')
+  /** Packs con al menos una linea (cualquier tipo) en stock 0 */
+  private async getPackIdsWithAnyZeroLineStock(): Promise<number[]> {
+    const rows = await Database.from('products_packs')
       .distinct('pack_id')
       .where('stock', 0)
-      .andWhere('is_variant', false)
       .select('pack_id')
+    return rows.map((p: { pack_id: number }) => p.pack_id)
+  }
 
-    return packs.map((p: { pack_id: number }) => p.pack_id)
+  /**
+   * Pares (pack_id, pack_variant_id) distintos donde una linea quedo en 0.
+   * pack_variant_id = variants.id con variants.product_id = pack_id.
+   */
+  private async getDistinctPackVariantTargetsWithZeroStock(): Promise<
+    Array<{ pack_id: number; pack_variant_id: number }>
+  > {
+    const rows = await Database.from('products_packs')
+      .distinct('pack_id', 'pack_variant_id')
+      .where('stock', 0)
+      .whereNotNull('pack_variant_id')
+      .select('pack_id', 'pack_variant_id')
+    return rows.map((r: { pack_id: number; pack_variant_id: number }) => ({
+      pack_id: r.pack_id,
+      pack_variant_id: r.pack_variant_id,
+    }))
+  }
+
+  private async getDistinctPackIdsWithZeroStockMissingPackVariant(): Promise<number[]> {
+    const rows = await Database.from('products_packs')
+      .distinct('pack_id')
+      .where('stock', 0)
+      .whereNull('pack_variant_id')
+      .select('pack_id')
+    return rows.map((r: { pack_id: number }) => r.pack_id)
+  }
+
+  /** Si falta pack_variant_id (legacy / sin variantes BC), primera variante del pack por id */
+  private async resolveDefaultPackVariantTargets(
+    packIds: number[]
+  ): Promise<Array<{ pack_id: number; pack_variant_id: number }>> {
+    if (!packIds.length) return []
+    const rows = (await Database.from('variants')
+      .select('product_id', 'id')
+      .whereIn('product_id', packIds)
+      .orderBy('product_id', 'asc')
+      .orderBy('id', 'asc')) as Array<{ product_id: number; id: number }>
+
+    const seen = new Set<number>()
+    const out: Array<{ pack_id: number; pack_variant_id: number }> = []
+    for (const r of rows) {
+      if (!seen.has(r.product_id)) {
+        seen.add(r.product_id)
+        out.push({ pack_id: r.product_id, pack_variant_id: r.id })
+      }
+    }
+    return out
+  }
+
+  private mergePackVariantTargets(
+    a: Array<{ pack_id: number; pack_variant_id: number }>,
+    b: Array<{ pack_id: number; pack_variant_id: number }>
+  ): Array<{ pack_id: number; pack_variant_id: number }> {
+    const map = new Map<string, { pack_id: number; pack_variant_id: number }>()
+    for (const t of [...a, ...b]) {
+      map.set(`${t.pack_id}\0${t.pack_variant_id}`, t)
+    }
+    return [...map.values()]
+  }
+
+  private async updatePackVariantsStockToZero(
+    targets: Array<{ pack_id: number; pack_variant_id: number }>
+  ): Promise<void> {
+    const CHUNK = 80
+    for (let i = 0; i < targets.length; i += CHUNK) {
+      const chunk = targets.slice(i, i + CHUNK)
+      await Database.transaction(async (trx) => {
+        for (const { pack_id, pack_variant_id } of chunk) {
+          await trx.from('variants').where('product_id', pack_id).where('id', pack_variant_id).update({
+            stock: 0,
+            updated_at: new Date(),
+          })
+        }
+      })
+    }
   }
 
   private async updateProductsVisibility(packIds: number[]): Promise<void> {

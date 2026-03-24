@@ -8,6 +8,8 @@ export interface PackItemInput {
   quantity?: number
   is_variant?: boolean
   variant_id?: number
+  /** variants.id del producto pack (variants.product_id = pack_id); linea exacta para BC */
+  pack_variant_id?: number
 }
 
 export interface PackInput {
@@ -34,13 +36,16 @@ export interface FormattedPackRecord {
   quantity: number | null
   is_variant: boolean
   variant_id: number | null
+  /** Variante del pack en BC: variants.id con product_id = pack_id */
+  pack_variant_id: number | null
   serial: string | null
   reserve: string | null
 }
 
 /**
  * Formatea packs con items usando mapas de inventario y reserve.
- * variant_id siempre es el de la variante del componente (SKU hijo), desde inventario.
+ * variant_id: variante del componente (hijo), desde inventario.
+ * pack_variant_id: variante del producto pack en BC (para UPDATE variants del pack).
  * line_index: orden denso de lineas persistidas por pack (permite mismo variant_id repetido).
  */
 export function formatPacksRecords(
@@ -66,25 +71,28 @@ export function formatPacksRecords(
         continue
       }
 
-      const stockSecurity = inventoryProduct.safety_stock || 0
       const reserveFromVariant = variantReserveMap.get(sku) ?? null
 
       const variantId = inventoryProduct.variant_id ?? null
       const isVariant = item?.is_variant ?? false
+      const qty = item.quantity ?? 0
+      const avail = inventoryProduct.available_to_sell
+      const rowStock = avail <= 0 || qty > avail ? 0 : avail
+      const packVariantId =
+        item.pack_variant_id !== undefined && item.pack_variant_id !== null
+          ? item.pack_variant_id
+          : null
 
       formattedPacks.push({
         line_index: lineIndex,
         pack_id: packId,
         product_id: inventoryProduct.product_id,
         sku: inventoryProduct.sku.trim(),
-        stock:
-          (item.quantity ?? 0) <= inventoryProduct.available_to_sell &&
-          stockSecurity < inventoryProduct.available_to_sell
-            ? inventoryProduct.available_to_sell
-            : 0,
+        stock: rowStock,
         quantity: item?.quantity ?? null,
         is_variant: isVariant,
         variant_id: variantId,
+        pack_variant_id: packVariantId,
         serial: inventoryProduct.bin_picking_number ?? null,
         reserve: reserveFromVariant,
       })

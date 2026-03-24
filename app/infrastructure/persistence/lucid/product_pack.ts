@@ -38,6 +38,10 @@ export default class ProductPack extends BaseModel {
   @column()
   declare variant_id: number | null
 
+  /** variants.id del pack (product_id = pack_id); el hijo sigue en variant_id */
+  @column()
+  declare pack_variant_id: number | null
+
   @column()
   declare serial: string | null
 
@@ -59,4 +63,9 @@ export default class ProductPack extends BaseModel {
     foreignKey: 'variant_id',
   })
   declare variant: BelongsTo<typeof Variant>
+
+  @belongsTo(() => Variant, {
+    foreignKey: 'pack_variant_id',
+  })
+  declare packVariant: BelongsTo<typeof Variant>
 }

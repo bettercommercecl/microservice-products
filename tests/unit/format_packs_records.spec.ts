@@ -61,6 +61,7 @@ test.group('formatPacksRecords', () => {
     assert.equal(result[0].variant_id, 101)
     assert.equal(result[0].serial, 'BP-A')
     assert.equal(result[0].reserve, 'reserve-a')
+    assert.isNull(result[0].pack_variant_id)
 
     assert.equal(result[1].variant_id, 102)
     assert.isNull(result[1].reserve)
@@ -105,6 +106,33 @@ test.group('formatPacksRecords', () => {
     assert.equal(result[0].line_index, 0)
     assert.isTrue(result[0].is_variant)
     assert.equal(result[0].variant_id, 88)
+    assert.isNull(result[0].pack_variant_id)
+  })
+
+  test('propaga pack_variant_id para ubicar variants.id del pack', ({ assert }) => {
+    const packs: PackInput[] = [
+      {
+        id: 700,
+        items_packs: [{ product: 'SKU-PV', quantity: 1, pack_variant_id: 7001 }],
+      },
+    ]
+    const inventoryMap = new Map<string, InventoryEntry>([
+      [
+        'SKU-PV',
+        {
+          product_id: 70,
+          sku: 'SKU-PV',
+          safety_stock: 0,
+          available_to_sell: 4,
+          variant_id: 7002,
+          bin_picking_number: null,
+        },
+      ],
+    ])
+    const result = formatPacksRecords(packs, inventoryMap, new Map())
+    assert.lengthOf(result, 1)
+    assert.equal(result[0].pack_variant_id, 7001)
+    assert.equal(result[0].variant_id, 7002)
   })
 
   test('misma variante en dos lineas: line_index distinto, mismo variant_id', ({ assert }) => {
@@ -138,6 +166,28 @@ test.group('formatPacksRecords', () => {
     assert.equal(result[1].variant_id, 6001)
     assert.equal(result[0].quantity, 1)
     assert.equal(result[1].quantity, 3)
+  })
+
+  test('stock 0 cuando available_to_sell es 0', ({ assert }) => {
+    const packs: PackInput[] = [
+      { id: 350, items_packs: [{ product: 'SKU-ZERO', quantity: 1 }] },
+    ]
+    const inventoryMap = new Map<string, InventoryEntry>([
+      [
+        'SKU-ZERO',
+        {
+          product_id: 55,
+          sku: 'SKU-ZERO',
+          safety_stock: 0,
+          available_to_sell: 0,
+          variant_id: 550,
+          bin_picking_number: null,
+        },
+      ],
+    ])
+    const result = formatPacksRecords(packs, inventoryMap, new Map())
+    assert.lengthOf(result, 1)
+    assert.equal(result[0].stock, 0)
   })
 
   test('stock 0 cuando quantity supera available_to_sell', ({ assert }) => {
