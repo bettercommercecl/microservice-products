@@ -24,8 +24,8 @@ export function partitionVariantsByBigCommerceId<T extends { id: number }>(
  * Usado por sync global (v2) y sync por canal (v1).
  */
 export async function releaseVariantSkuConflicts(
-  toUpdate: Array<{ id: number; sku: unknown }>,
-  toCreate: Array<{ sku: unknown }>,
+  toUpdate: Array<{ id: number; sku?: unknown }>,
+  toCreate: Array<{ sku?: unknown }>,
   trx: TransactionClientContract
 ): Promise<void> {
   const norm = (s: unknown) => (typeof s === 'string' ? s.trim() : '')
@@ -33,13 +33,6 @@ export async function releaseVariantSkuConflicts(
   for (const v of toUpdate) {
     const sku = norm(v.sku)
     if (!sku) continue
-    const prev = ownerBySku.get(sku)
-    if (prev !== undefined && prev !== v.id) {
-      log.warn(
-        { sku, ids: [prev, v.id] },
-        'Mismo SKU en varias variantes del lote; se reserva al ultimo id del lote'
-      )
-    }
     ownerBySku.set(sku, v.id)
   }
   const createSkus = new Set(
@@ -65,5 +58,78 @@ export async function releaseVariantSkuConflicts(
         .where('id', row.id)
         .update({ sku: `_sync_${row.id}`, updated_at: new Date() })
     }
+  }
+}
+
+/**
+ * Mismo SKU en varias filas del mismo toUpdate: solo el id menor conserva el SKU de BC;
+ * el resto recibe un SKU temporal unico (evita duplicate key en updateOrCreateMany).
+ */
+export function assignUniqueSkusForIntraBatchDuplicates<T extends { id: number; sku?: unknown }>(
+  toUpdate: T[]
+): T[] {
+  const norm = (s: unknown) => (typeof s === 'string' ? s.trim() : '')
+  const clones = toUpdate.map((v) => ({ ...v }))
+  const bySku = new Map<string, T[]>()
+  for (const v of clones) {
+    const sku = norm(v.sku)
+    if (!sku) continue
+    if (!bySku.has(sku)) bySku.set(sku, [])
+    bySku.get(sku)!.push(v)
+  }
+  for (const [sku, group] of bySku) {
+    if (group.length <= 1) continue
+    group.sort((a, b) => a.id - b.id)
+    for (let i = 1; i < group.length; i++) {
+      log.warn(
+        { sku, keptId: group[0].id, reassignedId: group[i].id },
+        'SKU repetido en el mismo lote; se asigna SKU temporal a variantes extra'
+      )
+      group[i].sku = `_sync_dup_${group[i].id}`
+    }
+  }
+  return clones
+}
+
+/** Quita los SKU objetivo del lote de filas a actualizar para que el bulk update no choque entre filas (intercambios, etc.). */
+export async function stashVariantRowsWithBatchPlaceholderSku(
+  toUpdate: Array<{ id: number }>,
+  trx: TransactionClientContract
+): Promise<void> {
+  const now = new Date()
+  for (const v of toUpdate) {
+    await Variant.query({ client: trx }).where('id', v.id).update({
+      sku: `_batch_tmp_${v.id}`,
+      updated_at: now,
+    })
+  }
+}
+
+/**
+ * Flujo completo: particion, dedup intra-lote, stash, liberar ocupantes, update, creates.
+ * Generico para aceptar FormattedVariantForModel u otros payloads con id + sku.
+ */
+export async function applyVariantBatchUpsert<T extends { id: number; sku?: unknown }>(
+  variantBatch: T[],
+  existingIds: Set<number>,
+  trx: TransactionClientContract
+): Promise<void> {
+  const { toUpdate, toCreate } = partitionVariantsByBigCommerceId(variantBatch, existingIds)
+  const prepared = assignUniqueSkusForIntraBatchDuplicates(toUpdate)
+
+  if (prepared.length > 0) {
+    await stashVariantRowsWithBatchPlaceholderSku(prepared, trx)
+  }
+
+  await releaseVariantSkuConflicts(prepared, toCreate, trx)
+
+  if (prepared.length > 0) {
+    await Variant.updateOrCreateMany('id', prepared as Partial<Variant>[], { client: trx })
+  }
+
+  await releaseVariantSkuConflicts([], toCreate, trx)
+
+  if (toCreate.length > 0) {
+    await Variant.createMany(toCreate as Partial<Variant>[], { client: trx })
   }
 }

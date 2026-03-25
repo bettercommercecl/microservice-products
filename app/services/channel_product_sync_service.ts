@@ -9,7 +9,6 @@ import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import db from '@adonisjs/lucid/services/db'
 import type { QueryClientContract, TransactionClientContract } from '@adonisjs/lucid/types/database'
-import pLimit from 'p-limit'
 import CategoryService from '#services/categories_service'
 import ChannelsService from '#services/channels_service'
 import ChannelFormatProductsService from '#services/channel_format_products_service'
@@ -18,10 +17,7 @@ import FormatVariantsService from '#services/format_variants_service'
 import FiltersService from '#services/filters_service'
 import InventoryService from '#services/inventory_service'
 import ProductService from '#services/product_service'
-import {
-  partitionVariantsByBigCommerceId,
-  releaseVariantSkuConflicts,
-} from '#utils/release_variant_sku_conflicts'
+import { applyVariantBatchUpsert } from '#utils/release_variant_sku_conflicts'
 
 export interface ChannelProductSyncServiceDeps {
   bigcommerceService: BigcommerceService
@@ -191,54 +187,39 @@ export default class ChannelProductSyncService {
               `Procesando ${variantBatches.length} sub-lotes de variantes en paralelo...`
             )
 
-            // Procesar sub-lotes de variantes en paralelo con límite de concurrencia
-            const limitConcurrency = pLimit(3) // Máximo 3 sub-lotes en paralelo
-            const variantBatchResults = await Promise.all(
-              variantBatches.map((variantBatch, variantBatchIndex) =>
-                limitConcurrency(async () => {
-                  try {
-                    const ids = variantBatch.map((v) => v.id)
-                    const existingVariants = await Variant.query({ client: batchTrx })
-                      .whereIn('id', ids)
-                      .select('id', 'sku')
+            // Secuencial: mismo batchTrx; paralelo provocaba condiciones de carrera en variants_sku_unique
+            const variantBatchResults: { success: boolean; processed: number; batch: number }[] = []
+            for (let variantBatchIndex = 0; variantBatchIndex < variantBatches.length; variantBatchIndex++) {
+              const variantBatch = variantBatches[variantBatchIndex]
+              try {
+                const ids = variantBatch.map((v) => v.id)
+                const existingVariants = await Variant.query({ client: batchTrx })
+                  .whereIn('id', ids)
+                  .select('id', 'sku')
 
-                    const existingIdsSet = new Set(existingVariants.map((v) => v.id))
-                    const { toUpdate: variantsToUpdate, toCreate: variantsToCreate } =
-                      partitionVariantsByBigCommerceId(variantBatch, existingIdsSet)
+                const existingIdsSet = new Set(existingVariants.map((v) => v.id))
+                await applyVariantBatchUpsert(variantBatch, existingIdsSet, batchTrx)
 
-                    await releaseVariantSkuConflicts(variantsToUpdate, variantsToCreate, batchTrx)
-
-                    if (variantsToUpdate.length > 0) {
-                      await Variant.updateOrCreateMany('id', variantsToUpdate, { client: batchTrx })
-                    }
-
-                    // Crear variantes nuevas
-                    if (variantsToCreate.length > 0) {
-                      await Variant.createMany(variantsToCreate, { client: batchTrx })
-                    }
-
-                    this.logger.debug(
-                      `Sub-lote de variantes ${variantBatchIndex + 1}/${variantBatches.length} procesado: ${variantsToUpdate.length} actualizadas, ${variantsToCreate.length} creadas`
-                    )
-                    return {
-                      success: true,
-                      processed: variantBatch.length,
-                      batch: variantBatchIndex + 1,
-                    }
-                  } catch (variantError) {
-                    this.logger.error(
-                      {
-                        error: variantError.message,
-                        batch_size: variantBatch.length,
-                        skus: variantBatch.map((v) => v.sku).slice(0, 5),
-                      },
-                      `Error en sub-lote de variantes ${variantBatchIndex + 1}`
-                    )
-                    throw variantError
-                  }
+                this.logger.debug(
+                  `Sub-lote de variantes ${variantBatchIndex + 1}/${variantBatches.length} procesado (${variantBatch.length} variantes)`
+                )
+                variantBatchResults.push({
+                  success: true,
+                  processed: variantBatch.length,
+                  batch: variantBatchIndex + 1,
                 })
-              )
-            )
+              } catch (variantError: any) {
+                this.logger.error(
+                  {
+                    error: variantError.message,
+                    batch_size: variantBatch.length,
+                    skus: variantBatch.map((v) => v.sku).slice(0, 5),
+                  },
+                  `Error en sub-lote de variantes ${variantBatchIndex + 1}`
+                )
+                throw variantError
+              }
+            }
 
             // Consolidar resultados de sub-lotes
             const totalVariantsProcessed = variantBatchResults.reduce(

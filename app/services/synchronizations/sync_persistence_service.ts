@@ -9,12 +9,8 @@ import Variant from '#models/variant'
 import Logger from '@adonisjs/core/services/logger'
 import db from '@adonisjs/lucid/services/db'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
-import pLimit from 'p-limit'
 import { createBatches } from '#utils/env_parser'
-import {
-  partitionVariantsByBigCommerceId,
-  releaseVariantSkuConflicts,
-} from '#utils/release_variant_sku_conflicts'
+import { applyVariantBatchUpsert } from '#utils/release_variant_sku_conflicts'
 
 /**
  * Responsabilidad unica: persistir datos formateados en la base de datos.
@@ -65,11 +61,9 @@ export default class SyncPersistenceService {
     if (allVariants.length === 0) return
 
     const variantBatches = createBatches(allVariants, SyncPersistenceService.VARIANT_BATCH_SIZE)
-    const limit = pLimit(3)
-
-    await Promise.all(
-      variantBatches.map((batch, idx) => limit(() => this.reconcileVariantBatch(batch, idx, trx)))
-    )
+    for (let idx = 0; idx < variantBatches.length; idx++) {
+      await this.reconcileVariantBatch(variantBatches[idx], idx, trx)
+    }
   }
 
   private async reconcileVariantBatch(
@@ -82,16 +76,7 @@ export default class SyncPersistenceService {
       const existing = await Variant.query({ client: trx }).whereIn('id', ids).select('id', 'sku')
 
       const existingIds = new Set(existing.map((v) => v.id))
-      const { toUpdate, toCreate } = partitionVariantsByBigCommerceId(variantBatch, existingIds)
-
-      await releaseVariantSkuConflicts(toUpdate, toCreate, trx)
-
-      if (toUpdate.length > 0) {
-        await Variant.updateOrCreateMany('id', toUpdate, { client: trx })
-      }
-      if (toCreate.length > 0) {
-        await Variant.createMany(toCreate, { client: trx })
-      }
+      await applyVariantBatchUpsert(variantBatch, existingIds, trx)
     } catch (error: any) {
       this.logger.error(
         { error: error.message, batch: batchIdx + 1 },
