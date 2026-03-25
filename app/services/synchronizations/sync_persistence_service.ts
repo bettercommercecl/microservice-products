@@ -11,6 +11,10 @@ import db from '@adonisjs/lucid/services/db'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import pLimit from 'p-limit'
 import { createBatches } from '#utils/env_parser'
+import {
+  partitionVariantsByBigCommerceId,
+  releaseVariantSkuConflicts,
+} from '#utils/release_variant_sku_conflicts'
 
 /**
  * Responsabilidad unica: persistir datos formateados en la base de datos.
@@ -49,8 +53,9 @@ export default class SyncPersistenceService {
   }
 
   /**
-   * Persiste variantes con logica de reconciliacion: si existe por SKU, actualiza;
-   * si existe por ID, actualiza; si no existe, crea.
+   * Persiste variantes: clave BC = id (PK). Si el id existe, actualiza esa fila;
+   * si no, crea. El match previo por SKU primero provocaba updates en fila equivocada
+   * y violacion de variants_sku_unique al cambiar SKUs.
    */
   private async saveVariants(
     products: FormattedProductWithVariants[],
@@ -73,31 +78,13 @@ export default class SyncPersistenceService {
     trx: TransactionClientContract
   ): Promise<void> {
     try {
-      const skus = variantBatch.map((v) => v.sku)
       const ids = variantBatch.map((v) => v.id)
+      const existing = await Variant.query({ client: trx }).whereIn('id', ids).select('id', 'sku')
 
-      const existing = await Variant.query({ client: trx })
-        .where((q) => q.whereIn('sku', skus).orWhereIn('id', ids))
-        .select('id', 'sku')
-
-      const skuToId = new Map(existing.map((v) => [v.sku, v.id]))
       const existingIds = new Set(existing.map((v) => v.id))
+      const { toUpdate, toCreate } = partitionVariantsByBigCommerceId(variantBatch, existingIds)
 
-      const toUpdate: any[] = []
-      const toCreate: any[] = []
-
-      for (const variant of variantBatch) {
-        const matchedId = skuToId.get(variant.sku)
-
-        if (matchedId) {
-          const { id, ...rest } = variant
-          toUpdate.push({ ...rest, id: matchedId })
-        } else if (existingIds.has(variant.id)) {
-          toUpdate.push(variant)
-        } else {
-          toCreate.push(variant)
-        }
-      }
+      await releaseVariantSkuConflicts(toUpdate, toCreate, trx)
 
       if (toUpdate.length > 0) {
         await Variant.updateOrCreateMany('id', toUpdate, { client: trx })
