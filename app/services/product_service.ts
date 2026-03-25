@@ -184,6 +184,24 @@ export default class ProductService {
     return sku.trim()
   }
 
+  /**
+   * La columna reviews en DB suele venir como string; el modelo solo parsea en serialize().
+   * Sin esto, mapProductToReviewsPayload ve string y devuelve null para todo.
+   */
+  private normalizeReviewsFromProduct(raw: unknown): unknown {
+    if (raw == null) return null
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim()
+      if (!trimmed) return null
+      try {
+        return JSON.parse(trimmed) as unknown
+      } catch {
+        return null
+      }
+    }
+    return raw
+  }
+
   private mapProductToReviewsPayload(product: Product): {
     product_id: number | undefined
     sku: string | null
@@ -193,9 +211,10 @@ export default class ProductService {
   } | null {
     const productId = typeof product.product_id === 'number' ? product.product_id : undefined
     const sku = this.firstVariantSku(product)
-    const reviewsValue = product.reviews
+    const reviewsValue = this.normalizeReviewsFromProduct(product.reviews)
+    if (reviewsValue == null) return null
 
-    if (reviewsValue && typeof reviewsValue === 'object' && !Array.isArray(reviewsValue)) {
+    if (typeof reviewsValue === 'object' && !Array.isArray(reviewsValue)) {
       const obj = reviewsValue as Record<string, unknown>
       const list = Array.isArray(obj.reviews) ? obj.reviews : []
       if (list.length === 0) return null
