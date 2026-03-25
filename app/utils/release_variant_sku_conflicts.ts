@@ -91,6 +91,19 @@ export function assignUniqueSkusForIntraBatchDuplicates<T extends { id: number; 
   return clones
 }
 
+/**
+ * variants.sku es UNIQUE: solo una fila puede tener ''. BC a veces envia SKU vacio en varias variantes
+ * y Postgres responde Key (sku)=() already exists.
+ */
+export function assignPlaceholderSkuIfEmpty<T extends { id: number; sku?: unknown }>(rows: T[]): T[] {
+  const norm = (s: unknown) => (typeof s === 'string' ? s.trim() : '')
+  return rows.map((row) => {
+    if (norm(row.sku).length > 0) return row
+    log.warn({ variantId: row.id }, 'SKU vacio; placeholder unico para cumplir variants_sku_unique')
+    return { ...row, sku: `__missing_sku__${row.id}` }
+  })
+}
+
 /** Quita los SKU objetivo del lote de filas a actualizar para que el bulk update no choque entre filas (intercambios, etc.). */
 export async function stashVariantRowsWithBatchPlaceholderSku(
   toUpdate: Array<{ id: number }>,
@@ -115,21 +128,22 @@ export async function applyVariantBatchUpsert<T extends { id: number; sku?: unkn
   trx: TransactionClientContract
 ): Promise<void> {
   const { toUpdate, toCreate } = partitionVariantsByBigCommerceId(variantBatch, existingIds)
-  const prepared = assignUniqueSkusForIntraBatchDuplicates(toUpdate)
+  const prepared = assignPlaceholderSkuIfEmpty(assignUniqueSkusForIntraBatchDuplicates(toUpdate))
+  const toCreateReady = assignPlaceholderSkuIfEmpty(toCreate.map((r) => ({ ...r })))
 
   if (prepared.length > 0) {
     await stashVariantRowsWithBatchPlaceholderSku(prepared, trx)
   }
 
-  await releaseVariantSkuConflicts(prepared, toCreate, trx)
+  await releaseVariantSkuConflicts(prepared, toCreateReady, trx)
 
   if (prepared.length > 0) {
     await Variant.updateOrCreateMany('id', prepared as Partial<Variant>[], { client: trx })
   }
 
-  await releaseVariantSkuConflicts([], toCreate, trx)
+  await releaseVariantSkuConflicts([], toCreateReady, trx)
 
-  if (toCreate.length > 0) {
-    await Variant.createMany(toCreate as Partial<Variant>[], { client: trx })
+  if (toCreateReady.length > 0) {
+    await Variant.createMany(toCreateReady as Partial<Variant>[], { client: trx })
   }
 }
