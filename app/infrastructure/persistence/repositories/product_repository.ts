@@ -29,6 +29,9 @@ export default class ProductRepository implements ProductRepositoryPort {
   async findReviewsPaginated(page: number, limit: number): Promise<ProductPaginatedResult> {
     const paginated = await Product.query()
       .select(['id', 'product_id', 'reviews'])
+      .preload('variants', (q) =>
+        q.orderBy('id', 'asc').select(['id', 'product_id', 'sku'])
+      )
       .whereNotNull('reviews')
       .whereRaw("reviews::jsonb <> '[]'::jsonb")
       .orderBy('id', 'asc')

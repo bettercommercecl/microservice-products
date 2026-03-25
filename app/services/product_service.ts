@@ -1,11 +1,11 @@
 import type { CalculationPort } from '#application/ports/calculation.port'
 import type { ProductRepositoryPort } from '#application/ports/product_repository.port'
+import { getSizesConfig } from '#config/sizes_config'
+import syncConfig from '#config/sync'
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import { toProductForFormatDTO } from '#infrastructure/mappers/product_format.mapper'
 import Product from '#models/product'
 import CacheService from '#services/cache_service'
-import syncConfig from '#config/sync'
-import { getSizesConfig } from '#config/sizes_config'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import pLimit from 'p-limit'
@@ -164,47 +164,63 @@ export default class ProductService {
   }
 
   /**
-   * Lista reseñas de productos paginadas (50 por página)
+   * Lista reseñas de productos paginadas (50 por página).
+   * Incluye sku de la primera variante (orden por id); aqui id y product_id coinciden con el catalogo.
    */
   async getProductReviewsPaginated(page: number, limit: number) {
     const { data: items, meta } = await this.productRepository.findReviewsPaginated(page, limit)
-    const rows = (items as { serialize: () => unknown }[]).map((p) => p.serialize()) as Array<{
-      product_id?: number
-      reviews?: unknown
-    }>
+    const products = items as Product[]
 
-    const data = rows
-      .map((row) => {
-        const productId = typeof row.product_id === 'number' ? row.product_id : undefined
-        const reviewsValue = row.reviews
-
-        if (reviewsValue && typeof reviewsValue === 'object' && !Array.isArray(reviewsValue)) {
-          const obj = reviewsValue as Record<string, unknown>
-          const list = Array.isArray(obj.reviews) ? obj.reviews : []
-          if (list.length === 0) return null
-          return {
-            product_id: productId ?? (typeof obj.product_id === 'number' ? (obj.product_id as number) : undefined),
-            quantity: typeof obj.quantity === 'number' ? obj.quantity : undefined,
-            rating: typeof obj.rating === 'number' ? obj.rating : undefined,
-            reviews: list,
-          }
-        }
-
-        if (Array.isArray(reviewsValue)) {
-          if (reviewsValue.length === 0) return null
-          return {
-            product_id: productId,
-            quantity: reviewsValue.length,
-            rating: undefined,
-            reviews: reviewsValue,
-          }
-        }
-
-        return null
-      })
-      .filter(Boolean)
+    const data = products
+      .map((product) => this.mapProductToReviewsPayload(product))
+      .filter((row): row is NonNullable<typeof row> => row !== null)
 
     return { success: true as const, data, meta }
+  }
+
+  private firstVariantSku(product: Product): string | null {
+    const sku = product.variants?.[0]?.sku
+    if (typeof sku !== 'string' || sku.trim() === '') return null
+    return sku.trim()
+  }
+
+  private mapProductToReviewsPayload(product: Product): {
+    product_id: number | undefined
+    sku: string | null
+    quantity?: number
+    rating?: number
+    reviews: unknown[]
+  } | null {
+    const productId = typeof product.product_id === 'number' ? product.product_id : undefined
+    const sku = this.firstVariantSku(product)
+    const reviewsValue = product.reviews
+
+    if (reviewsValue && typeof reviewsValue === 'object' && !Array.isArray(reviewsValue)) {
+      const obj = reviewsValue as Record<string, unknown>
+      const list = Array.isArray(obj.reviews) ? obj.reviews : []
+      if (list.length === 0) return null
+      return {
+        product_id:
+          productId ?? (typeof obj.product_id === 'number' ? (obj.product_id as number) : undefined),
+        sku,
+        quantity: typeof obj.quantity === 'number' ? obj.quantity : undefined,
+        rating: typeof obj.rating === 'number' ? obj.rating : undefined,
+        reviews: list,
+      }
+    }
+
+    if (Array.isArray(reviewsValue)) {
+      if (reviewsValue.length === 0) return null
+      return {
+        product_id: productId,
+        sku,
+        quantity: reviewsValue.length,
+        rating: undefined,
+        reviews: reviewsValue,
+      }
+    }
+
+    return null
   }
 
   /**
