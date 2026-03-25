@@ -9,20 +9,23 @@
     "build": "node ace build",
     "dev": "node ace serve --watch",
     "test": "node ace test",
+    "test:packs": "node ace test --files=tests/unit/format_packs_records.spec.ts --files=tests/functional/packs_sync.spec.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit"
   },
   "imports": {
-    "#controllers/*": "./app/controllers/*.js",
+    "#controllers/*": "./app/presentation/controllers/*.js",
+    "#controllers/synchronizations/v1/*": "./app/presentation/controllers/synchronizations/v1/*.js",
+    "#controllers/synchronizations/v2/*": "./app/presentation/controllers/synchronizations/v2/*.js",
     "#exceptions/*": "./app/exceptions/*.js",
-    "#models/*": "./app/models/*.js",
+    "#models/*": "./app/infrastructure/persistence/lucid/*.js",
     "#mails/*": "./app/mails/*.js",
     "#services/*": "./app/services/*.js",
     "#listeners/*": "./app/listeners/*.js",
     "#events/*": "./app/events/*.js",
-    "#middleware/*": "./app/middleware/*.js",
-    "#validators/*": "./app/validators/*.js",
+    "#middleware/*": "./app/presentation/middleware/*.js",
+    "#validators/*": "./app/presentation/validators/*.js",
     "#providers/*": "./providers/*.js",
     "#policies/*": "./app/policies/*.js",
     "#abilities/*": "./app/abilities/*.js",
@@ -33,7 +36,10 @@
     "#utils/*": "./app/utils/*.js",
     "#dto/*": "./app/dto/*.js",
     "#interfaces/*": "./app/interfaces/*.js",
-    "#infrastructure/*": "./app/infrastructure/*.js"
+    "#infrastructure/*": "./app/infrastructure/*.js",
+    "#ports/*": "./app/ports/*.js",
+    "#application/*": "./app/application/*.js",
+    "#domain/*": "./app/domain/*.js"
   },
   "devDependencies": {
     "@adonisjs/assembler": "^7.8.2",
@@ -61,6 +67,7 @@
     "@adonisjs/lucid": "^21.6.1",
     "@vinejs/vine": "^3.0.1",
     "axios": "^1.9.0",
+    "ioredis": "^5.10.0",
     "luxon": "^3.6.1",
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2"

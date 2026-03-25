@@ -1,212 +1,128 @@
-import Logger from '@adonisjs/core/services/logger'
 import Channel from '#models/channel'
 import ChannelProduct from '#models/channel_product'
-import { channels as channelsConfig } from '../utils/channels/channels.js'
-import db from '@adonisjs/lucid/services/db'
-import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
+import Logger from '@adonisjs/core/services/logger'
+import env from '#start/env'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 
+export interface CreateChannelPayload {
+  id: number
+  name: string
+  tree_id?: number | null
+  parent_category?: number | null
+}
+
+export interface UpdateChannelPayload {
+  name?: string
+  tree_id?: number | null
+  parent_category?: number | null
+  country?: string | null
+}
+
+/**
+ * Servicio de canales. El id coincide con channel_id de BigCommerce.
+ */
 export default class ChannelsService {
   private readonly logger = Logger.child({ service: 'ChannelsService' })
 
-  /**
-   * Inicializa los canales desde la configuración
-   */
-  async initializeChannels(): Promise<void> {
-    try {
-      const results = {
-        created: 0,
-        updated: 0,
-        errors: [] as string[],
+  async create(payload: CreateChannelPayload): Promise<Channel> {
+    const country = env.get('COUNTRY_CODE')
+    const channel = await Channel.updateOrCreate(
+      { id: payload.id },
+      {
+        id: payload.id,
+        name: payload.name,
+        tree_id: payload.tree_id ?? null,
+        parent_category: payload.parent_category ?? null,
+        country: country,
       }
+    )
+    this.logger.info(`Canal creado: ${channel.id} - ${channel.name}`)
+    return channel
+  }
 
-      // Iterar sobre cada marca (UF, FC, AF, etc.)
-      for (const [brandName, countries] of Object.entries(channelsConfig)) {
-        // Iterar sobre cada país (CL, CO, PE)
-        for (const [countryCode, config] of Object.entries(countries as Record<string, any>)) {
-          try {
-            const channelId = config.CHANNEL
-            const channelName = `${brandName}_${countryCode}`
+  async getAll(): Promise<Channel[]> {
+    return Channel.query().orderBy('id', 'asc')
+  }
 
-            // Usar updateOrCreate con el channel_id como id
-            const channel = await Channel.updateOrCreate(
-              { id: channelId }, // Buscar por id (que será el channel_id)
-              {
-                id: channelId, // El id será el channel_id
-                name: channelName,
-              }
-            )
+  async getById(id: number): Promise<Channel | null> {
+    return Channel.find(id)
+  }
 
-            if (channel.$isNew) {
-              results.created++
-            } else {
-              results.updated++
-            }
-          } catch (error) {
-            const errorMsg = `Error procesando ${brandName}_${countryCode}: ${error.message}`
-            results.errors.push(errorMsg)
-            this.logger.error('Error procesando canal', {
-              brand: brandName,
-              country: countryCode,
-              error: error.message,
-            })
-          }
-        }
-      }
+  async getByName(name: string): Promise<Channel | null> {
+    return Channel.query().where('name', name).first()
+  }
 
-      if (results.errors.length > 0) {
-        this.logger.warn('Errores durante inicialización de canales', {
-          errors_count: results.errors.length,
-          created: results.created,
-          updated: results.updated,
-        })
-      }
-    } catch (error) {
-      this.logger.error('Error en inicialización de canales', {
-        error: error.message,
-      })
-      throw error
-    }
+  async update(id: number, payload: UpdateChannelPayload): Promise<Channel | null> {
+    const channel = await Channel.find(id)
+    if (!channel) return null
+
+    if (payload.name !== undefined) channel.name = payload.name
+    if (payload.tree_id !== undefined) channel.tree_id = payload.tree_id
+    if (payload.parent_category !== undefined) channel.parent_category = payload.parent_category
+    if (payload.country !== undefined) channel.country = payload.country
+
+    await channel.save()
+    this.logger.info(`Canal actualizado: ${channel.id}`)
+    return channel
+  }
+
+  async delete(id: number): Promise<boolean> {
+    const channel = await Channel.find(id)
+    if (!channel) return false
+
+    await channel.delete()
+    this.logger.info(`Canal eliminado: ${id}`)
+    return true
+  }
+
+  async getWithProducts(): Promise<Channel[]> {
+    return Channel.getChannelsWithProducts()
   }
 
   /**
-   * Sincroniza las relaciones producto-canal
-   * Responsabilidad: Gestionar asociaciones entre productos y canales
+   * Devuelve canales agrupados por pais para debug/monitoreo de configuracion.
+   */
+  async getByCountry(): Promise<
+    { country: string | null; channels: { id: number; name: string; parent_category: number | null }[] }[]
+  > {
+    const channels = await Channel.query().orderBy('country', 'asc').orderBy('id', 'asc')
+
+    const groups = new Map<
+      string | null,
+      { id: number; name: string; parent_category: number | null }[]
+    >()
+
+    for (const ch of channels) {
+      const key = ch.country ?? null
+      if (!groups.has(key)) {
+        groups.set(key, [])
+      }
+      groups.get(key)!.push({
+        id: ch.id,
+        name: ch.name,
+        parent_category: ch.parent_category,
+      })
+    }
+
+    return Array.from(groups.entries()).map(([country, list]) => ({
+      country,
+      channels: list,
+    }))
+  }
+
+  /**
+   * Sincroniza relaciones canal-producto a partir de variantes formateadas (cada una con product_id).
    */
   async syncChannelByProduct(
-    products: FormattedProductWithModelVariants[],
-    channel_id: number,
-    trx?: any
-  ) {
-    const useExternalTransaction = !!trx
-    const transaction = trx || (await db.transaction())
-
-    try {
-      // Preparar datos de canales
-      const productsList = products.map((product) => ({
-        product_id: product.id,
-        channel_id: channel_id,
-      }))
-
-      // Guardar nuevas relaciones (sin eliminar existentes) - usar updateOrCreateMany para evitar duplicados
-      await ChannelProduct.updateOrCreateMany(['channel_id', 'product_id'], productsList, {
-        client: transaction,
-      })
-
-      // Solo hacer commit si es nuestra propia transacción
-      if (!useExternalTransaction) {
-        await transaction.commit()
-      }
-
-      return {
-        success: true,
-        message: 'Canales sincronizados correctamente',
-        total: productsList.length,
-        meta: {
-          channel_id,
-          products_count: productsList.length,
-          timestamp: new Date().toISOString(),
-        },
-      }
-    } catch (error) {
-      // Solo hacer rollback si es nuestra propia transacción
-      if (!useExternalTransaction) {
-        await transaction.rollback()
-      }
-
-      this.logger.error('Error al sincronizar canal', {
-        channel_id,
-        products_count: products.length,
-        error: error.message,
-      })
-      return {
-        success: false,
-        message: 'Error al sincronizar canales',
-        error: error instanceof Error ? error.message : 'Error desconocido',
-      }
-    }
-  }
-
-  /**
-   * 🧹 Limpia todos los productos de un canal
-   * Responsabilidad: Eliminar todas las relaciones producto-canal de un canal específico
-   */
-  async clearChannelProducts(channel_id: number, trx?: any) {
-    const useExternalTransaction = !!trx
-    const transaction = trx || (await db.transaction())
-
-    try {
-      // Limpiar SOLO los registros del canal actual
-      const deletedCount = await ChannelProduct.query({ client: transaction })
-        .where('channel_id', channel_id)
-        .delete()
-
-      // Solo hacer commit si es nuestra propia transacción
-      if (!useExternalTransaction) {
-        await transaction.commit()
-      }
-
-      return {
-        success: true,
-        message: 'Productos del canal eliminados correctamente',
-        deleted_count: deletedCount,
-        meta: {
-          channel_id,
-          timestamp: new Date().toISOString(),
-        },
-      }
-    } catch (error) {
-      // Solo hacer rollback si es nuestra propia transacción
-      if (!useExternalTransaction) {
-        await transaction.rollback()
-      }
-
-      this.logger.error('Error al limpiar productos del canal', {
-        channel_id,
-        error: error.message,
-      })
-      return {
-        success: false,
-        message: 'Error al limpiar productos del canal',
-        error: error instanceof Error ? error.message : 'Error desconocido',
-      }
-    }
-  }
-
-  /**
-   * Obtiene estadísticas de canales
-   */
-  async getChannelStats() {
-    try {
-      const totalChannels = await Channel.query().count('* as total')
-      const totalRelations = await ChannelProduct.query().count('* as total')
-
-      return {
-        success: true,
-        data: {
-          total_channels: Number(totalChannels[0].$extras.total),
-          total_product_channel_relations: Number(totalRelations[0].$extras.total),
-        },
-      }
-    } catch (error) {
-      this.logger.error('Error al obtener estadísticas de canales', {
-        error: error.message,
-      })
-      throw error
-    }
-  }
-
-  /**
-   * Ejecuta todas las tareas de inicialización
-   */
-  async initialize(): Promise<void> {
-    try {
-      // Inicializar canales
-      await this.initializeChannels()
-    } catch (error) {
-      this.logger.error('Error en servicios de arranque', {
-        error: error.message,
-      })
-      throw error
-    }
+    formattedVariants: { product_id: number }[],
+    channelId: number,
+    trx: TransactionClientContract
+  ): Promise<void> {
+    const productIds = [...new Set(formattedVariants.map((v) => v.product_id))]
+    const allRelations = productIds.map((product_id) => ({ product_id, channel_id: channelId }))
+    if (allRelations.length === 0) return
+    await ChannelProduct.updateOrCreateMany(['channel_id', 'product_id'], allRelations, {
+      client: trx,
+    })
   }
 }

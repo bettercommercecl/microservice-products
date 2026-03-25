@@ -1,42 +1,93 @@
+import type { CalculationPort } from '#application/ports/calculation.port'
+import type { ProductRepositoryPort } from '#application/ports/product_repository.port'
+import { getSizesConfig } from '#config/sizes_config'
+import syncConfig from '#config/sync'
+import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
+import { toProductForFormatDTO } from '#infrastructure/mappers/product_format.mapper'
 import Product from '#models/product'
-import BigCommerceService from '#services/bigcommerce_service'
-
-import pLimit from 'p-limit'
+import CacheService from '#services/cache_service'
+import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
+import pLimit from 'p-limit'
+
+export type ProductsPaginatedMeta = {
+  total: number
+  perPage: number
+  currentPage: number
+  lastPage: number
+  firstPage: number
+  firstPageUrl: string
+  lastPageUrl: string
+  nextPageUrl: string | null
+  previousPageUrl: string | null
+}
+
+type ProductsByChannelResponse = {
+  data?: unknown[]
+  meta?: { pagination?: { total_pages?: number } }
+}
+
+export interface ProductServiceDeps {
+  cache: CacheService
+  bigCommerce: BigCommerceService
+  calculation: CalculationPort
+  productRepository: ProductRepositoryPort
+}
 
 export default class ProductService {
   private readonly logger = Logger.child({ service: 'ProductService' })
-  private readonly bigCommerceService = new BigCommerceService()
+  private readonly bigCommerceService: BigCommerceService
+  private readonly cache: CacheService
+  private readonly calculation: CalculationPort
+  private readonly productRepository: ProductRepositoryPort
+
+  constructor(deps: ProductServiceDeps) {
+    this.cache = deps.cache
+    this.bigCommerceService = deps.bigCommerce
+    this.calculation = deps.calculation
+    this.productRepository = deps.productRepository
+  }
 
   /**
-   * Obtiene todos los productos
+   * Obtiene todos los productos (cache Redis si esta configurado).
+   * Usa Product.all() y serialize() para mantener la misma estructura que las rutas antiguas.
    */
   async getAllProducts() {
+    const cacheKey = 'products:list'
     try {
-      const products = await Product.all()
-      return {
-        success: true,
-        data: products,
-      }
+      const cached = await this.cache.get(cacheKey)
+      if (cached) return JSON.parse(cached) as { success: true; data: unknown }
+
+      const products = await this.productRepository.findAll()
+      const data = (products as { serialize: () => unknown }[]).map((p) => p.serialize())
+      const result = { success: true as const, data }
+      await this.cache.set(cacheKey, JSON.stringify(result), syncConfig.cacheTtlProductsSeconds)
+      return result
     } catch (error) {
-      this.logger.error('Error obteniendo todos los productos', { error: error.message })
+      this.logger.error('Error obteniendo todos los productos', { error: (error as Error).message })
       throw new Error(
         `Error al obtener productos: ${error instanceof Error ? error.message : 'Error desconocido'}`
       )
     }
   }
+
   /**
-   * Obtiene un producto por ID
+   * Obtiene un producto por ID (cache Redis si esta configurado).
+   * Respuesta con la misma estructura que las rutas antiguas.
    */
   async getProductById(id: number) {
+    const cacheKey = `products:id:${id}`
     try {
-      const product = await Product.findOrFail(id)
-      return {
-        success: true,
-        data: product,
-      }
+      const cached = await this.cache.get(cacheKey)
+      if (cached) return JSON.parse(cached) as { success: true; data: unknown }
+
+      const product = await this.productRepository.findById(id)
+      if (!product) throw new Error(`Producto no encontrado: ${id}`)
+      const result = { success: true as const, data: (product as { serialize: () => unknown }).serialize() }
+      await this.cache.set(cacheKey, JSON.stringify(result), syncConfig.cacheTtlProductsSeconds)
+      return result
     } catch (error) {
-      this.logger.error('Error obteniendo producto por ID', { id, error: error.message })
+      this.logger.error('Error obteniendo producto por ID', { id, error: (error as Error).message })
       throw new Error(
         `Error al obtener producto: ${error instanceof Error ? error.message : 'Error desconocido'}`
       )
@@ -51,7 +102,11 @@ export default class ProductService {
       let allIds: number[] = []
 
       // 1. Primera petición para saber cuántas páginas hay
-      const firstResponse = await this.bigCommerceService.getProductsByChannel(channelId, 1, limit)
+      const firstResponse = (await this.bigCommerceService.getProductsByChannel(
+        channelId,
+        1,
+        limit
+      )) as ProductsByChannelResponse
       const { data: firstData, meta } = firstResponse
 
       if (!firstData || firstData.length === 0) {
@@ -62,7 +117,7 @@ export default class ProductService {
       allIds.push(...ids)
 
       // 2. Calcular total de páginas
-      const totalPages = meta && meta.pagination ? meta.pagination.total_pages : 1
+      const totalPages = meta?.pagination?.total_pages ?? 1
 
       if (totalPages === 1) {
         return allIds.filter(Boolean)
@@ -75,12 +130,12 @@ export default class ProductService {
       for (let page = 2; page <= totalPages; page++) {
         pagePromises.push(
           limitConcurrency(async () => {
-            const response = await this.bigCommerceService.getProductsByChannel(
+            const response = (await this.bigCommerceService.getProductsByChannel(
               channelId,
               page,
               limit
-            )
-            return response.data.map((item: any) => item.product_id || item.id)
+            )) as ProductsByChannelResponse
+            return (response.data ?? []).map((item: any) => item.product_id || item.id)
           })
         )
       }
@@ -97,5 +152,122 @@ export default class ProductService {
       })
       throw error
     }
+  }
+
+  /**
+   * Lista productos paginados para marcas
+   */
+  async getProductsPaginated(page: number, limit: number) {
+    const { data: items, meta } = await this.productRepository.findPaginated(page, limit)
+    const data = (items as { serialize: () => unknown }[]).map((p) => p.serialize())
+    return { success: true as const, data, meta }
+  }
+
+  /**
+   * Lista reseñas de productos paginadas (50 por página).
+   * Incluye sku de la primera variante (orden por id); aqui id y product_id coinciden con el catalogo.
+   */
+  async getProductReviewsPaginated(page: number, limit: number) {
+    const { data: items, meta } = await this.productRepository.findReviewsPaginated(page, limit)
+    const products = items as Product[]
+
+    const data = products
+      .map((product) => this.mapProductToReviewsPayload(product))
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+
+    return { success: true as const, data, meta }
+  }
+
+  private firstVariantSku(product: Product): string | null {
+    const sku = product.variants?.[0]?.sku
+    if (typeof sku !== 'string' || sku.trim() === '') return null
+    return sku.trim()
+  }
+
+  /**
+   * La columna reviews en DB suele venir como string; el modelo solo parsea en serialize().
+   * Sin esto, mapProductToReviewsPayload ve string y devuelve null para todo.
+   */
+  private normalizeReviewsFromProduct(raw: unknown): unknown {
+    if (raw == null) return null
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim()
+      if (!trimmed) return null
+      try {
+        return JSON.parse(trimmed) as unknown
+      } catch {
+        return null
+      }
+    }
+    return raw
+  }
+
+  private mapProductToReviewsPayload(product: Product): {
+    product_id: number | undefined
+    sku: string | null
+    quantity?: number
+    rating?: number
+    reviews: unknown[]
+  } | null {
+    const productId = typeof product.product_id === 'number' ? product.product_id : undefined
+    const sku = this.firstVariantSku(product)
+    const reviewsValue = this.normalizeReviewsFromProduct(product.reviews)
+    if (reviewsValue == null) return null
+
+    if (typeof reviewsValue === 'object' && !Array.isArray(reviewsValue)) {
+      const obj = reviewsValue as Record<string, unknown>
+      const list = Array.isArray(obj.reviews) ? obj.reviews : []
+      if (list.length === 0) return null
+      return {
+        product_id:
+          productId ?? (typeof obj.product_id === 'number' ? (obj.product_id as number) : undefined),
+        sku,
+        quantity: typeof obj.quantity === 'number' ? obj.quantity : undefined,
+        rating: typeof obj.rating === 'number' ? obj.rating : undefined,
+        reviews: list,
+      }
+    }
+
+    if (Array.isArray(reviewsValue)) {
+      if (reviewsValue.length === 0) return null
+      return {
+        product_id: productId,
+        sku,
+        quantity: reviewsValue.length,
+        rating: undefined,
+        reviews: reviewsValue,
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * Lista productos de un canal en el formato que consumen y guardan las marcas.
+   */
+  async getProductsByChannel(
+    channelId: number,
+    page: number,
+    limit: number,
+    parentCategoryId?: number
+  ): Promise<{ success: true; data: unknown[]; meta: ProductsPaginatedMeta }> {
+    const { data: items, meta } = await this.productRepository.findPaginatedByChannel(
+      channelId,
+      page,
+      limit,
+      parentCategoryId
+    )
+    const { formatProductForMarcas } = await import('#application/formatters/products_by_channel_formatter')
+    const options = {
+      percentTransfer: Number(env.get('PERCENT_DISCOUNT_TRANSFER_PRICE')) || 2,
+      idPacks: env.get('ID_PACKS') != null ? Number(env.get('ID_PACKS')) : undefined,
+      sizesConfig: getSizesConfig(),
+    }
+    const data = await Promise.all(
+      (items as Product[]).map((p) =>
+        formatProductForMarcas(toProductForFormatDTO(p), this.calculation, options)
+      )
+    )
+    return { success: true, data, meta: meta as ProductsPaginatedMeta }
   }
 }

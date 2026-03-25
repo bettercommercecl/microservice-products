@@ -1,0 +1,434 @@
+{
+  "info": {
+    "name": "Products API",
+    "description": "Rutas del microservicio de productos. Cambiar variable `baseUrl` o usar entornos (CL, CO, PE, Local, 127).\n\nNotas:\n- Sync v2 oficial vive bajo /api/sync/*\n- Sync v1 legacy se mantiene bajo /api/sincronizar-* (por compatibilidad con producción)\n- Se eliminaron aliases v2 antiguos (/api/sync/v1/* y /api/sincronizar-*) para reducir ambigüedad.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{M2M_API_KEY_CURRENT}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3333/api" },
+    { "key": "M2M_API_KEY_CURRENT", "value": "" },
+    { "key": "baseUrlcl", "value": "https://products.bettercommerce.cl/api" },
+    { "key": "baseUrlco", "value": "https://co.products.bettercommerce.cl/api" },
+    { "key": "baseUrlpe", "value": "https://pe.products.bettercommerce.cl/api" },
+    { "key": "baseUrltest", "value": "http://test.products.bettercommerce.cl/api" },
+    { "key": "baseUrl127", "value": "http://127.0.0.1:3333/api" }
+  ],
+  "item": [
+    {
+      "name": "Brands",
+      "item": [
+        {
+          "name": "Listar marcas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/brands", "host": ["{{baseUrl}}"], "path": ["brands"] }
+          }
+        },
+        {
+          "name": "Obtener marca por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/brands/1", "host": ["{{baseUrl}}"], "path": ["brands", "1"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "Listar categorias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/categories", "host": ["{{baseUrl}}"], "path": ["categories"] }
+          }
+        },
+        {
+          "name": "Obtener categoria por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/categories/1", "host": ["{{baseUrl}}"], "path": ["categories", "1"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Channels",
+      "item": [
+        {
+          "name": "Listar canales",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels", "host": ["{{baseUrl}}"], "path": ["channels"] } }
+        },
+        {
+          "name": "Canales con productos",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels/with-products", "host": ["{{baseUrl}}"], "path": ["channels", "with-products"] } }
+        },
+        {
+          "name": "Canales por pais",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels/by-country", "host": ["{{baseUrl}}"], "path": ["channels", "by-country"] } }
+        },
+        {
+          "name": "Canal por nombre",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels/name/UF", "host": ["{{baseUrl}}"], "path": ["channels", "name", "UF"] } }
+        },
+        {
+          "name": "Obtener canal por ID",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/channels/1", "host": ["{{baseUrl}}"], "path": ["channels", "1"] } }
+        },
+        {
+          "name": "Crear canal",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"MARCA\"\n}" },
+            "url": { "raw": "{{baseUrl}}/channels", "host": ["{{baseUrl}}"], "path": ["channels"] }
+          }
+        },
+        {
+          "name": "Actualizar canal",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"MARCA\"\n}" },
+            "url": { "raw": "{{baseUrl}}/channels/1", "host": ["{{baseUrl}}"], "path": ["channels", "1"] }
+          }
+        },
+        {
+          "name": "Eliminar canal",
+          "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/channels/1", "host": ["{{baseUrl}}"], "path": ["channels", "1"] } }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Listar productos",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/products", "host": ["{{baseUrl}}"], "path": ["products"] } }
+        },
+        {
+          "name": "Reseñas de productos (paginado 50)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/reviews/paginated?page=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "reviews", "paginated"],
+              "query": [{ "key": "page", "value": "1", "description": "Página (50 registros por página)" }]
+            }
+          }
+        },
+        {
+          "name": "Productos paginados (estructura tabla)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/paginated?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "paginated"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Pagina" },
+                { "key": "limit", "value": "50", "description": "Registros por pagina (max 200)" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Productos por canal (channel_id o brand)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/by-channel?channel_id=1&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "by-channel"],
+              "query": [
+                { "key": "channel_id", "value": "1", "description": "ID del canal (numero)" },
+                { "key": "brand", "value": "UF", "description": "Nombre del canal (alternativa a channel_id)" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Obtener producto por ID",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/products/1", "host": ["{{baseUrl}}"], "path": ["products", "1"] } }
+        },
+        {
+          "name": "Sync stats por canal",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync-stats/1", "host": ["{{baseUrl}}"], "path": ["sync-stats", "1"] } }
+        }
+      ]
+    },
+    {
+      "name": "Variants",
+      "item": [
+        {
+          "name": "Listar variantes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/variants?channel=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["variants"],
+              "query": [{"key": "channel", "value": "1", "description": "ID canal opcional"}]
+            }
+          }
+        },
+        {
+          "name": "Variantes paginadas (estructura tabla)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/variants/paginated?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["variants", "paginated"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50", "description": "Max 200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Variantes por canal (channel_id o brand)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/variants/by-channel?channel_id=1&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["variants", "by-channel"],
+              "query": [
+                { "key": "channel_id", "value": "1", "description": "ID del canal" },
+                { "key": "brand", "value": "UF", "description": "Nombre del canal (alternativa)" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Variantes formateadas por IDs",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [1, 2, 3]\n}" },
+            "url": { "raw": "{{baseUrl}}/variants/formatted-by-ids", "host": ["{{baseUrl}}"], "path": ["variants", "formatted-by-ids"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Packs (estructura tabla)",
+      "item": [
+        {
+          "name": "Packs paginados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/packs/paginated?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["packs", "paginated"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50", "description": "Max 200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Packs por canal (channel_id o brand)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/packs/by-channel?channel_id=1&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["packs", "by-channel"],
+              "query": [
+                { "key": "channel_id", "value": "1" },
+                { "key": "brand", "value": "UF" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Options (estructura tabla)",
+      "item": [
+        {
+          "name": "Options paginados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/options/paginated?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["options", "paginated"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50", "description": "Max 200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Options por canal (channel_id o brand)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/options/by-channel?channel_id=1&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["options", "by-channel"],
+              "query": [
+                { "key": "channel_id", "value": "1" },
+                { "key": "brand", "value": "UF" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Category products (estructura tabla)",
+      "item": [
+        {
+          "name": "Category products paginados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/category-products/paginated?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["category-products", "paginated"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50", "description": "Max 200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Category products por canal (channel_id o brand)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/category-products/by-channel?channel_id=1&page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["category-products", "by-channel"],
+              "query": [
+                { "key": "channel_id", "value": "1" },
+                { "key": "brand", "value": "UF" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalog safe stocks",
+      "item": [
+        {
+          "name": "Catalog safe stocks (paginado sin timestamps)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalog-safe-stocks?page=1&limit=1000",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog-safe-stocks"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Página" },
+                { "key": "limit", "value": "1000", "description": "Registros por página (max 2000)" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sync (v1 legacy)",
+      "description": "Legacy (v1). Mantener para no romper flujos en producción. Productos se sincroniza por canal: /sincronizar-productos/:channel_id.",
+      "item": [
+        {
+          "name": "Sincronizar productos por canal",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-productos/1", "host": ["{{baseUrl}}"], "path": ["sincronizar-productos", "1"] } }
+        },
+        {
+          "name": "Sincronizar categorias",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-categorias", "host": ["{{baseUrl}}"], "path": ["sincronizar-categorias"] } }
+        },
+        {
+          "name": "Sincronizar marcas",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-marcas", "host": ["{{baseUrl}}"], "path": ["sincronizar-marcas"] } }
+        },
+        {
+          "name": "Sincronizar canales",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sincronizar-canales", "host": ["{{baseUrl}}"], "path": ["sincronizar-canales"] } }
+        }
+      ]
+    },
+    {
+      "name": "Sync (v2 oficial)",
+      "description": "Superficie oficial v2. Usar estos endpoints para sincronizaciones globales y tareas individuales.",
+      "item": [
+        {
+          "name": "Sync completo",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/completo", "host": ["{{baseUrl}}"], "path": ["sync", "completo"] } }
+        },
+        {
+          "name": "Sync marcas",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/marcas", "host": ["{{baseUrl}}"], "path": ["sync", "marcas"] } }
+        },
+        {
+          "name": "Sync categorias",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/categorias", "host": ["{{baseUrl}}"], "path": ["sync", "categorias"] } }
+        },
+        {
+          "name": "Sync canales",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/canales", "host": ["{{baseUrl}}"], "path": ["sync", "canales"] } }
+        },
+        {
+          "name": "Sync productos",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/productos", "host": ["{{baseUrl}}"], "path": ["sync", "productos"] } }
+        },
+        {
+          "name": "Sync packs",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/packs", "host": ["{{baseUrl}}"], "path": ["sync", "packs"] } }
+        },
+        {
+          "name": "Sync packs reserva",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/packs-reserva", "host": ["{{baseUrl}}"], "path": ["sync", "packs-reserva"] } }
+        },
+        {
+          "name": "Sync stock",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/stock", "host": ["{{baseUrl}}"], "path": ["sync", "stock"] } }
+        }
+      ]
+    }
+  ]
+}

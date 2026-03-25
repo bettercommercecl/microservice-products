@@ -1,12 +1,12 @@
 import { BigcommerceProductVariant } from '#dto/bigcommerce/bigcommerce_product.dto'
 import { ChannelConfigInterface } from '#interfaces/channel_interface'
 import { FormattedProduct, FormattedVariantForModel } from '#interfaces/formatted_product.interface'
-import CatalogSafeStock from '#models/catalog.safe.stock'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 import Category from '#models/category'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import pLimit from 'p-limit'
-import CalculationService from './calculation_service.js'
+import type { CalculationPort } from '#application/ports/calculation.port'
 import CategoriesService from './categories_service.js'
 import ImageProcessingService from './image_processing_service.js'
 import PriceService from './price_service.js'
@@ -17,11 +17,15 @@ type FormattedProductWithModelVariants = Omit<FormattedProduct, 'variants'> & {
   variants: FormattedVariantForModel[]
 }
 
+export interface FormatVariantsServiceDeps {
+  calculation: CalculationPort
+}
+
 export default class FormatVariantsService {
   private readonly logger = Logger.child({ service: 'FormatVariantsService' })
   private readonly country = env.get('COUNTRY_CODE')
   private readonly priceService: PriceService
-  private readonly calculationService: CalculationService
+  private readonly calculation: CalculationPort
   private readonly imageProcessingService: ImageProcessingService
   private readonly categoriesService: CategoriesService
   // Constantes para valores por defecto
@@ -34,9 +38,9 @@ export default class FormatVariantsService {
     discount_rate: '0%',
   }
 
-  constructor() {
+  constructor(deps: FormatVariantsServiceDeps) {
     this.priceService = new PriceService()
-    this.calculationService = new CalculationService()
+    this.calculation = deps.calculation
     this.imageProcessingService = new ImageProcessingService()
     this.categoriesService = new CategoriesService()
   }
@@ -190,11 +194,11 @@ export default class FormatVariantsService {
   ) {
     try {
       if (this.country === 'CL') {
-        const discount = this.calculationService.calculateDiscount(
+        const discount = this.calculation.calculateDiscount(
           variant.price,
           variant.sale_price || variant.calculated_price
         )
-        const percentDiscount = this.calculationService.calculateTransferPrice(
+        const percentDiscount = this.calculation.calculateTransferPrice(
           variant.price,
           variant.sale_price || variant.calculated_price,
           PERCENT_DISCOUNT_TRANSFER_PRICE
@@ -215,11 +219,11 @@ export default class FormatVariantsService {
         }
 
         // Usar precios de PriceService si están disponibles
-        const discount = this.calculationService.calculateDiscount(
+        const discount = this.calculation.calculateDiscount(
           prices.price,
           prices.calculatedPrice
         )
-        const percentDiscount = this.calculationService.calculateTransferPrice(
+        const percentDiscount = this.calculation.calculateTransferPrice(
           prices.price,
           prices.calculatedPrice,
           PERCENT_DISCOUNT_TRANSFER_PRICE
@@ -402,7 +406,7 @@ export default class FormatVariantsService {
 
     // Verificar si los precios son 0 para marcar como no visible
     const hasZeroPrices = prices.normal_price === 0 && prices.discount_price === 0
-    const calculatedWeight = this.calculationService.calculateVolumetricWeight(
+    const calculatedWeight = this.calculation.calculateVolumetricWeight(
       variant.width,
       variant.depth,
       variant.height,
@@ -455,6 +459,7 @@ export default class FormatVariantsService {
       related_products: product.related_products ? product.related_products : null,
       option_label: variant.option_values?.[0]?.label || null,
       keywords: keywords,
+      reserve: product.reserve || null,
       is_visible: hasZeroPrices ? false : product.is_visible,
     }
   }

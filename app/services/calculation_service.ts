@@ -76,7 +76,7 @@ export default class CalculationService {
       const volumetric = (width * depth * height) / 4000
 
       // Perú usa peso real, otros países usan el mayor entre volumétrico y real
-      if (countryCode === 'PE') {
+      if (countryCode !== 'CL') {
         return weight
       }
 
