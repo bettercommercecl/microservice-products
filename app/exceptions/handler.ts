@@ -1,158 +1,117 @@
 import app from '@adonisjs/core/services/app'
 import { HttpContext, ExceptionHandler } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
+import { DomainException, type ErrorContext } from '#domain/exceptions/domain_exception'
+import { buildUnifiedErrorResponse } from './unified_error_response.js'
+import { extractDbError } from '#utils/db_error_extractor'
 
 export default class HttpExceptionHandler extends ExceptionHandler {
-  /**
-   * In debug mode, the exception handler will display verbose errors
-   * with pretty printed stack traces.
-   */
   protected debug = !app.inProduction
 
-  /**
-   * The method is used for handling errors and returning
-   * response to the client
-   */
   async handle(error: unknown, ctx: HttpContext) {
     const logger = Logger.child({ service: 'GlobalExceptionHandler' })
 
     try {
-      // Identificar el tipo de error y manejarlo apropiadamente
-      const errorResponse = this.handleError(error, ctx, logger)
-
-      // 📝 Log del error para debugging
+      if (this.isNotFoundError(error) && ctx.request.url().includes('favicon.ico')) {
+        return ctx.response.status(204).send('')
+      }
+      const { body, statusCode } = this.buildResponse(error, ctx)
       this.logError(error, ctx, logger)
-
-      return errorResponse
+      return ctx.response.status(statusCode).json(body)
     } catch (handlerError) {
-      // 🚨 Si el manejador falla, usar fallback básico
       logger.error('Error en el manejador de excepciones:', handlerError)
-      return ctx.response.internalServerError({
-        success: false,
-        message: 'Error interno del servidor',
-        data: null,
-        meta: { timestamp: new Date().toISOString() },
-      })
+      const { body, statusCode } = buildUnifiedErrorResponse(
+        new Error('Error interno del manejador'),
+        { statusCode: 500 }
+      )
+      return ctx.response.status(statusCode).json(body)
     }
   }
 
   /**
-   * Maneja diferentes tipos de errores y retorna respuestas apropiadas
+   * Construye la respuesta unificada segun el tipo de error.
+   * Siempre devuelve la misma estructura { success, message, error, context?, meta }.
    */
-  private handleError(error: unknown, ctx: HttpContext, logger: any) {
-    const response = ctx.response
-
-    // 🚫 Error de validación (VineJS)
+  private buildResponse(
+    error: unknown,
+    _ctx: HttpContext
+  ): { body: ReturnType<typeof buildUnifiedErrorResponse>['body']; statusCode: number } {
     if (this.isValidationError(error)) {
-      logger.warn('Error de validación detectado:', error.message)
-      return response.badRequest({
-        success: false,
-        message: 'Error de validación en los datos de entrada',
-        data: null,
-        errors: this.extractValidationErrors(error),
-        meta: {
-          timestamp: new Date().toISOString(),
+      return {
+        body: {
+          success: false,
+          message: 'Error de validacion en los datos de entrada',
+          error: (error as Error).message,
+          context: { type: 'validation', errors: this.extractValidationErrors(error) },
+          meta: { timestamp: new Date().toISOString() },
         },
-      })
-    }
-
-    // 🔐 Error de autenticación/autorización
-    if (this.isAuthError(error)) {
-      logger.warn('🚫 Error de autenticación/autorización:', error.message)
-      return response.forbidden({
-        success: false,
-        message: 'Acceso denegado',
-        data: null,
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      })
-    }
-
-    // Error de recurso no encontrado
-    if (this.isNotFoundError(error)) {
-      // Manejo especial para favicon.ico
-      if (ctx.request.url().includes('favicon.ico')) {
-        logger.debug('Favicon request ignorado:', ctx.request.url())
-        return response.status(204).send('') // No Content
+        statusCode: 400,
       }
-
-      logger.warn('Recurso no encontrado:', error.message)
-      return response.notFound({
-        success: false,
-        message: 'Recurso no encontrado',
-        data: null,
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      })
     }
 
-    // 🌐 Error de Axios/HTTP
+    if (this.isAuthError(error)) {
+      return {
+        body: buildUnifiedErrorResponse(error, {
+          statusCode: 403,
+          overrideMessage: 'Acceso denegado',
+        }).body,
+        statusCode: 403,
+      }
+    }
+
+    if (this.isNotFoundError(error)) {
+      return {
+        body: buildUnifiedErrorResponse(error, {
+          statusCode: 404,
+          overrideMessage: 'Recurso no encontrado',
+        }).body,
+        statusCode: 404,
+      }
+    }
+
     if (this.isAxiosError(error)) {
-      logger.error('🌐 Error de API externa:', error.message)
-      return response.status(502).json({
-        success: false,
-        message: 'Error en servicio externo',
-        data: null,
-        errors: [{ field: 'external_api', message: error.message, code: 'EXTERNAL_API_ERROR' }],
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      })
+      const { body, statusCode } = buildUnifiedErrorResponse(error, { statusCode: 502 })
+      body.context = { ...body.context, type: 'external' as const }
+      return { body, statusCode }
     }
 
-    //  Error de base de datos
     if (this.isDatabaseError(error)) {
-      logger.error(' Error de base de datos:', error.message)
-      return response.status(500).json({
-        success: false,
-        message: 'Error en la base de datos',
-        data: null,
-        errors: [
-          { field: 'database', message: 'Error interno de base de datos', code: 'DATABASE_ERROR' },
-        ],
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
+      const dbError = extractDbError(error)
+      const e = error as Error & { dbError?: Record<string, unknown> }
+      if (!e.dbError) (e as any).dbError = dbError
+      const { body, statusCode } = buildUnifiedErrorResponse(error, {
+        statusCode: 500,
+        overrideMessage: 'Error en la base de datos',
       })
+      body.context = { ...body.context, type: 'database' as const }
+      return { body, statusCode }
     }
 
-    // 📝 Error de TypeScript/compilación
+    if (error instanceof DomainException) {
+      const e = error as Error & { bcContext?: ErrorContext; dbError?: Record<string, unknown> }
+      e.bcContext = error.context
+      e.dbError = error.context?.dbError as Record<string, unknown>
+      const { body, statusCode } = buildUnifiedErrorResponse(error, {
+        statusCode: error.statusCode,
+      })
+      if (error.context) body.context = { ...body.context, ...error.context }
+      return { body, statusCode }
+    }
+
     if (this.isTypeError(error)) {
-      logger.error('📝 Error de tipo:', error.message)
-      return response.status(500).json({
-        success: false,
-        message: 'Error interno del sistema',
-        data: null,
-        errors: [{ field: 'system', message: 'Error de tipo interno', code: 'TYPE_ERROR' }],
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
+      const { body, statusCode } = buildUnifiedErrorResponse(error, {
+        statusCode: 500,
+        overrideMessage: 'Error interno del sistema',
       })
+      if (body.context) body.context.type = 'business'
+      return { body, statusCode }
     }
 
-    // ⚡ Error interno del servidor (fallback)
-    logger.error('⚡ Error interno no manejado:', {
-      error: error instanceof Error ? error.message : String(error),
-      name: error instanceof Error ? error.name : 'Unknown',
-      stack: error instanceof Error ? error.stack : undefined,
-      type: typeof error,
-      constructor: error?.constructor?.name,
+    const { body, statusCode } = buildUnifiedErrorResponse(error, {
+      statusCode: 500,
+      includeDebug: this.debug,
     })
-    return response.internalServerError({
-      success: false,
-      message: this.debug
-        ? error instanceof Error
-          ? error.message
-          : 'Error interno del servidor'
-        : 'Error interno del servidor',
-      data: null,
-      meta: {
-        timestamp: new Date().toISOString(),
-        debug: this.debug && error instanceof Error ? error.stack : undefined,
-      },
-    })
+    return { body, statusCode }
   }
 
   /**
@@ -278,17 +237,17 @@ export default class HttpExceptionHandler extends ExceptionHandler {
    */
   async report(error: unknown, ctx: HttpContext) {
     const logger = Logger.child({ service: 'GlobalExceptionHandler' })
+    const e = error as Error & { bcContext?: unknown; dbError?: unknown }
 
-    // Reportar error a servicios externos (Sentry, LogRocket, etc.)
     if (app.inProduction) {
       try {
-        // Aquí puedes integrar con servicios de monitoreo
-        // await Sentry.captureException(error)
-        // await LogRocket.captureException(error)
-
-        logger.error('Error reportado a servicios externos:', error)
+        logger.error('Error reportado:', {
+          message: e?.message,
+          bcContext: e?.bcContext,
+          dbError: e?.dbError,
+        })
       } catch (reportError) {
-        logger.error('Error al reportar a servicios externos:', reportError)
+        logger.error('Error al reportar:', reportError)
       }
     }
 

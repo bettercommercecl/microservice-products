@@ -1,9 +1,10 @@
+import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
 import Category from '#models/category'
 import CategoryProduct from '#models/category_product'
-import BigCommerceService from '#services/bigcommerce_service'
 import Logger from '@adonisjs/core/services/logger'
 import pLimit from 'p-limit'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 
 export default class CategoryService {
   private readonly logger = Logger.child({ service: 'CategoryService' })
@@ -28,11 +29,22 @@ export default class CategoryService {
    * Sincroniza las categorías desde BigCommerce
    */
   async syncCategories() {
+    type BCCategory = {
+      category_id: number
+      name?: string
+      url?: { path?: string }
+      parent_id?: number
+      sort_order?: number
+      image_url?: string
+      is_visible?: number
+      tree_id?: number | null
+    }
+
     try {
       const bigCommerceService = new BigCommerceService()
       const categories = await bigCommerceService.getCategories()
 
-      if (categories.length === 0) {
+      if (!Array.isArray(categories) || categories.length === 0) {
         return {
           success: true,
           message: 'No hay categorías para sincronizar',
@@ -40,15 +52,14 @@ export default class CategoryService {
         }
       }
 
-      // OPTIMIZACIÓN: Preparar datos para operación masiva
-      const categoriesData = categories.map((categoryData) => ({
+      const categoriesData = (categories as BCCategory[]).map((categoryData) => ({
         category_id: categoryData.category_id,
         title: categoryData.name,
         url: categoryData.url ? categoryData.url.path : '',
         parent_id: categoryData.parent_id,
         order: categoryData.sort_order,
         image: categoryData.image_url,
-        is_visible: categoryData.is_visible,
+        is_visible: Boolean(categoryData.is_visible),
         tree_id: categoryData.tree_id || null,
       }))
 
@@ -75,7 +86,7 @@ export default class CategoryService {
 
         // FALLBACK: Si falla la masiva, usar la estrategia individual como respaldo
         const results = await Promise.all(
-          categories.map(async (categoryData) => {
+          (categories as BCCategory[]).map(async (categoryData) => {
             try {
               const searchPayload = { category_id: categoryData.category_id }
               const persistancePayload = {
@@ -85,7 +96,7 @@ export default class CategoryService {
                 parent_id: categoryData.parent_id,
                 order: categoryData.sort_order,
                 image: categoryData.image_url,
-                is_visible: categoryData.is_visible,
+                is_visible: Boolean(categoryData.is_visible),
                 tree_id: categoryData.tree_id || null,
               }
 
@@ -100,7 +111,7 @@ export default class CategoryService {
               this.logger.warn('Error al sincronizar categoría', {
                 category_name: categoryData.name,
                 category_id: categoryData.category_id,
-                error: error.message,
+                error: (error as Error).message,
               })
               return {
                 error: true,
@@ -112,7 +123,7 @@ export default class CategoryService {
         )
 
         // Filtrar solo las categorías que fallaron
-        const failedCategories = results.filter((result) => result.error)
+        const failedCategories = results.filter((r: { error: boolean }) => r.error)
 
         if (failedCategories.length > 0) {
           this.logger.warn('Fallaron categorías en sincronización individual', {
@@ -384,5 +395,87 @@ export default class CategoryService {
       .pojo()
 
     return childsCategories
+  }
+
+  /**
+   * Limpieza de relaciones producto-categoría huérfanas antes de guardar un lote nuevo.
+   * Elimina relaciones existentes que no están en el lote a guardar.
+   */
+  async cleanupOrphanedCategoryProducts(
+    productIds: number[],
+    newRelationsToSave: { product_id: number; category_id: number }[],
+    trx: TransactionClientContract
+  ): Promise<number> {
+    try {
+      this.logger.info('Limpieza de categorías huérfanas antes de guardar...')
+
+      if (newRelationsToSave.length === 0) {
+        this.logger.info('No hay relaciones nuevas para guardar, eliminando todas las existentes')
+        const deleted = await CategoryProduct.query({ client: trx })
+          .whereIn('product_id', productIds)
+          .delete()
+        const totalDeleted = Array.isArray(deleted) ? deleted.length : deleted
+        this.logger.info(`Categorías eliminadas: ${totalDeleted}`)
+        return totalDeleted
+      }
+
+      const newRelationsSet = new Set(
+        newRelationsToSave.map((rel) => `${rel.product_id}-${rel.category_id}`)
+      )
+      this.logger.info(`Relaciones que se van a guardar: ${newRelationsToSave.length}`)
+
+      const existingRelations = await CategoryProduct.query({ client: trx })
+        .whereIn('product_id', productIds)
+        .select('product_id', 'category_id')
+      this.logger.info(`Relaciones existentes en BD: ${existingRelations.length}`)
+
+      const orphanedRelations = existingRelations.filter((rel) => {
+        const key = `${rel.product_id}-${rel.category_id}`
+        return !newRelationsSet.has(key)
+      })
+
+      if (orphanedRelations.length === 0) {
+        this.logger.info('No hay categorías huérfanas para eliminar')
+        return 0
+      }
+
+      this.logger.info(`Categorías huérfanas detectadas: ${orphanedRelations.length}`)
+
+      const limit = pLimit(20)
+      const batchSize = 1000
+      const batches: { product_id: number; category_id: number }[][] = []
+      for (let i = 0; i < orphanedRelations.length; i += batchSize) {
+        batches.push(orphanedRelations.slice(i, i + batchSize))
+      }
+
+      const batchPromises = batches.map((batch) =>
+        limit(async () => {
+          let deleted = 0
+          for (const relation of batch) {
+            try {
+              const result = await CategoryProduct.query({ client: trx })
+                .where('product_id', relation.product_id)
+                .where('category_id', relation.category_id)
+                .delete()
+              deleted += Array.isArray(result) ? result.length : result
+            } catch (error) {
+              this.logger.error(
+                { error },
+                `Error eliminando categoría huérfana ${relation.product_id}-${relation.category_id}`
+              )
+            }
+          }
+          return deleted
+        })
+      )
+
+      const results = await Promise.all(batchPromises)
+      const totalDeleted = results.reduce((sum, count) => sum + count, 0)
+      this.logger.info(`Categorías huérfanas eliminadas: ${totalDeleted}`)
+      return totalDeleted
+    } catch (error) {
+      this.logger.error({ error }, 'Error en limpieza de categorías antes de guardar')
+      return 0
+    }
   }
 }

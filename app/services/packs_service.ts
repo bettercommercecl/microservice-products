@@ -32,10 +32,10 @@ export default class PacksService {
       )
       const response = await axios.get(`${this.channelConfig.API_URL}/api/packs`, {
         headers: {
-          'x-api-key': env.get('X_API_KEY'),
+          'x-api-key': env.get('X_API_KEY') ?? '',
         },
       })
-      return response.data
+      return response.data as PackItem[]
     } catch (error) {
       this.logger.error({ error }, 'Error obteniendo packs')
       throw error

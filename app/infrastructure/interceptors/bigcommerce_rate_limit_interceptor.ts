@@ -1,6 +1,5 @@
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
+import { AxiosError, AxiosRequestConfig, AxiosResponse, type AxiosInstance } from 'axios'
 import Logger from '@adonisjs/core/services/logger'
-import env from '#start/env'
 
 type AxiosRequestConfigWithRetry = AxiosRequestConfig & { _retryCount?: number }
 
@@ -25,45 +24,39 @@ export default class BigcommerceRateLimitInterceptor {
     return BigcommerceRateLimitInterceptor.instance
   }
 
-  public setup(): void {
-    axios.interceptors.request.use(
+  /**
+   * Registra interceptores sobre la instancia de axios dedicada a BigCommerce.
+   * Ya no se valida si el request es de BigCommerce porque el cliente
+   * solo se usa para eso.
+   */
+  public setup(client: AxiosInstance): void {
+    const clientWithInterceptors = client as AxiosInstance & {
+      interceptors: { request: { use: (onFulfilled?: (c: unknown) => unknown, onRejected?: (e: unknown) => unknown) => number }; response: { use: (onFulfilled?: (r: AxiosResponse) => AxiosResponse | Promise<AxiosResponse>, onRejected?: (e: unknown) => unknown) => number } }
+      request: (config: AxiosRequestConfig) => Promise<unknown>
+    }
+    clientWithInterceptors.interceptors.request.use(
       async (config: any) => {
-        if (this.isBigcommerceRequest(config)) {
-          await this.handlePreRequest(config)
-        }
+        await this.handlePreRequest(config)
         return config
       },
-      (error) => Promise.reject(error)
+      (error: unknown) => Promise.reject(error)
     )
 
-    axios.interceptors.response.use(
+    clientWithInterceptors.interceptors.response.use(
       (response: AxiosResponse) => {
-        if (this.isBigcommerceRequest(response.config)) {
-          this.handleSuccessResponse(response)
-        }
+        this.handleSuccessResponse(response)
         return response
       },
-      async (error: AxiosError) => {
-        if (error.config && this.isBigcommerceRequest(error.config)) {
-          return await this.handleErrorResponse(error)
+      async (error: unknown) => {
+        const axiosError = error as AxiosError
+        if (axiosError.config) {
+          return await this.handleErrorResponse(axiosError, clientWithInterceptors)
         }
         return Promise.reject(error)
       }
     )
 
-    Logger.info('✅ BigCommerce Rate Limit Interceptor configurado')
-  }
-
-  private isBigcommerceRequest(config: AxiosRequestConfig): boolean {
-    const url = config.url || ''
-    const baseURL = config.baseURL || ''
-    const fullUrl = (baseURL + url).toLowerCase()
-    const bigcommerceUrl = env.get('BIGCOMMERCE_API_URL', '').toLowerCase()
-
-    return (
-      fullUrl.includes('api.bigcommerce.com') ||
-      (!!bigcommerceUrl && fullUrl.includes(bigcommerceUrl))
-    )
+    Logger.info('BigCommerce Rate Limit Interceptor configurado sobre cliente dedicado')
   }
 
   private async handlePreRequest(_config: AxiosRequestConfig): Promise<void> {
@@ -132,12 +125,12 @@ export default class BigcommerceRateLimitInterceptor {
     }
   }
 
-  private async handleErrorResponse(error: AxiosError): Promise<any> {
+  private async handleErrorResponse(error: AxiosError, client: AxiosInstance): Promise<any> {
     const status = error.response?.status
     const config = error.config as AxiosRequestConfigWithRetry
 
     if (status === 429) {
-      const headers = error.response?.headers || {}
+      const headers = (error.response as AxiosResponse | undefined)?.headers ?? {}
       const timeResetMsHeader = this.getHeaderValue(headers, 'x-rate-limit-time-reset-ms')
       const timeResetMs = this.parseIntHeader(timeResetMsHeader, 30000)
 
@@ -145,15 +138,15 @@ export default class BigcommerceRateLimitInterceptor {
 
       if (config._retryCount <= this.MAX_RETRIES) {
         Logger.warn(
-          `🔄 Rate limit excedido (429). Reintento ${config._retryCount}/${this.MAX_RETRIES} después de ${timeResetMs}ms`
+          `Rate limit excedido (429). Reintento ${config._retryCount}/${this.MAX_RETRIES} después de ${timeResetMs}ms`
         )
         await this.sleep(timeResetMs + 500)
         this.requestsLeft = this.quota
         this.timeResetMs = 0
 
-        return axios.request(config)
+        return (client as unknown as { request(config: AxiosRequestConfig): Promise<unknown> }).request(config)
       } else {
-        Logger.error(`❌ Rate limit excedido después de ${this.MAX_RETRIES} reintentos`)
+        Logger.error(`Rate limit excedido después de ${this.MAX_RETRIES} reintentos`)
         throw new Error(`Rate limit excedido después de ${this.MAX_RETRIES} intentos`)
       }
     }

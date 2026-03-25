@@ -45,6 +45,9 @@ export interface FormattedVariantForModel {
   option_label: string | null
   keywords: string
 
+  // Reserva (fecha de reserva desde n8n)
+  reserve: string | null
+
   // Control de visibilidad
   is_visible: boolean
 }

@@ -1,25 +1,44 @@
 import Variant from '#models/variant'
 import Product from '#models/product'
-import CategoryService from '#services/categories_service'
+import CatalogSafeStock from '#models/catalog_safe_stock'
+import InventoryReserve from '#models/inventory_reserve'
+import type { CalculationPort } from '#application/ports/calculation.port'
+import type { VariantRepositoryPort } from '#application/ports/variant_repository.port'
+import ProductTagsCampaignsService from '#services/product_tags_campaigns_service'
+import {
+  toInventoryForFormatDTO,
+  toReserveForFormatDTO,
+  toVariantForFormatDTO,
+} from '#infrastructure/mappers/variant_format.mapper'
 import env from '#start/env'
 import FiltersProduct from '#models/filters_product'
-import CategoryProduct from '#models/category_product'
-import Category from '#models/category'
 import Logger from '@adonisjs/core/services/logger'
+import { formatVariantForMarcas } from '#application/formatters/variants_by_channel_formatter'
+
+export interface VariantServiceDeps {
+  productTagsCampaignsService: ProductTagsCampaignsService
+  calculation: CalculationPort
+  variantRepository: VariantRepositoryPort
+}
 
 export default class VariantService {
   private readonly logger = Logger.child({ service: 'VariantService' })
-  private categoryService: CategoryService
-  constructor() {
-    this.categoryService = new CategoryService()
+  private readonly productTagsCampaignsService: ProductTagsCampaignsService
+  private readonly calculation: CalculationPort
+  private readonly variantRepository: VariantRepositoryPort
+
+  constructor(deps: VariantServiceDeps) {
+    this.productTagsCampaignsService = deps.productTagsCampaignsService
+    this.calculation = deps.calculation
+    this.variantRepository = deps.variantRepository
   }
 
   /**
-   * Obtiene todas las variantes (Productos)
+   * Obtiene todas las variantes (usa replica de lectura si esta configurada).
    */
   async getAllVariants() {
     try {
-      const variants = await Variant.all()
+      const variants = await this.variantRepository.findAll()
       return {
         success: true,
         data: variants,
@@ -34,24 +53,14 @@ export default class VariantService {
 
   public async formatVariants(variants?: Variant[]) {
     try {
-      // Obtener todos los category_id que son hijos de la categoría
-      const childTags = await this.categoryService.getChildCategories(
-        Number(env.get('ID_BENEFITS'))
-      )
-      const childCampaigns = await this.categoryService.getChildCategories(
-        Number(env.get('ID_CAMPAIGNS'))
-      )
-
       if (variants) {
         const formattedVariants = await Promise.all(
           variants.map(async (variant) => {
-            // Buscar el producto y precargar las categorías y la marca
             const product = await Product.query()
               .where('id', variant.product_id)
               .preload('categoryProducts')
               .preload('brand')
               .first()
-            // Las categorías vienen del producto a través de la relación categoryProducts
             const variantCategories = product?.categoryProducts
               ? product.categoryProducts.map((catProd: any) => catProd.category_id)
               : []
@@ -59,13 +68,10 @@ export default class VariantService {
             let tags: string[] = []
             let campaigns: string[] = []
             if (product) {
-              tags = await this.categoryService.getCampaignsByCategory(product.id, childTags)
-              tags = tags.length ? [...new Set(tags)] : []
-              campaigns = await this.categoryService.getCampaignsByCategory(
-                product.id,
-                childCampaigns
-              )
-              campaigns = campaigns.length ? [...new Set(campaigns)] : []
+              const { tags: t, campaigns: c } =
+                await this.productTagsCampaignsService.getTagsAndCampaignsForProduct(product.id)
+              tags = t
+              campaigns = c
             }
 
             // Parsear reviews manualmente ya que preload no aplica serialización
@@ -140,15 +146,7 @@ export default class VariantService {
 
   public async getVariantsByIds(ids: number[]) {
     try {
-      // Convertir los IDs a números y filtrar valores no válidos
-      const numericIds = ids.map(Number).filter((id) => !Number.isNaN(id))
-
-      const variants = await Variant.query()
-        .whereIn('variants.id', numericIds)
-        .join('products', 'variants.product_id', 'products.id')
-        .where('products.is_visible', true)
-        .select('variants.*')
-
+      const variants = await this.variantRepository.findByIds(ids)
       return {
         success: true,
         data: variants,
@@ -161,7 +159,78 @@ export default class VariantService {
     }
   }
 
-  public async getAllVariantsPaginated(page = 1, limit = 100, channelId?: number) {
+  /**
+   * Variantes paginadas con estructura de tabla (columnas tal cual), timestamps en ISO.
+   * Para GET desde marcas y persistir sin transformar.
+   */
+  async getVariantsPaginatedTableShape(
+    page: number,
+    limit: number,
+    channelId?: number
+  ): Promise<{ data: Record<string, unknown>[]; meta: { total: number; perPage: number; currentPage: number; lastPage: number } }> {
+    return this.variantRepository.findPaginatedTableShape(page, limit, channelId)
+  }
+
+  /**
+   * Variantes por canal en formato marcas (id, sku, type, image, stock, main_title, precios, reserve, etc.).
+   */
+  async getVariantsByChannelForMarcas(
+    channelId: number,
+    page: number,
+    limit: number,
+    parentCategoryId?: number
+  ): Promise<{ data: unknown[]; meta: { total: number; perPage: number; currentPage: number; lastPage: number } }> {
+    const { data: variants, meta } = await this.variantRepository.findPaginatedByChannelWithProduct(
+      channelId,
+      page,
+      limit,
+      parentCategoryId
+    )
+    if (variants.length === 0) {
+      return { data: [], meta }
+    }
+
+    const variantIds = (variants as { id: number }[]).map((v) => v.id)
+    const skus = (variants as { sku?: string }[])
+      .map((v) => v.sku)
+      .filter((s): s is string => typeof s === 'string' && s.length > 0)
+
+    const [inventoryRows, reserveRows] = await Promise.all([
+      CatalogSafeStock.query().whereIn('variant_id', variantIds),
+      skus.length > 0 ? InventoryReserve.query().whereIn('sku', skus) : [],
+    ])
+
+    const inventoryByVariantId = new Map<number, CatalogSafeStock>()
+    for (const row of inventoryRows) {
+      inventoryByVariantId.set(row.variant_id, row)
+    }
+    const reserveBySku = new Map<string, InventoryReserve>()
+    for (const row of reserveRows) {
+      reserveBySku.set(row.sku, row)
+    }
+
+    const formatOptions = {
+      percentTransfer: Number(env.get('PERCENT_DISCOUNT_TRANSFER_PRICE')) || 2,
+      idPacks: env.get('ID_PACKS') != null ? Number(env.get('ID_PACKS')) : undefined,
+    }
+    const data = (variants as Variant[]).map((v) =>
+      formatVariantForMarcas(
+        toVariantForFormatDTO(v),
+        toInventoryForFormatDTO(inventoryByVariantId.get(v.id) ?? null),
+        toReserveForFormatDTO(reserveBySku.get(v.sku) ?? null),
+        this.calculation,
+        formatOptions
+      )
+    )
+    return { data, meta }
+  }
+
+  public async getAllVariantsPaginated(
+    page = 1,
+    limit = 100,
+    channelId?: number,
+    options?: { parentCategoryId?: number }
+  ) {
     try {
       let paginated: any
       let productIds: number[] = []
@@ -192,62 +261,9 @@ export default class VariantService {
         })
       }
 
-      // Obtener tags y campaigns
-      const childTags = await this.categoryService.getChildCategories(
-        Number(env.get('ID_BENEFITS'))
-      )
-      const childCampaigns = await this.categoryService.getChildCategories(
-        Number(env.get('ID_CAMPAIGNS'))
-      )
-
-      // Cargar títulos de categorías una sola vez
-      const allCategoryIds = [...new Set([...childTags, ...childCampaigns])]
-      const categoryTitlesMap = new Map<number, string>()
-
-      if (allCategoryIds.length > 0) {
-        const categories = await Category.query()
-          .whereIn('category_id', allCategoryIds)
-          .select(['category_id', 'title'])
-
-        categories.forEach((cat) => {
-          categoryTitlesMap.set(cat.category_id, cat.title)
-        })
-      }
-
-      const childTagsSet = new Set(childTags)
-      const childCampaignsSet = new Set(childCampaigns)
-      const tagsMap = new Map<number, string[]>()
-      const campaignsMap = new Map<number, string[]>()
       const uniqueProductIds = [...new Set(productIds)]
-
-      if (uniqueProductIds.length > 0 && categoryTitlesMap.size > 0) {
-        const productCategories = await CategoryProduct.query()
-          .whereIn('product_id', uniqueProductIds)
-          .whereIn('category_id', allCategoryIds)
-          .select(['product_id', 'category_id'])
-
-        productCategories.forEach((relation) => {
-          const productId = relation.product_id
-          const categoryId = relation.category_id
-          const categoryTitle = categoryTitlesMap.get(categoryId)
-
-          if (!categoryTitle) return
-
-          if (childTagsSet.has(categoryId)) {
-            if (!tagsMap.has(productId)) {
-              tagsMap.set(productId, [])
-            }
-            tagsMap.get(productId)!.push(categoryTitle)
-          }
-
-          if (childCampaignsSet.has(categoryId)) {
-            if (!campaignsMap.has(productId)) {
-              campaignsMap.set(productId, [])
-            }
-            campaignsMap.get(productId)!.push(categoryTitle)
-          }
-        })
-      }
+      const tagsCampaignsMap =
+        await this.productTagsCampaignsService.getTagsAndCampaignsForProducts(uniqueProductIds)
 
       // Cargar datos de productos
       const productsMap = new Map<number, any>()
@@ -267,11 +283,11 @@ export default class VariantService {
       const ID_RESERVE =
         env.get('COUNTRY_CODE') === 'CL' ? 1487 : env.get('COUNTRY_CODE') === 'CO' ? 3053 : 1472
       // Procesar variantes
-      const variantsWithFilters = paginated.all().map((variant: any) => {
+      let variantsWithFilters = paginated.all().map((variant: any) => {
         const filters = filtersMap.get(variant.product_id) || []
         const product = productsMap.get(variant.product_id)
-        let tags = tagsMap.get(variant.product_id) || []
-        let campaigns = campaignsMap.get(variant.product_id) || []
+        let tags = tagsCampaignsMap.get(variant.product_id)?.tags ?? []
+        let campaigns = tagsCampaignsMap.get(variant.product_id)?.campaigns ?? []
 
         // Si el producto tiene categorías de reserva, filtrar tags y campaigns que contengan "mañana"
         if (product?.categoryProducts?.some((cp: any) => cp.category_id === ID_RESERVE)) {
@@ -332,6 +348,28 @@ export default class VariantService {
 
         return processedVariant
       })
+
+      const parentCategoryId = options?.parentCategoryId
+      if (parentCategoryId) {
+        const allowedProductIds = new Set<number>()
+
+        for (const [productId, product] of productsMap.entries()) {
+          const hasParentCategory =
+            product?.categoryProducts?.some((cp: any) => cp.category_id === parentCategoryId) ??
+            false
+          if (hasParentCategory) {
+            allowedProductIds.add(productId)
+          }
+        }
+
+        if (allowedProductIds.size > 0) {
+          variantsWithFilters = variantsWithFilters.filter((variant: any) =>
+            allowedProductIds.has(variant.product_id)
+          )
+        } else {
+          variantsWithFilters = []
+        }
+      }
 
       const filteredVariants = this.filterVariantsBySizeAndColor(variantsWithFilters)
       return { data: filteredVariants, meta: paginated.getMeta() }

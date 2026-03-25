@@ -1,8 +1,8 @@
-import { test } from '@japa/runner'
-import ChannelsController from '#controllers/channels_controller'
+import ChannelsController from '#controllers/channels/channels_controller'
 import Channel from '#models/channel'
-import { channels as channelsConfig } from '../../app/utils/channels/channels.js'
 import Database from '@adonisjs/lucid/services/db'
+import { test } from '@japa/runner'
+import { channels as channelsConfig } from '../../app/utils/channels/channels.js'
 
 // 🇨🇱 Channel IDs únicos de Chile extraídos de la configuración
 const CHILE_CHANNEL_IDS = [

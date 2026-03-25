@@ -1,5 +1,5 @@
+import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import Brand from '#models/brand'
-import BigCommerceService from '#services/bigcommerce_service'
 import Logger from '@adonisjs/core/services/logger'
 
 export default class BrandService {
