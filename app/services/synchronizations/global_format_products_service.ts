@@ -82,6 +82,20 @@ export default class GlobalFormatProductsService {
   // CONSTRUCCION DEL PRODUCTO FORMATEADO
   // ================================================================
 
+  /**
+   * `channels` en BC es un array de channel_id numericos (uno o varios), p. ej. [1457601] .
+   */
+  private normalizeChannelIds(raw: BigCommerceProduct['channels']): number[] {
+    if (!raw?.length) return []
+    const unique = new Set<number>()
+    for (const id of raw) {
+      if (typeof id === 'number' && Number.isFinite(id) && id > 0) {
+        unique.add(Math.trunc(id))
+      }
+    }
+    return [...unique]
+  }
+
   private async buildFormattedProduct(
     product: BigCommerceProduct,
     inventoryMap: Map<number, StockData>,
@@ -93,7 +107,7 @@ export default class GlobalFormatProductsService {
     const prices = await this.pricingStrategy.getProductPrices(product, this.percentDiscount)
     const images = product.images || []
     const variants = product.variants || []
-    const channels = product.channels || []
+    const channels = this.normalizeChannelIds(product.channels)
     const quantity = variants.reduce((acc, v) => acc + v.inventory_level, 0)
 
     const hasZeroPrices = prices.normal_price === 0 && prices.discount_price === 0

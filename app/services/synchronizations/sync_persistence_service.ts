@@ -1,16 +1,16 @@
 import type { FormattedProductWithVariants } from '#interfaces/product-sync/sync.interfaces'
-import type { FormattedOption } from '#services/format_options_service'
-import CategoryProduct from '#models/category_product'
 import Category from '#models/category'
+import CategoryProduct from '#models/category_product'
 import ChannelProduct from '#models/channel_product'
 import Option from '#models/option'
 import Product from '#models/product'
 import Variant from '#models/variant'
+import type { FormattedOption } from '#services/format_options_service'
+import { createBatches } from '#utils/env_parser'
+import { applyVariantBatchUpsert } from '#utils/release_variant_sku_conflicts'
 import Logger from '@adonisjs/core/services/logger'
 import db from '@adonisjs/lucid/services/db'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
-import { createBatches } from '#utils/env_parser'
-import { applyVariantBatchUpsert } from '#utils/release_variant_sku_conflicts'
 
 /**
  * Responsabilidad unica: persistir datos formateados en la base de datos.
@@ -136,7 +136,15 @@ export default class SyncPersistenceService {
     const allRelations: { product_id: number; channel_id: number }[] = []
 
     for (const product of products) {
-      for (const channelId of product._channels) {
+      const channelIds = [...new Set(product._channels.map((id) => Number(id)).filter((id) => id > 0))]
+      if (channelIds.length > 0) {
+        // Fuente de verdad: el array channels de BC. Quitamos filas viejas del producto que ya no esten en el array.
+        await ChannelProduct.query({ client: trx })
+          .where('product_id', product.id)
+          .whereNotIn('channel_id', channelIds)
+          .delete()
+      }
+      for (const channelId of channelIds) {
         allRelations.push({ product_id: product.id, channel_id: channelId })
       }
     }
