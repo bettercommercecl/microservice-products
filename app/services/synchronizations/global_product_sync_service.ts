@@ -1,26 +1,26 @@
 import type { CalculationPort } from '#application/ports/calculation.port'
+import syncConfig from '#config/sync'
+import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import type { BigCommerceProduct } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
 import type {
-  FormattedProductWithVariants,
-  SyncResult,
-  SyncEnrichmentData,
   BatchResult,
+  FormattedProductWithVariants,
+  SyncEnrichmentData,
+  SyncResult,
 } from '#interfaces/product-sync/sync.interfaces'
-import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
-import Logger from '@adonisjs/core/services/logger'
-import { createBatches } from '#utils/env_parser'
+import FiltersService from '#services/filters_service'
+import FormatOptionsService from '#services/format_options_service'
 import InventoryService from '#services/inventory_service'
 import N8nReserveService from '#services/n8n_reserve_service'
-import FormatOptionsService from '#services/format_options_service'
-import GlobalFormatProductsService from '#services/synchronizations/global_format_products_service'
 import FormatVariantsService from '#services/synchronizations/format_variants_service'
+import GlobalFormatProductsService from '#services/synchronizations/global_format_products_service'
+import PacksSyncService from '#services/synchronizations/packs_sync_service'
+import SyncCleanupService from '#services/synchronizations/sync_cleanup_service'
 import SyncPersistenceService from '#services/synchronizations/sync_persistence_service'
 import SyncPreloadService from '#services/synchronizations/sync_preload_service'
-import SyncCleanupService from '#services/synchronizations/sync_cleanup_service'
-import FiltersService from '#services/filters_service'
-import PacksSyncService from '#services/synchronizations/packs_sync_service'
 import env from '#start/env'
-import syncConfig from '#config/sync'
+import { createBatches } from '#utils/env_parser'
+import Logger from '@adonisjs/core/services/logger'
 
 /**
  * Orquestador de la sincronizacion global de productos.
@@ -83,7 +83,6 @@ export default class GlobalProductSyncService {
       if (products.length === 0) {
         return this.buildResponse(startTime, { products: 0, variants: 0, hidden: 0 }, 0)
       }
-
       // 3. Reviews y timers en batch para evitar N+1
       const enrichment = await this.preloadService.loadAll(products)
 
