@@ -1,19 +1,19 @@
-import Variant from '#models/variant'
-import Product from '#models/product'
-import CatalogSafeStock from '#models/catalog_safe_stock'
-import InventoryReserve from '#models/inventory_reserve'
+import { formatVariantForMarcas } from '#application/formatters/variants_by_channel_formatter'
 import type { CalculationPort } from '#application/ports/calculation.port'
 import type { VariantRepositoryPort } from '#application/ports/variant_repository.port'
-import ProductTagsCampaignsService from '#services/product_tags_campaigns_service'
 import {
   toInventoryForFormatDTO,
   toReserveForFormatDTO,
   toVariantForFormatDTO,
 } from '#infrastructure/mappers/variant_format.mapper'
-import env from '#start/env'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 import FiltersProduct from '#models/filters_product'
+import InventoryReserve from '#models/inventory_reserve'
+import Product from '#models/product'
+import Variant from '#models/variant'
+import ProductTagsCampaignsService from '#services/product_tags_campaigns_service'
+import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
-import { formatVariantForMarcas } from '#application/formatters/variants_by_channel_formatter'
 
 export interface VariantServiceDeps {
   productTagsCampaignsService: ProductTagsCampaignsService
@@ -229,7 +229,7 @@ export default class VariantService {
     page = 1,
     limit = 100,
     channelId?: number,
-    options?: { parentCategoryId?: number }
+    _options?: { parentCategoryId?: number }
   ) {
     try {
       let paginated: any
@@ -349,27 +349,27 @@ export default class VariantService {
         return processedVariant
       })
 
-      const parentCategoryId = options?.parentCategoryId
-      if (parentCategoryId) {
-        const allowedProductIds = new Set<number>()
-
-        for (const [productId, product] of productsMap.entries()) {
-          const hasParentCategory =
-            product?.categoryProducts?.some((cp: any) => cp.category_id === parentCategoryId) ??
-            false
-          if (hasParentCategory) {
-            allowedProductIds.add(productId)
-          }
-        }
-
-        if (allowedProductIds.size > 0) {
-          variantsWithFilters = variantsWithFilters.filter((variant: any) =>
-            allowedProductIds.has(variant.product_id)
-          )
-        } else {
-          variantsWithFilters = []
-        }
-      }
+      // parent_category: desactivado a propósito. El vínculo producto–canal ya lo define channel_product;
+      // volver a filtrar por la categoría padre en category_products quitaba del listado productos que sí
+      // pertenecen al canal cuando la taxonomía local no repetía esa categoría en category_products.
+      // const parentCategoryId = options?.parentCategoryId
+      // if (parentCategoryId) {
+      //   const allowedProductIds = new Set<number>()
+      //   for (const [productId, product] of productsMap.entries()) {
+      //     const hasParentCategory =
+      //       product?.categoryProducts?.some((cp: any) => cp.category_id === parentCategoryId) ?? false
+      //     if (hasParentCategory) {
+      //       allowedProductIds.add(productId)
+      //     }
+      //   }
+      //   if (allowedProductIds.size > 0) {
+      //     variantsWithFilters = variantsWithFilters.filter((variant: any) =>
+      //       allowedProductIds.has(variant.product_id)
+      //     )
+      //   } else {
+      //     variantsWithFilters = []
+      //   }
+      // }
 
       const filteredVariants = this.filterVariantsBySizeAndColor(variantsWithFilters)
       return { data: filteredVariants, meta: paginated.getMeta() }

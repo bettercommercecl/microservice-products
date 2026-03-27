@@ -1,20 +1,20 @@
+import GetVariantsByChannelUseCase from '#application/use_cases/variants/get_variants_by_channel_use_case'
+import GetVariantsPaginatedUseCase from '#application/use_cases/variants/get_variants_paginated_use_case'
+import CalculationAdapter from '#infrastructure/adapters/calculation_adapter'
+import ChannelLookupAdapter from '#infrastructure/adapters/channel_lookup_adapter'
+import VariantCatalogAdapter from '#infrastructure/adapters/variant_catalog_adapter'
+import VariantRepository from '#infrastructure/persistence/repositories/variant_repository'
 import Channel from '#models/channel'
 import type Variant from '#models/variant'
-import VariantService from '#services/variant_service'
 import CategoryService from '#services/categories_service'
 import ProductTagsCampaignsService from '#services/product_tags_campaigns_service'
-import CalculationAdapter from '#infrastructure/adapters/calculation_adapter'
-import VariantRepository from '#infrastructure/persistence/repositories/variant_repository'
-import GetVariantsPaginatedUseCase from '#application/use_cases/variants/get_variants_paginated_use_case'
-import GetVariantsByChannelUseCase from '#application/use_cases/variants/get_variants_by_channel_use_case'
-import VariantCatalogAdapter from '#infrastructure/adapters/variant_catalog_adapter'
-import ChannelLookupAdapter from '#infrastructure/adapters/channel_lookup_adapter'
-import { HttpContext } from '@adonisjs/core/http'
-import vine from '@vinejs/vine'
-import { variantsByIdsSchema } from '#validators/variants_by_ids_validator'
+import VariantService from '#services/variant_service'
 import { variantsByChannelSchema } from '#validators/variants_by_channel_validator'
+import { variantsByIdsSchema } from '#validators/variants_by_ids_validator'
 import { variantsPaginatedListSchema } from '#validators/variants_paginated_list_validator'
 import { variantsPaginatedSchema } from '#validators/variants_paginated_validator'
+import { HttpContext } from '@adonisjs/core/http'
+import vine from '@vinejs/vine'
 
 export default class VariantController {
   private readonly variantService: VariantService
@@ -49,6 +49,7 @@ export default class VariantController {
     const page = validated.page ?? 1
     const limit = validated.limit ?? 50
     const { data, meta } = await this.getVariantsPaginatedUseCase.execute(page, limit)
+    console.log(data.length)
     return response.ok({ success: true, data, meta })
   }
 
