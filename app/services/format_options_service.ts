@@ -1,8 +1,8 @@
 import { FormattedProductWithModelVariants } from '#interfaces/formatted_product.interface'
 import Option from '#models/option'
 import Logger from '@adonisjs/core/services/logger'
-import pLimit from 'p-limit'
 import type { QueryClientContract } from '@adonisjs/lucid/types/database'
+import pLimit from 'p-limit'
 import BigCommerceService from '../infrastructure/bigcommerce/bigcommerce_api.js'
 
 /**
@@ -193,6 +193,30 @@ export default class FormatOptionsService {
     }
   }
   /**
+   * URLs (https) se guardan como string; colores u otros valores no URL van en array, ej. ["#334FF"].
+   */
+  private normalizeValueDataForStorage(raw: unknown): string | string[] {
+    if (raw == null) return []
+
+    if (typeof raw === 'string') {
+      const t = raw.trim()
+      if (t === '') return []
+      return t.includes('https://') ? t : [t]
+    }
+
+    if (Array.isArray(raw)) {
+      const strings = raw
+        .map((x) => (typeof x === 'string' ? x.trim() : x != null ? String(x) : ''))
+        .filter((s) => s.length > 0)
+      if (strings.length === 0) return []
+      if (strings.length === 1 && strings[0].includes('https://')) return strings[0]
+      return strings
+    }
+
+    return [String(raw)]
+  }
+
+  /**
    * Formatea valores de las opciones del producto
    * @param options - Array de opciones de Bigcommerce
    * @returns Array de opciones formateadas
@@ -203,14 +227,14 @@ export default class FormatOptionsService {
     }
 
     return options.map((elem) => {
-      const valueData = elem.value_data?.colors
+      const raw = elem.value_data?.colors
         ? elem.value_data.colors
         : elem.value_data?.image_url
 
       return {
         id: elem.id,
         label: elem.label,
-        value_data: valueData,
+        value_data: this.normalizeValueDataForStorage(raw),
       }
     })
   }
