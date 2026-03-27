@@ -1,7 +1,6 @@
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import BigcommerceRateLimitInterceptor from '#infrastructure/interceptors/bigcommerce_rate_limit_interceptor'
 import CatalogSafeStock from '#models/catalog_safe_stock'
-import Product from '#models/product'
 import ProductPack from '#models/product_pack'
 import env from '#start/env'
 import {
@@ -161,8 +160,9 @@ export default class PacksSyncService {
       throw error
     } finally {
       try {
-        Logger.info('Sync packs: finalizando, lineas hijo en 0 -> variants del pack + visibilidad')
-        const packIdsAnyZero = await this.getPackIdsWithAnyZeroLineStock()
+        Logger.info(
+          'Sync packs: finalizando, lineas hijo en 0 -> stock 0 en variantes de pack afectadas (sin ocultar producto padre)'
+        )
         const variantTargets = await this.getDistinctPackVariantTargetsWithZeroStock()
         const packsMissingPv = await this.getDistinctPackIdsWithZeroStockMissingPackVariant()
         const fallbackTargets = await this.resolveDefaultPackVariantTargets(packsMissingPv)
@@ -173,15 +173,9 @@ export default class PacksSyncService {
           )
           await this.updatePackVariantsStockToZero(mergedTargets)
         }
-        if (packIdsAnyZero.length > 0) {
-          Logger.info(
-            `Sync packs: is_visible=false para ${packIdsAnyZero.length} packs con alguna linea en stock 0`
-          )
-          await this.updateProductsVisibility(packIdsAnyZero)
-        }
         Logger.info('Sync packs: proceso finalizado')
       } catch (error: any) {
-        Logger.error({ err: error }, 'Sync packs: error en actualizacion de visibilidad')
+        Logger.error({ err: error }, 'Sync packs: error en actualizacion post-sync de packs')
       }
     }
   }
@@ -557,15 +551,6 @@ export default class PacksSyncService {
     return results
   }
 
-  /** Packs con al menos una linea (cualquier tipo) en stock 0 */
-  private async getPackIdsWithAnyZeroLineStock(): Promise<number[]> {
-    const rows = await Database.from('products_packs')
-      .distinct('pack_id')
-      .where('stock', 0)
-      .select('pack_id')
-    return rows.map((p: { pack_id: number }) => p.pack_id)
-  }
-
   /**
    * Pares (pack_id, pack_variant_id) distintos donde una linea quedo en 0.
    * pack_variant_id = variants.id con variants.product_id = pack_id.
@@ -643,7 +628,4 @@ export default class PacksSyncService {
     }
   }
 
-  private async updateProductsVisibility(packIds: number[]): Promise<void> {
-    await Product.query().whereIn('id', packIds).update({ is_visible: false })
-  }
 }

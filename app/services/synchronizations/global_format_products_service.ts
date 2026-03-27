@@ -1,23 +1,23 @@
+import { getSizesByProduct } from '#application/formatters/get_sizes_by_product'
+import type { CalculationPort } from '#application/ports/calculation.port'
+import { getSizesConfig } from '#config/sizes_config'
 import type {
   BigCommerceProduct,
   BigCommerceProductImage,
 } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
-import type InventoryReserve from '#models/inventory_reserve'
 import type {
   FormattedProduct,
   ReviewData,
-  TimerData,
   StockData,
+  TimerData,
 } from '#interfaces/product-sync/sync.interfaces'
 import CatalogSafeStock from '#models/catalog_safe_stock'
-import env from '#start/env'
-import Logger from '@adonisjs/core/services/logger'
-import { parseEnvInt, parseEnvFloat } from '#utils/env_parser'
-import type { CalculationPort } from '#application/ports/calculation.port'
+import type InventoryReserve from '#models/inventory_reserve'
 import type { PricingStrategy } from '#services/synchronizations/pricing/product_pricing_strategy'
 import { PricingStrategyFactory } from '#services/synchronizations/pricing/product_pricing_strategy'
-import { getSizesByProduct } from '#application/formatters/get_sizes_by_product'
-import { getSizesConfig } from '#config/sizes_config'
+import env from '#start/env'
+import { parseEnvFloat, parseEnvInt } from '#utils/env_parser'
+import Logger from '@adonisjs/core/services/logger'
 
 interface SpecialCategoryIds {
   sameday: number | null
