@@ -208,9 +208,7 @@ export default class PackReserveSyncService {
         (r) => r.status === 'rejected'
       ).length
 
-      const productDataForBigCommerce = await this.formatDataForBigCommerceProduct(packCategoryGroups)
       const productUpdateResults = await this.updateBigCommerceProducts(
-        productDataForBigCommerce,
         packCategoryGroups,
         Number(reserveCategoryId),
         deadline
@@ -656,25 +654,6 @@ export default class PackReserveSyncService {
     return { updated: 0, skipped: _groupedPackData.length }
   }
 
-  async formatDataForBigCommerceProduct(
-    groupedPackData: GroupedPackData[]
-  ): Promise<{ id: number; categories: number[] }[]> {
-    if (!groupedPackData.length) return []
-    const uniquePackIds = [...new Set(groupedPackData.map((g) => g.pack_id))]
-    const allCp = await Database.from('category_products')
-      .select('product_id', 'category_id')
-      .whereIn('product_id', uniquePackIds)
-    const categoriesMap = new Map<number, number[]>()
-    allCp.forEach((cp: { product_id: number; category_id: number }) => {
-      if (!categoriesMap.has(cp.product_id)) categoriesMap.set(cp.product_id, [])
-      categoriesMap.get(cp.product_id)!.push(cp.category_id)
-    })
-    return groupedPackData.map((g) => ({
-      id: g.pack_id,
-      categories: categoriesMap.get(g.pack_id) ?? [],
-    }))
-  }
-
   async formatDataForBigCommerceInventory(groupedPackData: GroupedPackData[]): Promise<
     Array<{
       settings: Array<{
@@ -738,13 +717,18 @@ export default class PackReserveSyncService {
       .filter((x): x is NonNullable<typeof x> => x !== null)
   }
 
+  /**
+   * En BigCommerce solo se toca la categoria reserva: DELETE del par (pack, ID_RESERVE) si sale de reserva;
+   * PUT de asignaciones solo con { product_id: pack_id, category_id: ID_RESERVE } si entra o sigue en reserva.
+   * No se reenvian el resto de categorias del pack (eso vive en category_products local y otros syncs).
+   */
   private async updateBigCommerceProducts(
-    productData: { id: number; categories: number[] }[],
     groupedPackData: GroupedPackData[],
     reserveCategoryId: number,
     deadline: number
   ): Promise<{ updateds: number; faileds: number }> {
     this.shouldAbort(deadline)
+    const uniquePackIds = [...new Set(groupedPackData.map((g) => g.pack_id))]
     try {
       const packIdsToRemoveFromReserve = [
         ...new Set(
@@ -761,27 +745,27 @@ export default class PackReserveSyncService {
         )
       }
 
-      if (!productData.length) return { updateds: 0, faileds: 0 }
-      const uniqueByProduct = new Map<number, number[]>()
-      productData.forEach((p) => {
-        const existing = uniqueByProduct.get(p.id) ?? []
-        const merged = [...new Set([...existing, ...p.categories])]
-        uniqueByProduct.set(p.id, merged)
-      })
-      const assignments = Array.from(uniqueByProduct.entries()).flatMap(([productId, categories]) =>
-        categories.map((categoryId) => ({
-          product_id: productId,
-          category_id: categoryId,
-        }))
-      )
+      const packIdsToAssignReserve = [
+        ...new Set(
+          groupedPackData.filter((g) => g.serial && g.serial.trim() !== '').map((g) => g.pack_id)
+        ),
+      ]
+      if (packIdsToAssignReserve.length === 0) {
+        return { updateds: 0, faileds: 0 }
+      }
+
+      const assignments = packIdsToAssignReserve.map((productId) => ({
+        product_id: productId,
+        category_id: reserveCategoryId,
+      }))
       await this.withRetries(
         () => this.bigcommerceService.updateCategoryAssignments(assignments),
-        'create category assignments'
+        'create category assignments (reserve only)'
       )
-      return { updateds: uniqueByProduct.size, faileds: 0 }
+      return { updateds: packIdsToAssignReserve.length, faileds: 0 }
     } catch (error: any) {
       Logger.error({ err: error }, 'Error actualizando categorias en BigCommerce')
-      return { updateds: 0, faileds: productData.length }
+      return { updateds: 0, faileds: uniquePackIds.length }
     }
   }
 
