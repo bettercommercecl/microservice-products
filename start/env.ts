@@ -64,7 +64,9 @@ export default await Env.create(new URL('../', import.meta.url), {
   | Variables for n8n integration
   |----------------------------------------------------------
   */
-  URL_N8N_RESERVES: Env.schema.string.optional(),
+  URL_N8N_RESERVES_CL: Env.schema.string.optional(),
+  URL_N8N_RESERVES_CO: Env.schema.string.optional(),
+  URL_N8N_RESERVES_PE: Env.schema.string.optional(),
   API_N8N_USER: Env.schema.string.optional(),
   VALUE_API_N8N: Env.schema.string.optional(),
 

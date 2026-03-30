@@ -51,11 +51,22 @@ export default class N8nReserveService {
         throw new Error('La respuesta de n8n no es un array valido')
       }
 
-      const normalized = this.normalizeResponse(response.data)
+      const rawNormalized = this.normalizeResponse(response.data)
+      const normalized = this.dedupeBySkuLastWins(rawNormalized)
 
       if (normalized.length === 0) {
         this.logger.info('n8n no retorno reservas para este pais')
         return { success: true, total: 0, message: 'Sin reservas disponibles' }
+      }
+
+      if (rawNormalized.length !== normalized.length) {
+        this.logger.warn(
+          {
+            filas_n8n: rawNormalized.length,
+            skus_unicos: normalized.length,
+          },
+          'n8n devolvio SKUs duplicados; se conserva la ultima fila por sku'
+        )
       }
 
       await InventoryReserve.updateOrCreateMany('sku', normalized)
@@ -103,6 +114,19 @@ export default class N8nReserveService {
   }
 
   /**
+   * Un sku por fila: para asegurar que no haya duplicados en la tabla inventory_reserve
+   */
+  private dedupeBySkuLastWins(rows: NormalizedReserve[]): NormalizedReserve[] {
+    const bySku = new Map<string, NormalizedReserve>()
+    for (const row of rows) {
+      const sku = row.sku.trim()
+      if (!sku) continue
+      bySku.set(sku, { ...row, sku })
+    }
+    return [...bySku.values()]
+  }
+
+  /**
    * Normaliza la respuesta cruda de n8n al formato de la tabla inventory_reserve
    */
   private normalizeResponse(raw: ReserveApiResponse[]): NormalizedReserve[] {
@@ -119,7 +143,7 @@ export default class N8nReserveService {
         fecha_reserva: fechaReserva,
         bp: item.BP || null,
         warning: item.WARNING || null,
-        stock: item.STOCK ?? null,
+        stock: Number(item.STOCK || 0) ?? null,
       }
     })
   }
