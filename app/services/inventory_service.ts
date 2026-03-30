@@ -285,9 +285,9 @@ export default class InventoryService {
       sku: item.identity.sku.trim(),
       variant_id: item.identity.variant_id,
       product_id: item.identity.product_id,
-      safety_stock: item.settings.safety_stock,
-      warning_level: item.settings.warning_level,
-      available_to_sell: item.available_to_sell,
+      safety_stock: item.settings.safety_stock || 0,
+      warning_level: item.settings.warning_level || 0,
+      available_to_sell: item.available_to_sell || 0,
       bin_picking_number: String(item.settings.bin_picking_number ?? ''),
     }))
 
