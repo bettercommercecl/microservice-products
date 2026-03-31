@@ -107,11 +107,20 @@ export default await Env.create(new URL('../', import.meta.url), {
 
   /*
   |----------------------------------------------------------
-  | Pricing: si tiene price list externo, se usa InternationalPricingStrategy
-  | Si no esta definido, se usan precios directos de BigCommerce
+  | Pricing (legacy): antes activaba precios via microservicio externo.
+  | La sync usa el price list de BigCommerce por lote; variable opcional por compatibilidad.
   |----------------------------------------------------------
   */
   USE_EXTERNAL_PRICING: Env.schema.boolean.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | Purga por price list (PE/CO): maximo ratio excluidos/catalogo BC antes de abortar.
+  | El catalogo BC suele ser mas amplio que el price list del pais; 0.5 era demasiado bajo.
+  | Default 0.85 si no se define. Rango recomendado 0.7 a 0.95.
+  |----------------------------------------------------------
+  */
+  PRICELIST_PURGE_MAX_EXCLUDED_RATIO: Env.schema.number.optional(),
 
   /*
   |----------------------------------------------------------

@@ -1,9 +1,11 @@
 import type { CalculationPort } from '#application/ports/calculation.port'
 import type { BigCommerceProductVariant } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
 import type { FormattedVariantForModel } from '#interfaces/formatted_variant_for_model.interface'
+import type { PriceListRecord } from '#infrastructure/bigcommerce/modules/pricelists/interfaces/pricelist_record.interface'
 import type {
   FormattedProduct,
   FormattedProductWithVariants,
+  PriceResult,
   StockData,
 } from '#interfaces/product-sync/sync.interfaces'
 import CatalogSafeStock from '#models/catalog_safe_stock'
@@ -12,6 +14,7 @@ import type InventoryReserve from '#models/inventory_reserve'
 import CategoryService from '#services/categories_service'
 import ImageProcessingService from '#services/image_processing_service'
 import ProductTagsCampaignsService from '#services/product_tags_campaigns_service'
+import { priceResultFromBcPricelistRecord } from '#services/synchronizations/bc_pricelist_pricing'
 import type { PricingStrategy } from '#services/synchronizations/pricing/product_pricing_strategy'
 import { PricingStrategyFactory } from '#services/synchronizations/pricing/product_pricing_strategy'
 import env from '#start/env'
@@ -29,7 +32,6 @@ export interface FormatVariantsServiceDeps {
 
 export default class FormatVariantsService {
   private readonly logger = Logger.child({ service: 'FormatVariantsService' })
-  private readonly country = env.get('COUNTRY_CODE')
   private readonly pricingStrategy: PricingStrategy
   private readonly calculation: CalculationPort
   private readonly imageProcessingService: ImageProcessingService
@@ -52,8 +54,21 @@ export default class FormatVariantsService {
 
   async formatVariants(
     products: FormattedProduct[],
-    reservesMap: Map<string, InventoryReserve>
+    reservesMap: Map<string, InventoryReserve>,
+    options?: { bcPriceListByVariantId?: Map<number, PriceListRecord> }
   ): Promise<FormattedProductWithVariants[]> {
+    // Keywords una vez por producto por lote (no por variante). Tags/campanas y posible batch
+    const keywordLimit = pLimit(10)
+    const keywordPairs = await Promise.all(
+      products.map((product) =>
+        keywordLimit(async () => {
+          const keywords = await this.generateKeywords(product)
+          return [product.id, keywords] as const
+        })
+      )
+    )
+    const keywordsByProductId = new Map<number, string>(keywordPairs)
+
     const allVariantIds = products.flatMap((p) =>
       (p._raw_variants as BigCommerceProductVariant[]).map((v) => v.id)
     )
@@ -64,7 +79,16 @@ export default class FormatVariantsService {
     const limit = pLimit(10)
     const formattedVariants = await Promise.all(
       allTasks.map(({ variant, product }) =>
-        limit(() => this.buildFormattedVariant(variant, product, inventoryMap, reservesMap))
+        limit(() =>
+          this.buildFormattedVariant(
+            variant,
+            product,
+            inventoryMap,
+            reservesMap,
+            keywordsByProductId.get(product.id) ?? '',
+            options?.bcPriceListByVariantId
+          )
+        )
       )
     )
 
@@ -75,14 +99,33 @@ export default class FormatVariantsService {
   // CONSTRUCCION DE VARIANTE FORMATEADA
   // ================================================================
 
+  private async resolveVariantPrices(
+    variant: BigCommerceProductVariant,
+    bcMap?: Map<number, PriceListRecord>
+  ): Promise<PriceResult> {
+    if (env.get('COUNTRY_CODE') === 'CL') {
+      return this.pricingStrategy.getVariantPrices(variant, this.percentDiscount)
+    }
+
+    const record = bcMap?.get(variant.id)
+    if (!record) {
+      this.logger.warn({ variant_id: variant.id }, 'Sin registro de price list BC para variante')
+      return PricingStrategyFactory.ZERO_PRICES
+    }
+
+    return priceResultFromBcPricelistRecord(record, this.calculation, this.percentDiscount)
+  }
+
   private async buildFormattedVariant(
     variant: BigCommerceProductVariant,
     product: FormattedProduct,
     inventoryMap: Map<number, StockData>,
-    reservesMap: Map<string, InventoryReserve>
+    reservesMap: Map<string, InventoryReserve>,
+    keywords: string,
+    bcPriceMap?: Map<number, PriceListRecord>
   ): Promise<FormattedVariantForModel> {
     const inventory = inventoryMap.get(variant.id) || { available_to_sell: 0, safety_stock: 0 }
-    const prices = await this.pricingStrategy.getVariantPrices(variant, this.percentDiscount)
+    const prices = await this.resolveVariantPrices(variant, bcPriceMap)
     const reserve = reservesMap.get(variant.sku)
     const hasZeroPrices = prices.normal_price === 0 && prices.discount_price === 0
 
@@ -101,10 +144,8 @@ export default class FormatVariantsService {
       variant.depth,
       variant.height,
       variant.weight ?? product.weight ?? 0,
-      this.country
+      env.get('COUNTRY_CODE')
     )
-
-    const keywords = await this.generateKeywords(product)
 
     return {
       id: variant.id,

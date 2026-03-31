@@ -4,13 +4,10 @@ import type {
   BigCommerceProductVariant,
 } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
 import type { PriceResult } from '#interfaces/product-sync/sync.interfaces'
-import env from '#start/env'
-import Logger from '@adonisjs/core/services/logger'
-import PriceService from '#services/price_service'
 
 /**
- * Contrato para estrategias de calculo de precios.
- * Cada pais puede tener su propia fuente de precios y forma de calcular.
+ * Contrato para calculo de precios desde el payload de producto/variante de BigCommerce (Chile).
+ * Paises distintos de CL usan el price list de BC cargado por lote (ver bc_pricelist_pricing y PricelistRecordsBatchService).
  */
 export interface PricingStrategy {
   getProductPrices(product: BigCommerceProduct, percentDiscount: number): Promise<PriceResult>
@@ -21,7 +18,7 @@ export interface PricingStrategy {
 }
 
 // ================================================================
-// CHILE: precios directos desde BigCommerce (price / sale_price)
+// CHILE: precios directos desde BigCommerce (price / sale_price en el payload)
 // ================================================================
 
 export class ClPricingStrategy implements PricingStrategy {
@@ -68,70 +65,7 @@ export class ClPricingStrategy implements PricingStrategy {
 }
 
 // ================================================================
-// CO / PE: precios desde PriceService (API externa por variant_id)
-// ================================================================
-
-export class InternationalPricingStrategy implements PricingStrategy {
-  private readonly logger = Logger.child({ service: 'InternationalPricing' })
-  constructor(
-    private readonly calculation: CalculationPort,
-    private readonly priceService: PriceService
-  ) {}
-
-  async getProductPrices(
-    product: BigCommerceProduct,
-    percentDiscount: number
-  ): Promise<PriceResult> {
-    const variants = product.variants || []
-    if (variants.length === 0) return PricingStrategyFactory.ZERO_PRICES
-
-    return this.fetchAndCalculate(variants[0].id, percentDiscount)
-  }
-
-  async getVariantPrices(
-    variant: BigCommerceProductVariant,
-    percentDiscount: number
-  ): Promise<PriceResult> {
-    return this.fetchAndCalculate(variant.id, percentDiscount)
-  }
-
-  private async fetchAndCalculate(
-    variantId: number,
-    percentDiscount: number
-  ): Promise<PriceResult> {
-    try {
-      const prices = await this.priceService.getPriceByVariantId(variantId)
-      if (!prices?.price || !prices?.calculatedPrice) {
-        return PricingStrategyFactory.ZERO_PRICES
-      }
-
-      const discount = this.calculation.calculateDiscount(
-        prices.price,
-        prices.calculatedPrice
-      )
-      const cashPrice = this.calculation.calculateTransferPrice(
-        prices.price,
-        prices.calculatedPrice,
-        percentDiscount
-      )
-
-      return {
-        normal_price: prices.price,
-        discount_price: prices.calculatedPrice,
-        cash_price: cashPrice,
-        discount,
-      }
-    } catch (error: any) {
-      this.logger.warn({ variant_id: variantId, error: error.message }, 'Sin datos de precios')
-      return PricingStrategyFactory.ZERO_PRICES
-    }
-  }
-}
-
-// ================================================================
-// FACTORY: Resuelve la estrategia segun USE_EXTERNAL_PRICING
-// Si el pais usa price list externo -> InternationalPricingStrategy
-// Si no -> precios directos de BigCommerce (ClPricingStrategy)
+// FACTORY: siempre estrategia Chile (payload BC). Otros paises usan mapa de price list por lote.
 // ================================================================
 
 export class PricingStrategyFactory {
@@ -147,10 +81,7 @@ export class PricingStrategyFactory {
   static create(calculation: CalculationPort): PricingStrategy {
     if (this.instance) return this.instance
 
-    const useExternal = env.get('USE_EXTERNAL_PRICING', false)
-    this.instance = useExternal
-      ? new InternationalPricingStrategy(calculation, new PriceService())
-      : new ClPricingStrategy(calculation)
+    this.instance = new ClPricingStrategy(calculation)
 
     return this.instance
   }

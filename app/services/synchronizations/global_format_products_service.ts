@@ -5,14 +5,17 @@ import type {
   BigCommerceProduct,
   BigCommerceProductImage,
 } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
+import type { PriceListRecord } from '#infrastructure/bigcommerce/modules/pricelists/interfaces/pricelist_record.interface'
 import type {
   FormattedProduct,
+  PriceResult,
   ReviewData,
   StockData,
   TimerData,
 } from '#interfaces/product-sync/sync.interfaces'
 import CatalogSafeStock from '#models/catalog_safe_stock'
 import type InventoryReserve from '#models/inventory_reserve'
+import { productPriceResultFromBcMap } from '#services/synchronizations/bc_pricelist_pricing'
 import type { PricingStrategy } from '#services/synchronizations/pricing/product_pricing_strategy'
 import { PricingStrategyFactory } from '#services/synchronizations/pricing/product_pricing_strategy'
 import env from '#start/env'
@@ -39,6 +42,7 @@ export interface GlobalFormatProductsServiceDeps {
 export default class GlobalFormatProductsService {
   private readonly logger = Logger.child({ service: 'GlobalFormatProductsService' })
 
+  private readonly calculation: CalculationPort
   private readonly pricingStrategy: PricingStrategy
   private readonly specialCategoryIds: SpecialCategoryIds
   private readonly idReserve: number | null
@@ -47,6 +51,7 @@ export default class GlobalFormatProductsService {
   private static readonly DEFAULT_PERCENT_DISCOUNT = 2
 
   constructor(deps: GlobalFormatProductsServiceDeps) {
+    this.calculation = deps.calculation
     this.pricingStrategy = PricingStrategyFactory.create(deps.calculation)
     this.specialCategoryIds = {
       sameday: parseEnvInt('ID_SAMEDAY'),
@@ -66,14 +71,22 @@ export default class GlobalFormatProductsService {
     products: BigCommerceProduct[],
     reservesMap: Map<string, InventoryReserve>,
     reviewsMap: Map<number, ReviewData>,
-    timerMap: Map<number, TimerData>
+    timerMap: Map<number, TimerData>,
+    options?: { bcPriceListByVariantId?: Map<number, PriceListRecord> }
   ): Promise<FormattedProduct[]> {
     const productIds = products.map((p) => p.id)
     const inventoryMap = await this.batchLoadInventory(productIds)
 
     return Promise.all(
       products.map((product) =>
-        this.buildFormattedProduct(product, inventoryMap, reservesMap, reviewsMap, timerMap)
+        this.buildFormattedProduct(
+          product,
+          inventoryMap,
+          reservesMap,
+          reviewsMap,
+          timerMap,
+          options
+        )
       )
     )
   }
@@ -96,15 +109,35 @@ export default class GlobalFormatProductsService {
     return [...unique]
   }
 
+  private async resolveProductPrices(
+    product: BigCommerceProduct,
+    bcMap?: Map<number, PriceListRecord>
+  ): Promise<PriceResult> {
+    if (env.get('COUNTRY_CODE') === 'CL') {
+      return this.pricingStrategy.getProductPrices(product, this.percentDiscount)
+    }
+
+    const firstId = product.variants?.[0]?.id
+    if (firstId && bcMap && !bcMap.get(firstId)) {
+      this.logger.warn(
+        { product_id: product.id, variant_id: firstId },
+        'Sin registro de price list BC para variante principal'
+      )
+    }
+
+    return productPriceResultFromBcMap(firstId, bcMap, this.calculation, this.percentDiscount)
+  }
+
   private async buildFormattedProduct(
     product: BigCommerceProduct,
     inventoryMap: Map<number, StockData>,
     reservesMap: Map<string, InventoryReserve>,
     reviewsMap: Map<number, ReviewData>,
-    timerMap: Map<number, TimerData>
+    timerMap: Map<number, TimerData>,
+    options?: { bcPriceListByVariantId?: Map<number, PriceListRecord> }
   ): Promise<FormattedProduct> {
     const inventory = inventoryMap.get(product.id) || { available_to_sell: 0, safety_stock: 0 }
-    const prices = await this.pricingStrategy.getProductPrices(product, this.percentDiscount)
+    const prices = await this.resolveProductPrices(product, options?.bcPriceListByVariantId)
     const images = product.images || []
     const variants = product.variants || []
     const channels = this.normalizeChannelIds(product.channels)

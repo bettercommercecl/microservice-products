@@ -1,6 +1,7 @@
 import type { CalculationPort } from '#application/ports/calculation.port'
 import syncConfig from '#config/sync'
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
+import type { PriceListRecord } from '#infrastructure/bigcommerce/modules/pricelists/interfaces/pricelist_record.interface'
 import type { BigCommerceProduct } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
 import type {
   BatchResult,
@@ -15,6 +16,10 @@ import N8nReserveService from '#services/n8n_reserve_service'
 import FormatVariantsService from '#services/synchronizations/format_variants_service'
 import GlobalFormatProductsService from '#services/synchronizations/global_format_products_service'
 import PacksSyncService from '#services/synchronizations/packs_sync_service'
+import PricelistRecordsBatchService, {
+  filterProductsByPricelistMembership,
+  getListPriceIdForCountry,
+} from '#services/synchronizations/pricelist_records_batch_service'
 import SyncCleanupService from '#services/synchronizations/sync_cleanup_service'
 import SyncPersistenceService from '#services/synchronizations/sync_persistence_service'
 import SyncPreloadService from '#services/synchronizations/sync_preload_service'
@@ -64,11 +69,12 @@ export default class GlobalProductSyncService {
    * Flujo principal:
    * 1. Sincronizar inventario y reservas
    * 2. Obtener catalogo completo de BigCommerce
-   * 3. Pre-cargar datos de enriquecimiento (reviews, timers)
-   * 4. Formatear y persistir por lotes
-   * 5. Limpiar productos descontinuados
-   * 6. Sincronizar filtros (ID_ADVANCED debe estar configurado)
-   * 7. Sincronizar packs (ID_PACKS debe estar configurado) si skipPacks es false
+   * 3. (No-CL) Price list completo BC, filtrar catalogo por variantes en lista, purgar excluidos en DB
+   * 4. Pre-cargar enriquecimiento (reviews, timers) solo sobre productos que pasan el filtro
+   * 5. Formatear y persistir por lotes
+   * 6. Limpiar productos descontinuados (ya no en catalogo BC)
+   * 7. Sincronizar filtros (ID_ADVANCED debe estar configurado)
+   * 8. Sincronizar packs (ID_PACKS debe estar configurado) si skipPacks es false
    */
   async syncProductsComplete(options?: { skipPacks?: boolean }): Promise<SyncResult> {
     const startTime = Date.now()
@@ -79,23 +85,51 @@ export default class GlobalProductSyncService {
       await this.syncInventoryAndReserves()
 
       // 2. Catalogo completo desde BigCommerce
-      const products = await this.fetchAllProducts()
+      let products = await this.fetchAllProducts()
       if (products.length === 0) {
         return this.buildResponse(startTime, { products: 0, variants: 0, hidden: 0 }, 0)
       }
-      // 3. Reviews y timers en batch para evitar N+1
+
+      const totalFetchedFromBc = products.length
+
+      // 3. Price list del pais + filtro + purga (sin variante en lista = no se procesa ni queda en BD como activo)
+      if (env.get('COUNTRY_CODE') !== 'CL') {
+        const priceListId = getListPriceIdForCountry()
+        const pricelistService = new PricelistRecordsBatchService(this.bigcommerceService)
+        await pricelistService.syncFullPricelistFromBigcommerce(priceListId)
+        const variantIdsInList = await pricelistService.getVariantIdsInPriceList(priceListId)
+        const { kept, excludedIds } = filterProductsByPricelistMembership(
+          products,
+          variantIdsInList
+        )
+        products = kept
+        await this.cleanupService.purgeExcludedFromPricelist(excludedIds, totalFetchedFromBc)
+        this.logger.info(
+          {
+            total_bc: totalFetchedFromBc,
+            synced: products.length,
+            excluded: excludedIds.length,
+          },
+          'Catalogo filtrado por price list del pais'
+        )
+        if (products.length === 0) {
+          return this.buildResponse(startTime, { products: 0, variants: 0, hidden: 0 }, 0)
+        }
+      }
+
+      // 4. Reviews y timers en batch (solo productos que se sincronizaran)
       const enrichment = await this.preloadService.loadAll(products)
 
-      // 4. Formatear y guardar por lotes
+      // 5. Formatear y guardar por lotes
       const stats = await this.processAllBatches(products, enrichment)
 
-      // 5. Ocultar descontinuados y limpiar huerfanos
+      // 6. Ocultar descontinuados y limpiar huerfanos
       await this.cleanupService.run(products.map((p) => p.id))
 
-      // 6. Poblar filters_products desde categorias
+      // 7. Poblar filters_products desde categorias
       await this.syncFilters()
 
-      // 7. Sincronizar packs (omitir si skipPacks o sin config)
+      // 8. Sincronizar packs (omitir si skipPacks o sin config)
       if (!options?.skipPacks && env.get('ID_PACKS')) {
         const packsSyncService = new PacksSyncService(this.bigcommerceService)
         await packsSyncService.syncPacksFromBigcommerce()
@@ -114,6 +148,26 @@ export default class GlobalProductSyncService {
   // ================================================================
   // PASOS DEL FLUJO
   // ================================================================
+
+  /**
+   * Fuera de Chile: mapa de precios del lote leido solo desde pricelist_variant_records
+   * (el sync completo del price list ya corrio antes de procesar lotes).
+   */
+  private async loadBcPricelistOptionsForBatch(
+    batch: BigCommerceProduct[]
+  ): Promise<{ bcPriceListByVariantId: Map<number, PriceListRecord> } | undefined> {
+    if (env.get('COUNTRY_CODE') === 'CL') {
+      return undefined
+    }
+
+    const variantIds = batch.flatMap((p) => (p.variants || []).map((v) => v.id))
+    const priceListId = getListPriceIdForCountry()
+    const bcPriceListByVariantId = await new PricelistRecordsBatchService(
+      this.bigcommerceService
+    ).loadMapFromDbForVariantIds(priceListId, variantIds)
+
+    return { bcPriceListByVariantId }
+  }
 
   private async syncInventoryAndReserves(): Promise<void> {
     this.logger.info('Sincronizando inventario y reservas...')
@@ -205,18 +259,22 @@ export default class GlobalProductSyncService {
       const allSkus = this.collectSkus(batch)
       const reservesMap = await this.n8nReserveService.getReservesBySkus(allSkus)
 
+      const bcPriceOptions = await this.loadBcPricelistOptionsForBatch(batch)
+
       // Productos con precios, imagenes, flags de categoria, reviews, timer
       const formattedProducts = await this.formatProductsService.formatProducts(
         batch,
         reservesMap,
         enrichment.reviewsMap,
-        enrichment.timerMap
+        enrichment.timerMap,
+        bcPriceOptions
       )
 
       // Variantes con stock, precios, imagenes
       const productsWithVariants = await this.formatVariantsService.formatVariants(
         formattedProducts,
-        reservesMap
+        reservesMap,
+        bcPriceOptions
       )
 
       // Ocultar productos cuyas variantes tienen precio 0

@@ -1,10 +1,10 @@
+import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import type { BigCommerceProduct } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
 import type {
   ReviewData,
-  TimerData,
   SyncEnrichmentData,
+  TimerData,
 } from '#interfaces/product-sync/sync.interfaces'
-import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import { DateTime } from 'luxon'
@@ -90,9 +90,17 @@ export default class SyncPreloadService {
             let metafieldRaw = await this.bigcommerceService.getMetafieldsByProduct(p.id, timerKey)
             const metafield =
               typeof metafieldRaw === 'string'
-                ? (JSON.parse(metafieldRaw) as { timer_status?: boolean; timer_price?: number; timer_datetime?: string } | null)
+                ? (JSON.parse(metafieldRaw) as {
+                    timer_status?: boolean
+                    timer_price?: number
+                    timer_datetime?: string
+                  } | null)
                 : Array.isArray(metafieldRaw) && metafieldRaw.length
-                  ? (JSON.parse(String(metafieldRaw)) as { timer_status?: boolean; timer_price?: number; timer_datetime?: string } | null)
+                  ? (JSON.parse(String(metafieldRaw)) as {
+                      timer_status?: boolean
+                      timer_price?: number
+                      timer_datetime?: string
+                    } | null)
                   : null
 
             if (metafield && typeof metafield === 'object' && metafield.timer_status) {
