@@ -1,15 +1,16 @@
 import { BigcommerceProductVariant } from '#dto/bigcommerce/bigcommerce_product.dto'
+import type { PriceListRecord } from '#infrastructure/bigcommerce/modules/pricelists/interfaces/pricelist_record.interface'
 import { ChannelConfigInterface } from '#interfaces/channel_interface'
 import { FormattedProduct, FormattedVariantForModel } from '#interfaces/formatted_product.interface'
 import CatalogSafeStock from '#models/catalog_safe_stock'
 import Category from '#models/category'
+import { priceResultFromBcPricelistRecord } from '#services/synchronizations/bc_pricelist_pricing'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import pLimit from 'p-limit'
 import type { CalculationPort } from '#application/ports/calculation.port'
 import CategoriesService from './categories_service.js'
 import ImageProcessingService from './image_processing_service.js'
-import PriceService from './price_service.js'
 /**
  * Tipo para productos con variantes formateadas según el modelo
  */
@@ -24,7 +25,6 @@ export interface FormatVariantsServiceDeps {
 export default class FormatVariantsService {
   private readonly logger = Logger.child({ service: 'FormatVariantsService' })
   private readonly country = env.get('COUNTRY_CODE')
-  private readonly priceService: PriceService
   private readonly calculation: CalculationPort
   private readonly imageProcessingService: ImageProcessingService
   private readonly categoriesService: CategoriesService
@@ -39,7 +39,6 @@ export default class FormatVariantsService {
   }
 
   constructor(deps: FormatVariantsServiceDeps) {
-    this.priceService = new PriceService()
     this.calculation = deps.calculation
     this.imageProcessingService = new ImageProcessingService()
     this.categoriesService = new CategoriesService()
@@ -57,10 +56,10 @@ export default class FormatVariantsService {
    */
   async formatVariants(
     productsList: FormattedProduct[],
-    currentChannelConfig: ChannelConfigInterface
+    currentChannelConfig: ChannelConfigInterface,
+    options?: { bcPriceListByVariantId?: Map<number, PriceListRecord> }
   ): Promise<FormattedProductWithModelVariants[]> {
-    // Control de concurrencia para evitar sobrecargar el microservicio de precios
-    // Limitar a 10 variantes procesadas simultáneamente para evitar timeouts
+    // Limita concurrencia en imagenes/keywords; precios no-CL vienen del mapa por lote (BC price list)
     const limitConcurrency = pLimit(10)
 
     // Obtener todas las variantes de todos los productos
@@ -88,7 +87,9 @@ export default class FormatVariantsService {
     // Procesar todas las variantes con límite de concurrencia
     const formattedVariantsResults = await Promise.all(
       allVariants.map(({ variant, product, config }) =>
-        limitConcurrency(() => this.processIndividualVariant(variant, product, config))
+        limitConcurrency(() =>
+          this.processIndividualVariant(variant, product, config, options?.bcPriceListByVariantId)
+        )
       )
     )
 
@@ -126,7 +127,8 @@ export default class FormatVariantsService {
   private async processIndividualVariant(
     variant: BigcommerceProductVariant,
     product: FormattedProduct,
-    config: ChannelConfigInterface
+    config: ChannelConfigInterface,
+    bcPriceMap?: Map<number, PriceListRecord>
   ): Promise<FormattedVariantForModel> {
     const { PERCENT_DISCOUNT_TRANSFER_PRICE } = config
 
@@ -134,7 +136,8 @@ export default class FormatVariantsService {
     const processedData = await this.processVariantData(
       variant,
       product,
-      PERCENT_DISCOUNT_TRANSFER_PRICE
+      PERCENT_DISCOUNT_TRANSFER_PRICE,
+      bcPriceMap
     )
 
     // Construir objeto de la variante formateada
@@ -190,7 +193,8 @@ export default class FormatVariantsService {
   private async calculateVariantPrices(
     variant: BigcommerceProductVariant,
     _product: FormattedProduct,
-    PERCENT_DISCOUNT_TRANSFER_PRICE: number
+    PERCENT_DISCOUNT_TRANSFER_PRICE: number,
+    bcPriceMap?: Map<number, PriceListRecord>
   ) {
     try {
       if (this.country === 'CL') {
@@ -210,30 +214,24 @@ export default class FormatVariantsService {
           cash_price: percentDiscount,
           discount_rate: discount,
         }
-      } else {
-        const prices = await this.priceService.getPriceByVariantId(variant.id)
+      }
 
-        // Validar que PriceService devolvió datos válidos
-        if (!prices || !prices.price || !prices.calculatedPrice) {
-          throw new Error(`PriceService sin datos para variante ${variant.id}`)
-        }
+      const record = bcPriceMap?.get(variant.id)
+      if (!record) {
+        throw new Error(`Sin registro de price list BC para variante ${variant.id}`)
+      }
 
-        // Usar precios de PriceService si están disponibles
-        const discount = this.calculation.calculateDiscount(
-          prices.price,
-          prices.calculatedPrice
-        )
-        const percentDiscount = this.calculation.calculateTransferPrice(
-          prices.price,
-          prices.calculatedPrice,
-          PERCENT_DISCOUNT_TRANSFER_PRICE
-        )
-        return {
-          normal_price: prices.price,
-          discount_price: prices.calculatedPrice,
-          cash_price: percentDiscount,
-          discount_rate: discount,
-        }
+      const pr = priceResultFromBcPricelistRecord(
+        record,
+        this.calculation,
+        PERCENT_DISCOUNT_TRANSFER_PRICE
+      )
+
+      return {
+        normal_price: pr.normal_price,
+        discount_price: pr.discount_price,
+        cash_price: pr.cash_price,
+        discount_rate: pr.discount,
       }
     } catch (error) {
       this.logger.warn(
@@ -258,7 +256,8 @@ export default class FormatVariantsService {
   private async processVariantData(
     variant: BigcommerceProductVariant,
     product: FormattedProduct,
-    percentDiscount: number | null
+    percentDiscount: number | null,
+    bcPriceMap?: Map<number, PriceListRecord>
   ) {
     let inventoryLevel: Array<{ available_to_sell: number; safety_stock: number }> = []
     let prices = { ...FormatVariantsService.DEFAULT_PRICES }
@@ -268,7 +267,8 @@ export default class FormatVariantsService {
       prices = await this.calculateVariantPrices(
         variant,
         product,
-        percentDiscount || FormatVariantsService.DEFAULT_PERCENT_DISCOUNT
+        percentDiscount || FormatVariantsService.DEFAULT_PERCENT_DISCOUNT,
+        bcPriceMap
       )
     } catch (error) {
       this.logger.warn(

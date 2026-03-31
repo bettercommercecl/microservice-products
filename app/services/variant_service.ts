@@ -167,7 +167,10 @@ export default class VariantService {
     page: number,
     limit: number,
     channelId?: number
-  ): Promise<{ data: Record<string, unknown>[]; meta: { total: number; perPage: number; currentPage: number; lastPage: number } }> {
+  ): Promise<{
+    data: Record<string, unknown>[]
+    meta: { total: number; perPage: number; currentPage: number; lastPage: number }
+  }> {
     return this.variantRepository.findPaginatedTableShape(page, limit, channelId)
   }
 
@@ -179,7 +182,10 @@ export default class VariantService {
     page: number,
     limit: number,
     parentCategoryId?: number
-  ): Promise<{ data: unknown[]; meta: { total: number; perPage: number; currentPage: number; lastPage: number } }> {
+  ): Promise<{
+    data: unknown[]
+    meta: { total: number; perPage: number; currentPage: number; lastPage: number }
+  }> {
     const { data: variants, meta } = await this.variantRepository.findPaginatedByChannelWithProduct(
       channelId,
       page,
@@ -211,7 +217,7 @@ export default class VariantService {
 
     const formatOptions = {
       percentTransfer: Number(env.get('PERCENT_DISCOUNT_TRANSFER_PRICE')) || 2,
-      idPacks: env.get('ID_PACKS') != null ? Number(env.get('ID_PACKS')) : undefined,
+      idPacks: env.get('ID_PACKS') !== null ? Number(env.get('ID_PACKS')) : undefined,
     }
     const data = (variants as Variant[]).map((v) =>
       formatVariantForMarcas(
@@ -239,13 +245,20 @@ export default class VariantService {
         paginated = await Variant.query()
           .join('channel_product', 'variants.product_id', 'channel_product.product_id')
           .where('channel_product.channel_id', channelId)
+          .join('products', 'variants.product_id', 'products.id')
           .where('variants.is_visible', '=', true)
+          .where('products.is_visible', '=', true)
           .select('variants.*')
           .paginate(page, limit)
 
         productIds = paginated.all().map((variant: any) => variant.product_id)
       } else {
-        paginated = await Variant.query().where('is_visible', '=', true).paginate(page, limit)
+        paginated = await Variant.query()
+          .join('products', 'variants.product_id', 'products.id')
+          .where('variants.is_visible', '=', true)
+          .where('products.is_visible', '=', true)
+          .select('variants.*')
+          .paginate(page, limit)
         productIds = paginated.all().map((variant: any) => variant.product_id)
       }
 

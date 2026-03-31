@@ -1,7 +1,11 @@
+import syncConfig from '#config/sync'
+import CatalogSafeStock from '#models/catalog_safe_stock'
 import CategoryProduct from '#models/category_product'
 import ChannelProduct from '#models/channel_product'
+import FiltersProduct from '#models/filters_product'
 import Option from '#models/option'
 import Product from '#models/product'
+import ProductPack from '#models/product_pack'
 import Variant from '#models/variant'
 import Logger from '@adonisjs/core/services/logger'
 import db from '@adonisjs/lucid/services/db'
@@ -13,8 +17,80 @@ import db from '@adonisjs/lucid/services/db'
 export default class SyncCleanupService {
   private readonly logger = Logger.child({ service: 'SyncCleanupService' })
 
-  // Si mas del 50% de productos desaparecen, probablemente es un error de la API
+  // Limpieza de obsoletos (run): si mas del 50% desaparecen, probable error de API
   private static readonly SAFETY_THRESHOLD = 0.5
+
+  /**
+   * Productos del catalogo BC que no tienen ninguna variante en el price list del pais (PE/CO).
+   * Producto y variantes: is_visible false (las variantes no se borran). Resto como run(): opciones, etc.
+   * Aborta si el volumen supera el umbral de seguridad.
+   */
+  async purgeExcludedFromPricelist(
+    excludedProductIds: number[],
+    totalProductsFetchedFromBc: number
+  ): Promise<void> {
+    if (excludedProductIds.length === 0) return
+    if (totalProductsFetchedFromBc === 0) return
+
+    const ratio = excludedProductIds.length / totalProductsFetchedFromBc
+    const maxRatio = syncConfig.pricelistPurgeMaxExcludedRatio
+    if (ratio > maxRatio) {
+      this.logger.error(
+        {
+          excluded: excludedProductIds.length,
+          fetched: totalProductsFetchedFromBc,
+          ratio: `${(ratio * 100).toFixed(1)}%`,
+          maxRatio: `${(maxRatio * 100).toFixed(1)}%`,
+        },
+        'Abortando purga por price list: ratio de excluidos supera PRICELIST_PURGE_MAX_EXCLUDED_RATIO (revisar price list, LIST_PRICE_ID o catalogo BC)'
+      )
+      return
+    }
+
+    this.logger.info(
+      { count: excludedProductIds.length },
+      'Limpiando productos sin variante en el price list del pais...'
+    )
+
+    await db.transaction(async (trx) => {
+      await FiltersProduct.query({ client: trx }).whereIn('product_id', excludedProductIds).delete()
+      await CatalogSafeStock.query({ client: trx })
+        .whereIn('product_id', excludedProductIds)
+        .delete()
+      await ProductPack.query({ client: trx }).whereIn('product_id', excludedProductIds).delete()
+
+      await Product.query({ client: trx })
+        .whereIn('id', excludedProductIds)
+        .update({ is_visible: false })
+
+      const hiddenVariants = await Variant.query({ client: trx })
+        .whereIn('product_id', excludedProductIds)
+        .update({ is_visible: false })
+
+      const deletedOptions = await Option.query({ client: trx })
+        .whereIn('product_id', excludedProductIds)
+        .delete()
+
+      const deletedCategories = await CategoryProduct.query({ client: trx })
+        .whereIn('product_id', excludedProductIds)
+        .delete()
+
+      const deletedChannels = await ChannelProduct.query({ client: trx })
+        .whereIn('product_id', excludedProductIds)
+        .delete()
+
+      this.logger.info(
+        {
+          hidden_products: excludedProductIds.length,
+          hidden_variants: hiddenVariants,
+          deleted_options: deletedOptions,
+          deleted_categories: deletedCategories,
+          deleted_channels: deletedChannels,
+        },
+        'Purga por price list completada'
+      )
+    })
+  }
 
   /**
    * Oculta productos que ya no estan en BigCommerce y limpia entidades huerfanas.

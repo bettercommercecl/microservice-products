@@ -1,20 +1,20 @@
+import GetAllProductsUseCase from '#application/use_cases/products/get_all_products_use_case'
+import GetProductByIdUseCase from '#application/use_cases/products/get_product_by_id_use_case'
+import GetProductReviewsPaginatedUseCase from '#application/use_cases/products/get_product_reviews_paginated_use_case'
+import GetProductsByChannelUseCase from '#application/use_cases/products/get_products_by_channel_use_case'
+import GetProductsPaginatedUseCase from '#application/use_cases/products/get_products_paginated_use_case'
+import ChannelLookupAdapter from '#infrastructure/adapters/channel_lookup_adapter'
+import ProductCatalogAdapter from '#infrastructure/adapters/product_catalog_adapter'
 import Channel from '#models/channel'
 import ChannelProduct from '#models/channel_product'
 import Variant from '#models/variant'
-import GetProductsPaginatedUseCase from '#application/use_cases/products/get_products_paginated_use_case'
-import GetProductsByChannelUseCase from '#application/use_cases/products/get_products_by_channel_use_case'
-import GetProductByIdUseCase from '#application/use_cases/products/get_product_by_id_use_case'
-import GetAllProductsUseCase from '#application/use_cases/products/get_all_products_use_case'
-import GetProductReviewsPaginatedUseCase from '#application/use_cases/products/get_product_reviews_paginated_use_case'
-import ProductCatalogAdapter from '#infrastructure/adapters/product_catalog_adapter'
-import ChannelLookupAdapter from '#infrastructure/adapters/channel_lookup_adapter'
-import { HttpContext } from '@adonisjs/core/http'
-import Logger from '@adonisjs/core/services/logger'
-import vine from '@vinejs/vine'
 import { productShowSchema } from '#validators/product_show_validator'
 import { productsByChannelSchema } from '#validators/products_by_channel_validator'
 import { productsPaginatedSchema } from '#validators/products_paginated_validator'
 import { reviewsPaginatedSchema } from '#validators/reviews_paginated_validator'
+import { HttpContext } from '@adonisjs/core/http'
+import Logger from '@adonisjs/core/services/logger'
+import vine from '@vinejs/vine'
 
 export default class ProductsController {
   private readonly getProductsPaginatedUseCase: GetProductsPaginatedUseCase
@@ -161,28 +161,33 @@ export default class ProductsController {
         .orderBy('updated_at', 'desc')
         .select('id', 'updated_at')
         .first(),
-      ChannelProduct.query()
-        .where('channel_id', channelId)
-        .select('product_id'),
+      ChannelProduct.query().where('channel_id', channelId).select('product_id'),
     ])
 
-    const productsCount = Number((productsCountResult as { $extras?: { total?: number } })?.$extras?.total ?? 0)
+    const productsCount = Number(
+      (productsCountResult as { $extras?: { total?: number } })?.$extras?.total ?? 0
+    )
     const productIds = productIdsRows.map((r) => r.product_id)
     let variantsCount = 0
     if (productIds.length > 0) {
       const variantsResult = await Variant.query()
-        .whereIn('product_id', productIds)
+        .join('products', 'variants.product_id', 'products.id')
+        .whereIn('variants.product_id', productIds)
+        .where('variants.is_visible', true)
+        .where('products.is_visible', true)
         .count('* as total')
         .first()
-      variantsCount = Number((variantsResult as { $extras?: { total?: number } })?.$extras?.total ?? 0)
+      variantsCount = Number(
+        (variantsResult as { $extras?: { total?: number } })?.$extras?.total ?? 0
+      )
     }
 
     const lastUpdated = lastUpdatedRow?.updatedAt
     const lastSyncedAt =
-      lastUpdated != null
+      lastUpdated !== null
         ? typeof lastUpdated === 'string'
           ? lastUpdated
-          : (lastUpdated as { toISO?: () => string }).toISO?.() ?? null
+          : ((lastUpdated as { toISO?: () => string }).toISO?.() ?? null)
         : null
 
     return response.ok({

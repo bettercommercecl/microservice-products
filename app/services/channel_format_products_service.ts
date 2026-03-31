@@ -1,14 +1,15 @@
 import { BigcommerceProduct } from '#dto/bigcommerce/bigcommerce_product.dto'
+import type { PriceListRecord } from '#infrastructure/bigcommerce/modules/pricelists/interfaces/pricelist_record.interface'
 import { ChannelConfigInterface } from '#interfaces/channel_interface'
 import { FormattedProduct } from '#interfaces/formatted_product.interface'
 import CatalogSafeStock from '#models/catalog_safe_stock'
+import { priceResultFromBcPricelistRecord } from '#services/synchronizations/bc_pricelist_pricing'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 import { DateTime } from 'luxon'
 import type { CalculationPort } from '#application/ports/calculation.port'
 import BigcommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import CategoriesService from '#services/categories_service'
-import PriceService from '#services/price_service'
 
 export interface ChannelFormatProductsServiceDeps {
   calculation: CalculationPort
@@ -19,7 +20,6 @@ export default class ChannelFormatProductsService {
   private readonly country = env.get('COUNTRY_CODE')
   private readonly categoriesService: CategoriesService
   private readonly bigcommerceService: BigcommerceService
-  private readonly priceService: PriceService
   private readonly calculation: CalculationPort
 
   // Constantes para valores por defecto
@@ -40,19 +40,16 @@ export default class ChannelFormatProductsService {
   constructor(deps: ChannelFormatProductsServiceDeps) {
     this.categoriesService = new CategoriesService()
     this.bigcommerceService = new BigcommerceService()
-    this.priceService = new PriceService()
     this.calculation = deps.calculation
   }
   async formatProducts(
     productsList: BigcommerceProduct[],
-    currentChannelConfig: ChannelConfigInterface
+    currentChannelConfig: ChannelConfigInterface,
+    options?: { bcPriceListByVariantId?: Map<number, PriceListRecord> }
   ): Promise<FormattedProduct[]> {
-    // Usar configuración del canal directamente
-
-    // Procesar todos los productos en paralelo
     const products = await Promise.all(
       productsList.map(async (product) => {
-        return await this.processIndividualProduct(product, currentChannelConfig)
+        return await this.processIndividualProduct(product, currentChannelConfig, options)
       })
     )
 
@@ -67,7 +64,8 @@ export default class ChannelFormatProductsService {
    */
   private async processIndividualProduct(
     product: BigcommerceProduct,
-    config: ChannelConfigInterface
+    config: ChannelConfigInterface,
+    options?: { bcPriceListByVariantId?: Map<number, PriceListRecord> }
   ): Promise<FormattedProduct> {
     const { PERCENT_DISCOUNT_TRANSFER_PRICE, ID_RESERVE } = config
 
@@ -81,7 +79,11 @@ export default class ChannelFormatProductsService {
     const quantity = product.variants.reduce((acc, variant) => acc + variant.inventory_level, 0)
 
     // Procesar datos con manejo de errores
-    const processedData = await this.processProductData(product, PERCENT_DISCOUNT_TRANSFER_PRICE)
+    const processedData = await this.processProductData(
+      product,
+      PERCENT_DISCOUNT_TRANSFER_PRICE,
+      options?.bcPriceListByVariantId
+    )
 
     // Construir objeto del producto formateado
     return this.buildFormattedProduct(product, {
@@ -231,7 +233,8 @@ export default class ChannelFormatProductsService {
   }
   private async calculatePricesProduct(
     product: BigcommerceProduct,
-    PERCENT_DISCOUNT_TRANSFER_PRICE: number
+    PERCENT_DISCOUNT_TRANSFER_PRICE: number,
+    bcPriceMap?: Map<number, PriceListRecord>
   ) {
     try {
       if (this.country === 'CL') {
@@ -251,35 +254,28 @@ export default class ChannelFormatProductsService {
           cash_price: percentDiscount,
           percent: discount,
         }
-      } else {
-        // Verificar que el producto tenga variantes antes de consultar precios
-        if (!product.variants || product.variants.length === 0) {
-          throw new Error(`Producto ${product.id} sin variantes`)
-        }
+      }
 
-        const prices = await this.priceService.getPriceByVariantId(product.variants[0].id)
+      if (!product.variants || product.variants.length === 0) {
+        throw new Error(`Producto ${product.id} sin variantes`)
+      }
 
-        // Validar que PriceService devolvió datos válidos
-        if (!prices || !prices.price || !prices.calculatedPrice) {
-          throw new Error(`PriceService sin datos para producto ${product.id}`)
-        }
+      const record = bcPriceMap?.get(product.variants[0].id)
+      if (!record) {
+        throw new Error(`Sin registro de price list BC para producto ${product.id}`)
+      }
 
-        // Usar precios de PriceService si están disponibles
-        const discount = this.calculation.calculateDiscount(
-          prices.price,
-          prices.calculatedPrice
-        )
-        const percentDiscount = this.calculation.calculateTransferPrice(
-          prices.price,
-          prices.calculatedPrice,
-          PERCENT_DISCOUNT_TRANSFER_PRICE
-        )
-        return {
-          normal_price: prices.price,
-          discount_price: prices.calculatedPrice,
-          cash_price: percentDiscount,
-          percent: discount,
-        }
+      const pr = priceResultFromBcPricelistRecord(
+        record,
+        this.calculation,
+        PERCENT_DISCOUNT_TRANSFER_PRICE
+      )
+
+      return {
+        normal_price: pr.normal_price,
+        discount_price: pr.discount_price,
+        cash_price: pr.cash_price,
+        percent: pr.discount,
       }
     } catch (error) {
       this.logger.warn(
@@ -438,7 +434,11 @@ export default class ChannelFormatProductsService {
    * @param percentDiscount - Porcentaje de descuento
    * @returns Objeto con los datos procesados
    */
-  private async processProductData(product: BigcommerceProduct, percentDiscount: number | null) {
+  private async processProductData(
+    product: BigcommerceProduct,
+    percentDiscount: number | null,
+    bcPriceMap?: Map<number, PriceListRecord>
+  ) {
     let inventoryLevel: Array<{ available_to_sell: number; safety_stock: number }> = []
     let timerMetafields = { ...ChannelFormatProductsService.DEFAULT_TIMER_METAFIELDS }
     let prices = { ...ChannelFormatProductsService.DEFAULT_PRICES }
@@ -448,7 +448,8 @@ export default class ChannelFormatProductsService {
       timerMetafields = await this.getProductTimerMetafields(product.id)
       prices = await this.calculatePricesProduct(
         product,
-        percentDiscount || ChannelFormatProductsService.DEFAULT_PERCENT_DISCOUNT
+        percentDiscount || ChannelFormatProductsService.DEFAULT_PERCENT_DISCOUNT,
+        bcPriceMap
       )
     } catch (error) {
       this.logger.warn(

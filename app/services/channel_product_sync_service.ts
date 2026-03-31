@@ -5,19 +5,24 @@ import { FormattedProductWithModelVariants } from '#interfaces/formatted_product
 import ChannelProduct from '#models/channel_product'
 import Product from '#models/product'
 import Variant from '#models/variant'
+import CategoryService from '#services/categories_service'
+import ChannelFormatProductsService from '#services/channel_format_products_service'
+import ChannelsService from '#services/channels_service'
+import FiltersService from '#services/filters_service'
+import FormatOptionsService from '#services/format_options_service'
+import FormatVariantsService from '#services/format_variants_service'
+import InventoryService from '#services/inventory_service'
+import ProductService from '#services/product_service'
+import PricelistRecordsBatchService, {
+  filterProductsByPricelistMembership,
+  getListPriceIdForCountry,
+} from '#services/synchronizations/pricelist_records_batch_service'
+import SyncCleanupService from '#services/synchronizations/sync_cleanup_service'
 import env from '#start/env'
+import { applyVariantBatchUpsert } from '#utils/release_variant_sku_conflicts'
 import Logger from '@adonisjs/core/services/logger'
 import db from '@adonisjs/lucid/services/db'
 import type { QueryClientContract, TransactionClientContract } from '@adonisjs/lucid/types/database'
-import CategoryService from '#services/categories_service'
-import ChannelsService from '#services/channels_service'
-import ChannelFormatProductsService from '#services/channel_format_products_service'
-import FormatOptionsService from '#services/format_options_service'
-import FormatVariantsService from '#services/format_variants_service'
-import FiltersService from '#services/filters_service'
-import InventoryService from '#services/inventory_service'
-import ProductService from '#services/product_service'
-import { applyVariantBatchUpsert } from '#utils/release_variant_sku_conflicts'
 
 export interface ChannelProductSyncServiceDeps {
   bigcommerceService: BigcommerceService
@@ -44,10 +49,7 @@ export default class ChannelProductSyncService {
   private readonly categoryService: CategoryService
   private readonly channelsService: ChannelsService
 
-  constructor(
-    currentChannelConfig: ChannelConfigInterface,
-    deps: ChannelProductSyncServiceDeps
-  ) {
+  constructor(currentChannelConfig: ChannelConfigInterface, deps: ChannelProductSyncServiceDeps) {
     this.currentChannelConfig = currentChannelConfig
     this.bigcommerceService = deps.bigcommerceService
     this.productService = deps.productService
@@ -116,8 +118,53 @@ export default class ChannelProductSyncService {
         }
       }
       // 2. Obtener productos de Bigcommerce
-      const bigcommerceProducts = await this.fetchBigcommerceProducts(CHANNEL)
+      let bigcommerceProducts = await this.fetchBigcommerceProducts(CHANNEL)
       this.logger.info(`Obtenidos ${bigcommerceProducts.length} productos de Bigcommerce`)
+
+      const totalFetchedFromBc = bigcommerceProducts.length
+
+      if (configuredCountry !== 'CL') {
+        const priceListId = getListPriceIdForCountry()
+        const pricelistService = new PricelistRecordsBatchService(this.bigcommerceService)
+        await pricelistService.syncFullPricelistFromBigcommerce(priceListId)
+        const variantIdsInList = await pricelistService.getVariantIdsInPriceList(priceListId)
+        const { kept, excludedIds } = filterProductsByPricelistMembership(
+          bigcommerceProducts,
+          variantIdsInList
+        )
+        bigcommerceProducts = kept
+        await new SyncCleanupService().purgeExcludedFromPricelist(excludedIds, totalFetchedFromBc)
+        this.logger.info(
+          {
+            total_bc: totalFetchedFromBc,
+            synced: bigcommerceProducts.length,
+            excluded: excludedIds.length,
+          },
+          'Catalogo filtrado por price list del pais'
+        )
+      }
+
+      if (bigcommerceProducts.length === 0) {
+        const totalTime = Date.now() - startTime
+        this.logger.info(
+          'Sin productos a sincronizar (catalogo vacio o ninguno cumple price list); se omite lotes y limpieza por canal'
+        )
+        return {
+          success: true,
+          message: `Sincronización sin productos para canal ${CHANNEL}`,
+          data: {
+            timestamp: new Date().toISOString(),
+            channelId: CHANNEL,
+            channelName: String(this.currentChannelConfig.CHANNEL || 'Unknown'),
+            processed: {
+              products: 0,
+              variants: 0,
+              batches: 0,
+              totalTime: `${totalTime}ms`,
+            },
+          },
+        }
+      }
 
       // ============================================================================
       // PASO 3: PROCESAR PRODUCTOS POR LOTES COMPLETOS (OPTIMIZADO)
@@ -147,17 +194,29 @@ export default class ChannelProductSyncService {
               `Procesando lote ${batchIndex + 1}/${batches.length} (${batch.length} productos)`
             )
 
+            const variantIds = batch.flatMap((p) => p.variants?.map((v) => v.id) || [])
+            const bcPriceOptions =
+              configuredCountry !== 'CL'
+                ? {
+                    bcPriceListByVariantId: await new PricelistRecordsBatchService(
+                      this.bigcommerceService
+                    ).loadMapFromDbForVariantIds(getListPriceIdForCountry(), variantIds),
+                  }
+                : undefined
+
             // ========================================
             // SUB-PASO 3.1: FORMATEAR PRODUCTOS Y VARIANTES
             // ========================================
             const formattedProducts = await this.formatProductsService.formatProducts(
               batch,
-              this.currentChannelConfig
+              this.currentChannelConfig,
+              bcPriceOptions
             )
 
             const formattedVariants = await this.formatVariantsService.formatVariants(
               formattedProducts,
-              this.currentChannelConfig
+              this.currentChannelConfig,
+              bcPriceOptions
             )
 
             // ========================================
@@ -189,7 +248,11 @@ export default class ChannelProductSyncService {
 
             // Secuencial: mismo batchTrx; paralelo provocaba condiciones de carrera en variants_sku_unique
             const variantBatchResults: { success: boolean; processed: number; batch: number }[] = []
-            for (let variantBatchIndex = 0; variantBatchIndex < variantBatches.length; variantBatchIndex++) {
+            for (
+              let variantBatchIndex = 0;
+              variantBatchIndex < variantBatches.length;
+              variantBatchIndex++
+            ) {
               const variantBatch = variantBatches[variantBatchIndex]
               try {
                 const ids = variantBatch.map((v) => v.id)
@@ -573,10 +636,6 @@ export default class ChannelProductSyncService {
     newRelationsToSave: { product_id: number; category_id: number }[],
     trx: TransactionClientContract
   ): Promise<number> {
-    return this.categoryService.cleanupOrphanedCategoryProducts(
-      productIds,
-      newRelationsToSave,
-      trx
-    )
+    return this.categoryService.cleanupOrphanedCategoryProducts(productIds, newRelationsToSave, trx)
   }
 }

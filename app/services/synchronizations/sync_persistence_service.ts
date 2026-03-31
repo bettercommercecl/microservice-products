@@ -13,8 +13,7 @@ import db from '@adonisjs/lucid/services/db'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 
 /**
- * Responsabilidad unica: persistir datos formateados en la base de datos.
- * No formatea, no llama APIs externas, solo escribe.
+ *  persistir datos formateados en la base de datos.
  */
 export default class SyncPersistenceService {
   private readonly logger = Logger.child({ service: 'SyncPersistenceService' })
@@ -23,7 +22,7 @@ export default class SyncPersistenceService {
   private static readonly RELATION_BATCH_SIZE = 500
 
   /**
-   * Persiste un lote completo de productos dentro de una transaccion atomica.
+   * Persiste un lote completo de productos dentro de una transaccion .
    */
   async saveBatch(
     products: FormattedProductWithVariants[],
@@ -61,8 +60,8 @@ export default class SyncPersistenceService {
     if (allVariants.length === 0) return
 
     const variantBatches = createBatches(allVariants, SyncPersistenceService.VARIANT_BATCH_SIZE)
-    for (let idx = 0; idx < variantBatches.length; idx++) {
-      await this.reconcileVariantBatch(variantBatches[idx], idx, trx)
+    for (const [idx, batch] of variantBatches.entries()) {
+      await this.reconcileVariantBatch(batch, idx, trx)
     }
   }
 
@@ -89,33 +88,67 @@ export default class SyncPersistenceService {
   /**
    * Sincroniza relaciones producto-categoria filtrando categorias inexistentes
    * para evitar FK violations.
+   * Quita en BD las categorias que ya no vienen de BC para cada producto del lote.
    */
   private async syncProductCategories(
     products: FormattedProductWithVariants[],
     trx: TransactionClientContract
   ): Promise<void> {
-    const allRelations: { product_id: number; category_id: number }[] = []
+    if (products.length === 0) return
 
-    for (const product of products) {
-      for (const categoryId of product._raw_categories) {
-        allRelations.push({ product_id: product.id, category_id: categoryId })
-      }
+    const allCategoryIdsInBatch = [...new Set(products.flatMap((p) => p._raw_categories ?? []))]
+
+    if (allCategoryIdsInBatch.length === 0) {
+      await CategoryProduct.query({ client: trx })
+        .whereIn(
+          'product_id',
+          products.map((p) => p.id)
+        )
+        .delete()
+      return
     }
 
-    if (allRelations.length === 0) return
-
-    const uniqueCategoryIds = [...new Set(allRelations.map((r) => r.category_id))]
     const existingCategories = await Category.query({ client: trx })
-      .whereIn('category_id', uniqueCategoryIds)
+      .whereIn('category_id', allCategoryIdsInBatch)
       .select('category_id')
     const validCategoryIds = new Set(existingCategories.map((c) => c.category_id))
 
-    const validRelations = allRelations.filter((r) => validCategoryIds.has(r.category_id))
+    for (const product of products) {
+      const desiredIds = [
+        ...new Set((product._raw_categories ?? []).filter((cid) => validCategoryIds.has(cid))),
+      ]
 
-    if (validRelations.length < allRelations.length) {
+      if (desiredIds.length > 0) {
+        await CategoryProduct.query({ client: trx })
+          .where('product_id', product.id)
+          .whereNotIn('category_id', desiredIds)
+          .delete()
+      } else {
+        await CategoryProduct.query({ client: trx }).where('product_id', product.id).delete()
+      }
+    }
+
+    const validRelations: { product_id: number; category_id: number }[] = []
+    const seenPair = new Set<string>()
+    let skippedInvalid = 0
+
+    for (const product of products) {
+      for (const categoryId of product._raw_categories ?? []) {
+        if (!validCategoryIds.has(categoryId)) {
+          skippedInvalid++
+          continue
+        }
+        const key = `${product.id}:${categoryId}`
+        if (seenPair.has(key)) continue
+        seenPair.add(key)
+        validRelations.push({ product_id: product.id, category_id: categoryId })
+      }
+    }
+
+    if (skippedInvalid > 0) {
       this.logger.warn(
-        { skipped: allRelations.length - validRelations.length },
-        'Relaciones omitidas por categorias inexistentes'
+        { skipped: skippedInvalid },
+        'Relaciones omitidas por categorias inexistentes en BD'
       )
     }
 
@@ -136,9 +169,11 @@ export default class SyncPersistenceService {
     const allRelations: { product_id: number; channel_id: number }[] = []
 
     for (const product of products) {
-      const channelIds = [...new Set(product._channels.map((id) => Number(id)).filter((id) => id > 0))]
+      const channelIds = [
+        ...new Set(product._channels.map((id) => Number(id)).filter((id) => id > 0)),
+      ]
       if (channelIds.length > 0) {
-        // Fuente de verdad: el array channels de BC. Quitamos filas viejas del producto que ya no esten en el array.
+        // Quitamos filas viejas del producto que ya no esten en el array.
         await ChannelProduct.query({ client: trx })
           .where('product_id', product.id)
           .whereNotIn('channel_id', channelIds)
