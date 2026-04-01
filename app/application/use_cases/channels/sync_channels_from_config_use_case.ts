@@ -1,4 +1,6 @@
 import type { ChannelRepositoryPort } from '#application/ports/channel_repository.port'
+import syncConfig from '#config/sync'
+import env from '#start/env'
 import { channels } from '#utils/channels/channels'
 
 export interface ChannelSyncInput {
@@ -6,12 +8,23 @@ export interface ChannelSyncInput {
   name: string
   country: string
   parentCategory: number | null
+  webhookUrl: string | null
+  webhookSecret: string | null
+  webhookEnabled: boolean
 }
 
 export interface SyncChannelsFromConfigResult {
   createdOrUpdated: number
   skipped: number
   countryCode: string
+}
+
+function brandsApiKeyFromEnv(): string | undefined {
+  return (
+    env.get('API_KEY_BRANDS')?.trim() ||
+    env.get('X_API_KEY_BRANDS')?.trim() ||
+    process.env['X-API-KEY-BRANDS']?.trim()
+  )
 }
 
 /**
@@ -34,12 +47,22 @@ export default class SyncChannelsFromConfigUseCase {
         continue
       }
 
-      const { CHANNEL, PARENT_CATEGORY } = countryConfig
+      const { CHANNEL, PARENT_CATEGORY, API_URL } = countryConfig
+      const apiUrl = typeof API_URL === 'string' ? API_URL.trim() : ''
+      const webhookUrl =
+        apiUrl.length > 0
+          ? `${apiUrl.replace(/\/$/, '')}${syncConfig.webhookSyncProductsPath}`
+          : null
+      const webhookSecret = brandsApiKeyFromEnv() ?? null
+
       const input: ChannelSyncInput = {
         id: CHANNEL,
         name: brandName,
         country: countryCode,
         parentCategory: PARENT_CATEGORY ?? null,
+        webhookUrl,
+        webhookSecret,
+        webhookEnabled: true,
       }
 
       await this.channelRepo.upsertChannel(input)
@@ -49,4 +72,3 @@ export default class SyncChannelsFromConfigUseCase {
     return results
   }
 }
-

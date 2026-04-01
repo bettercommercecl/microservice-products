@@ -21,10 +21,16 @@ declare module 'axios' {
     headers?: Record<string, string>
     timeout?: number
     params?: Record<string, string | number | undefined>
+    validateStatus?: (status: number) => boolean
   }
 
   export interface AxiosInstance {
     get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>
+    post<T = unknown>(
+      url: string,
+      data?: unknown,
+      config?: AxiosRequestConfig
+    ): Promise<AxiosResponse<T>>
     put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>
     patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>
     delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>

@@ -7,12 +7,15 @@ import type {
   BatchResult,
   FormattedProductWithVariants,
   SyncEnrichmentData,
+  SyncProductsCompleteOptions,
   SyncResult,
 } from '#interfaces/product-sync/sync.interfaces'
+import Channel from '#models/channel'
 import FiltersService from '#services/filters_service'
 import FormatOptionsService from '#services/format_options_service'
 import InventoryService from '#services/inventory_service'
 import N8nReserveService from '#services/n8n_reserve_service'
+import ProductService from '#services/product_service'
 import FormatVariantsService from '#services/synchronizations/format_variants_service'
 import GlobalFormatProductsService from '#services/synchronizations/global_format_products_service'
 import PacksSyncService from '#services/synchronizations/packs_sync_service'
@@ -45,10 +48,12 @@ export default class GlobalProductSyncService {
   private readonly preloadService: SyncPreloadService
   private readonly cleanupService: SyncCleanupService
   private readonly filtersService: FiltersService
+  private readonly productService?: ProductService
 
   private static readonly BATCH_SIZE = syncConfig.batchSize
 
-  constructor(deps: { calculation: CalculationPort }) {
+  constructor(deps: { calculation: CalculationPort; productService?: ProductService }) {
+    this.productService = deps.productService
     this.bigcommerceService = new BigCommerceService()
     this.inventoryService = new InventoryService()
     this.n8nReserveService = new N8nReserveService()
@@ -75,19 +80,48 @@ export default class GlobalProductSyncService {
    * 6. Limpiar productos descontinuados (ya no en catalogo BC)
    * 7. Sincronizar filtros (ID_ADVANCED debe estar configurado)
    * 8. Sincronizar packs (ID_PACKS debe estar configurado) si skipPacks es false
+   *
+   * Modo canal: `channelId` + `productService`; IDs por canal BC; detalle con `categories:in` solo si
+   * `channels.parent_category` en BD esta definido (fuente de verdad). Sin filtro post-fetch.
+   * Limpieza: cleanupAfterChannelSync (no run global).
    */
-  async syncProductsComplete(options?: { skipPacks?: boolean }): Promise<SyncResult> {
+  async syncProductsComplete(options?: SyncProductsCompleteOptions): Promise<SyncResult> {
     const startTime = Date.now()
-    this.logger.info('Iniciando sincronizacion global de productos...')
+    const channelId = options?.channelId
+    const channelName = options?.channelName
+    const isChannelMode = channelId !== undefined
+
+    if (isChannelMode) {
+      this.logger.info(
+        { channelId, channelName },
+        'Iniciando sincronizacion de productos (modo canal)'
+      )
+    } else {
+      this.logger.info('Iniciando sincronizacion global de productos...')
+    }
 
     try {
       // 1. Stock de seguridad y reservas n8n
       await this.syncInventoryAndReserves()
 
-      // 2. Catalogo completo desde BigCommerce
-      let products = await this.fetchAllProducts()
+      // 2. Catalogo desde BigCommerce (global o filtrado por canal)
+      let products: BigCommerceProduct[]
+      if (isChannelMode) {
+        if (!this.productService) {
+          throw new Error('ProductService es obligatorio para syncProductsComplete en modo canal')
+        }
+        products = await this.fetchProductsByChannel(channelId!)
+      } else {
+        products = await this.fetchAllProducts()
+      }
+
       if (products.length === 0) {
-        return this.buildResponse(startTime, { products: 0, variants: 0, hidden: 0 }, 0)
+        return this.buildResponse(
+          startTime,
+          { products: 0, variants: 0, hidden: 0 },
+          0,
+          isChannelMode ? { channelId: channelId!, channelName } : undefined
+        )
       }
 
       const totalFetchedFromBc = products.length
@@ -113,7 +147,12 @@ export default class GlobalProductSyncService {
           'Catalogo filtrado por price list del pais'
         )
         if (products.length === 0) {
-          return this.buildResponse(startTime, { products: 0, variants: 0, hidden: 0 }, 0)
+          return this.buildResponse(
+            startTime,
+            { products: 0, variants: 0, hidden: 0 },
+            0,
+            isChannelMode ? { channelId: channelId!, channelName } : undefined
+          )
         }
       }
 
@@ -123,11 +162,21 @@ export default class GlobalProductSyncService {
       // 5. Formatear y guardar por lotes
       const stats = await this.processAllBatches(products, enrichment)
 
-      // 6. Ocultar descontinuados y limpiar huerfanos
-      await this.cleanupService.run(products.map((p) => p.id))
+      // 6. Limpieza: global = obsoletos vs catalogo BC; canal = solo vínculos de ese canal + huérfanos
+      let channelCleanup: { staleLinksRemoved: number; orphansRemoved: number } | undefined
+      if (isChannelMode) {
+        channelCleanup = await this.cleanupService.cleanupAfterChannelSync(
+          channelId!,
+          products.map((p) => p.id)
+        )
+      } else {
+        await this.cleanupService.run(products.map((p) => p.id))
+      }
 
       // 7. Poblar filters_products desde categorias
-      await this.syncFilters()
+      if (!options?.skipFilters) {
+        await this.syncFilters()
+      }
 
       // 8. Sincronizar packs (omitir si skipPacks o sin config)
       if (!options?.skipPacks && env.get('ID_PACKS')) {
@@ -135,7 +184,12 @@ export default class GlobalProductSyncService {
         await packsSyncService.syncPacksFromBigcommerce()
       }
 
-      return this.buildResponse(startTime, stats, stats.batches || 0)
+      return this.buildResponse(
+        startTime,
+        stats,
+        stats.batches || 0,
+        isChannelMode ? { channelId: channelId!, channelName, channelCleanup } : undefined
+      )
     } catch (error: any) {
       this.logger.error(
         { error: error.message, stack: error.stack },
@@ -216,6 +270,71 @@ export default class GlobalProductSyncService {
     const products = result.data || []
     this.logger.info({ total: products.length }, 'Catalogo obtenido')
     return products
+  }
+
+  /**
+   * IDs por canal BC (getProductsByChannel) + detalle por lotes.
+   * `channels.parent_category` en BD define si getDetailedByIds agrega `categories:in`; si es null, solo ids de canal.
+   */
+  private async fetchProductsByChannel(channelId: number): Promise<BigCommerceProduct[]> {
+    const channelRow = await Channel.find(channelId)
+    if (!channelRow) {
+      throw new Error(
+        `Sync por canal: no hay fila en channels para channelId=${channelId}. Sincroniza o crea el canal en BD antes de ejecutar.`
+      )
+    }
+    const parentCategory = channelRow.parent_category ?? null
+
+    this.logger.info(
+      { channelId, parent_category: parentCategory },
+      'Obteniendo catalogo BigCommerce por canal (fuente parent_category: tabla channels)'
+    )
+
+    const productIds = await this.productService!.getAllProductIdsByChannel(channelId)
+    if (productIds.length === 0) {
+      this.logger.warn({ channelId }, 'No hay productos asignados al canal en BC')
+      return []
+    }
+
+    const batchSize = 250
+    const batches: number[][] = []
+    for (let i = 0; i < productIds.length; i += batchSize) {
+      batches.push(productIds.slice(i, i + batchSize))
+    }
+
+    const batchPromises = batches.map(async (batchIds, index) => {
+      try {
+        const productsPerPage = await this.bigcommerceService.getAllProductsRefactoring(
+          batchIds,
+          0,
+          parentCategory
+        )
+        this.logger.info(
+          { batch: index + 1, total: batches.length, count: productsPerPage.data?.length ?? 0 },
+          'Lote BC por canal'
+        )
+        return productsPerPage.data || []
+      } catch (error: any) {
+        this.logger.error(
+          { error: error.message, batch: index + 1 },
+          'Error en lote fetch por canal'
+        )
+        return []
+      }
+    })
+
+    const batchResults = await Promise.all(batchPromises)
+    const allProducts = batchResults.flat()
+    const uniqueProducts = allProducts.filter(
+      (product, index, self) => index === self.findIndex((p) => p.id === product.id)
+    )
+
+    this.logger.info(
+      { total: uniqueProducts.length, expected: productIds.length },
+      'Productos unicos obtenidos por canal'
+    )
+
+    return uniqueProducts as BigCommerceProduct[]
   }
 
   private async processAllBatches(
@@ -378,14 +497,23 @@ export default class GlobalProductSyncService {
   private buildResponse(
     startTime: number,
     stats: { products: number; variants: number; hidden: number },
-    totalBatches: number
+    totalBatches: number,
+    channelMeta?: {
+      channelId: number
+      channelName?: string
+      channelCleanup?: { staleLinksRemoved: number; orphansRemoved: number }
+    }
   ): SyncResult {
     const totalTime = Date.now() - startTime
     this.logger.info(`Sincronizacion de productos completada en ${totalTime}ms`)
 
+    const isChannel = channelMeta !== undefined
+
     return {
       success: true,
-      message: 'Sincronizacion global de productos completada',
+      message: isChannel
+        ? `Sincronizacion de productos completada (canal ${channelMeta.channelId})`
+        : 'Sincronizacion global de productos completada',
       data: {
         timestamp: new Date().toISOString(),
         processed: {
@@ -395,6 +523,13 @@ export default class GlobalProductSyncService {
           hidden: stats.hidden,
           totalTime: `${totalTime}ms`,
         },
+        ...(isChannel && {
+          mode: 'channel' as const,
+          channelId: channelMeta.channelId,
+          channelName: channelMeta.channelName,
+          ...(channelMeta.channelCleanup && { channelCleanup: channelMeta.channelCleanup }),
+        }),
+        ...(!isChannel && { mode: 'global' as const }),
       },
     }
   }

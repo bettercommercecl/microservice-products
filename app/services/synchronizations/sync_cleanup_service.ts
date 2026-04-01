@@ -147,6 +147,88 @@ export default class SyncCleanupService {
     })
   }
 
+  /**
+   * Sync por canal: quita el canal a productos que ya no vienen en el fetch BC de ese canal.
+   * Si un producto queda sin ningun canal, se elimina del catalogo (removeOrphanProductsFromDb).
+   */
+  async cleanupAfterChannelSync(
+    channelId: number,
+    activeProductIds: number[]
+  ): Promise<{ staleLinksRemoved: number; orphansRemoved: number }> {
+    const linkedBefore = await ChannelProduct.query()
+      .where('channel_id', channelId)
+      .select('product_id')
+
+    const linkedBeforeIds = new Set(linkedBefore.map((r) => r.product_id))
+    const activeSet = new Set(activeProductIds)
+
+    let staleDeleted = 0
+    if (activeProductIds.length === 0) {
+      const del = await ChannelProduct.query().where('channel_id', channelId).delete()
+      staleDeleted = typeof del === 'number' ? del : (del as unknown[]).length
+    } else {
+      const del = await ChannelProduct.query()
+        .where('channel_id', channelId)
+        .whereNotIn('product_id', activeProductIds)
+        .delete()
+      staleDeleted = typeof del === 'number' ? del : (del as unknown[]).length
+    }
+
+    const removedFromChannel = [...linkedBeforeIds].filter((id) => !activeSet.has(id))
+
+    const orphanIds: number[] = []
+    for (const pid of removedFromChannel) {
+      const stillLinked = await ChannelProduct.query().where('product_id', pid).first()
+      if (!stillLinked) {
+        orphanIds.push(pid)
+      }
+    }
+
+    let orphansRemoved = 0
+    if (orphanIds.length > 0) {
+      if (this.exceedsSafetyThreshold(orphanIds.length, Math.max(linkedBeforeIds.size, 1))) {
+        this.logger.error(
+          { orphans: orphanIds.length, channelId },
+          'Abortando eliminacion de productos huerfanos por canal: umbral de seguridad'
+        )
+        return { staleLinksRemoved: staleDeleted, orphansRemoved: 0 }
+      }
+      orphansRemoved = await this.removeOrphanProductsFromDb(orphanIds)
+    }
+
+    this.logger.info(
+      { channelId, staleLinksRemoved: staleDeleted, orphansRemoved },
+      'Limpieza por canal completada'
+    )
+
+    return { staleLinksRemoved: staleDeleted, orphansRemoved }
+  }
+
+  /**
+   * Productos sin ninguna fila en channel_product: baja de catalogo alineada a run() global.
+   */
+  private async removeOrphanProductsFromDb(productIds: number[]): Promise<number> {
+    if (productIds.length === 0) return 0
+
+    await db.transaction(async (trx) => {
+      await FiltersProduct.query({ client: trx }).whereIn('product_id', productIds).delete()
+      await CatalogSafeStock.query({ client: trx }).whereIn('product_id', productIds).delete()
+      await ProductPack.query({ client: trx }).whereIn('product_id', productIds).delete()
+
+      await Product.query({ client: trx }).whereIn('id', productIds).update({ is_visible: false })
+
+      await Variant.query({ client: trx }).whereIn('product_id', productIds).delete()
+
+      await Option.query({ client: trx }).whereIn('product_id', productIds).delete()
+
+      await CategoryProduct.query({ client: trx }).whereIn('product_id', productIds).delete()
+
+      await ChannelProduct.query({ client: trx }).whereIn('product_id', productIds).delete()
+    })
+
+    return productIds.length
+  }
+
   private exceedsSafetyThreshold(obsoleteCount: number, totalCount: number): boolean {
     const ratio = obsoleteCount / totalCount
 

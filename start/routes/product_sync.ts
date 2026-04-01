@@ -10,12 +10,6 @@ router
       .get('/completo', [FullSyncController, 'syncFull'])
       .use(middleware.rateLimit({ max: 1, windowMs: 600_000, key: 'global' }))
     router
-      .get('/marcas', [SyncControllerV2, 'syncBrands'])
-      .use(middleware.rateLimit({ max: 1, windowMs: 5_000, key: 'global' }))
-    router
-      .get('/categorias', [SyncControllerV2, 'syncCategories'])
-      .use(middleware.rateLimit({ max: 1, windowMs: 15_000, key: 'global' }))
-    router
       .get('/canales', [SyncControllerV2, 'syncChannels'])
       .use(middleware.rateLimit({ max: 10, windowMs: 60_000, key: 'global' }))
     router

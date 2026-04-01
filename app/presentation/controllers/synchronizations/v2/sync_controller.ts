@@ -1,49 +1,24 @@
+import SyncChannelsFromConfigUseCase from '#application/use_cases/channels/sync_channels_from_config_use_case'
+import syncConfig from '#config/sync'
 import CalculationAdapter from '#infrastructure/adapters/calculation_adapter'
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
-import BrandService from '#services/brands_service'
-import CategoryService from '#services/categories_service'
+import ChannelRepository from '#infrastructure/persistence/repositories/channel_repository'
+import CacheService from '#services/cache_service'
 import GlobalProductSyncService from '#services/synchronizations/global_product_sync_service'
 import PackReserveSyncService from '#services/synchronizations/pack_reserve_sync_service'
 import PacksSyncService from '#services/synchronizations/packs_sync_service'
 import StockSyncService from '#services/synchronizations/stock_sync_service'
-import CacheService from '#services/cache_service'
-import syncConfig from '#config/sync'
+import SyncWebhookNotifier from '#services/synchronizations/sync_webhook_notifier'
 import env from '#start/env'
-import ChannelRepository from '#infrastructure/persistence/repositories/channel_repository'
-import SyncChannelsFromConfigUseCase from '#application/use_cases/channels/sync_channels_from_config_use_case'
 import { HttpContext } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
 
 /**
- * Sincronizaciones v2: endpoints individuales (marcas, categorias, productos, packs, packs reserva, stock).
+ * Sincronizaciones v2: endpoints individuales (canales, productos, packs, packs reserva, stock).
+ * Marcas y categorias: mismas rutas legacy en `start/routes/sync.ts` (`api/sincronizar-marcas`, `api/sincronizar-categorias`).
  */
 export default class SyncControllerV2 {
   private readonly logger = Logger.child({ service: 'SyncControllerV2' })
-
-  async syncBrands({ response }: HttpContext) {
-    this.logger.info('Sincronizacion de marcas solicitada')
-    const brandService = new BrandService()
-    const result = await brandService.syncBrands()
-    return response.ok({
-      success: result.success,
-      message: result.message,
-      data: result.data,
-      meta: { timestamp: new Date().toISOString(), version: 'brands-sync' },
-      errors: result.errors,
-    })
-  }
-
-  async syncCategories({ response }: HttpContext) {
-    this.logger.info('Sincronizacion de categorias solicitada')
-    const categoryService = new CategoryService()
-    const result = await categoryService.syncCategories()
-    return response.ok({
-      success: true,
-      message: result.message,
-      data: result.data,
-      meta: { timestamp: new Date().toISOString(), version: 'categories-sync' },
-    })
-  }
 
   async syncChannels({ response }: HttpContext) {
     this.logger.info('Sincronizacion de canales solicitada (v2)')
@@ -70,6 +45,16 @@ export default class SyncControllerV2 {
     } catch (e: any) {
       this.logger.warn({ err: e }, 'Invalidacion de cache Redis omitida')
     }
+
+    const hooks = new SyncWebhookNotifier()
+    void hooks
+      .notifyAllChannelsInCountry('products_sync_completed', {
+        success: result.success,
+        source: 'standalone',
+        message: 'Productos sincronizados (global)',
+      })
+      .catch((err) => this.logger.error({ err }, 'Webhook products_sync_completed (global)'))
+
     return response.ok({
       success: result.success,
       message: result.message,
@@ -84,6 +69,16 @@ export default class SyncControllerV2 {
     const packsSyncService = new PacksSyncService(bigcommerceService)
     const result = await packsSyncService.syncPacksFromBigcommerce()
     const status = result.status === 201 ? 200 : result.status
+    const packOk = result.status < 400
+    const hooks = new SyncWebhookNotifier()
+    void hooks
+      .notifyAllChannelsInCountry('packs_sync_completed', {
+        success: packOk,
+        source: 'standalone',
+        message: 'Packs sincronizados desde BigCommerce',
+      })
+      .catch((err) => this.logger.error({ err }, 'Webhook packs_sync_completed'))
+
     return response.status(status).json({
       success: result.status < 400,
       message: result.message ?? (result.status === 201 ? 'Packs sincronizados' : 'Sin packs'),
@@ -97,6 +92,15 @@ export default class SyncControllerV2 {
     const bigcommerceService = new BigCommerceService()
     const packReserveSyncService = new PackReserveSyncService(bigcommerceService)
     const result = await packReserveSyncService.syncPacksReserve()
+    const hooks = new SyncWebhookNotifier()
+    void hooks
+      .notifyAllChannelsInCountry('packs_reserve_sync_completed', {
+        success: true,
+        source: 'standalone',
+        message: 'Packs reserva sincronizados',
+      })
+      .catch((err) => this.logger.error({ err }, 'Webhook packs_reserve_sync_completed'))
+
     return response.ok({
       success: true,
       message: 'Packs reserva sincronizados',
@@ -110,6 +114,15 @@ export default class SyncControllerV2 {
     const bigcommerceService = new BigCommerceService()
     const stockSyncService = new StockSyncService(bigcommerceService)
     const result = await stockSyncService.syncStock()
+    const hooks = new SyncWebhookNotifier()
+    void hooks
+      .notifyAllChannelsInCountry('stock_sync_completed', {
+        success: true,
+        source: 'standalone',
+        message: 'Stock sincronizado',
+      })
+      .catch((err) => this.logger.error({ err }, 'Webhook stock_sync_completed'))
+
     return response.ok({
       success: true,
       message: 'Stock sincronizado',
