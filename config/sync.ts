@@ -18,6 +18,8 @@ export default {
   batchSize: 200,
   cacheTtlProductsSeconds: 60,
   cacheInvalidationPrefixProducts: 'products',
+  /** Tras `API_URL` en `utils/channels/channels` para notificar sync al storefront */
+  webhookSyncProductsPath: '/api/webhook-sync-products',
   get pricelistPurgeMaxExcludedRatio() {
     return pricelistPurgeMaxExcludedRatio()
   },

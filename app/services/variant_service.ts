@@ -412,8 +412,15 @@ export default class VariantService {
     return field
   }
 
+  /** Stock numerico para comparar variantes del mismo producto (NaN/null -> 0). */
+  private numericStockForFilter(variant: { stock?: unknown }): number {
+    const n = Number(variant?.stock)
+    return Number.isFinite(n) ? n : 0
+  }
+
   /**
-   * Filtra variantes por Size+Color, agrupando por product_id
+   * Filtra variantes por Size+Color, agrupando por product_id: una variante por producto,
+   * la de mayor stock (empate: menor id).
    */
   private filterVariantsBySizeAndColor(variants: any[]): any[] {
     try {
@@ -427,8 +434,15 @@ export default class VariantService {
             if (productId === undefined || productId === null) {
               acc.variantsWithoutSize.push(variant)
             } else {
-              if (!acc.selectedMap[productId] || variant.id < acc.selectedMap[productId].id) {
+              const prev = acc.selectedMap[productId]
+              if (!prev) {
                 acc.selectedMap[productId] = variant
+              } else {
+                const stockNew = this.numericStockForFilter(variant)
+                const stockPrev = this.numericStockForFilter(prev)
+                if (stockNew > stockPrev || (stockNew === stockPrev && variant.id < prev.id)) {
+                  acc.selectedMap[productId] = variant
+                }
               }
             }
           } else {

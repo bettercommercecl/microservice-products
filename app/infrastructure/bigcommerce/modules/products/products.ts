@@ -1,5 +1,5 @@
-import type { AxiosInstance } from 'axios'
 import type { Logger } from '@adonisjs/core/logger'
+import type { AxiosInstance } from 'axios'
 
 type SortField =
   | 'id'
@@ -114,7 +114,10 @@ export default class ProductsApi {
           timeout: 30_000,
         })
 
-        const body = response.data as { data: unknown[]; meta?: { pagination?: { total_pages?: number } } }
+        const body = response.data as {
+          data: unknown[]
+          meta?: { pagination?: { total_pages?: number } }
+        }
         const { data, meta } = body
 
         if (!data || data.length === 0) break
@@ -182,7 +185,7 @@ export default class ProductsApi {
       'availability': 'available',
       'sort': 'id',
       'direction': 'desc',
-      'include': ['images', 'variants'],
+      'include': ['images', 'variants', 'channels'],
       'limit': 250,
     }
 
@@ -221,7 +224,18 @@ export default class ProductsApi {
         params: { status: 1 },
       })
 
-      const data = (results.data as { data: Array<{ id?: number; name?: string; title?: string; text?: string; rating?: number; date_reviewed?: string }> }).data
+      const data = (
+        results.data as {
+          data: Array<{
+            id?: number
+            name?: string
+            title?: string
+            text?: string
+            rating?: number
+            date_reviewed?: string
+          }>
+        }
+      ).data
       const arrayReviews: any[] = []
       let totalRating = 0
 

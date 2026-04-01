@@ -1,5 +1,5 @@
-import type { ChannelSyncInput } from '#application/use_cases/channels/sync_channels_from_config_use_case'
 import type { ChannelRepositoryPort } from '#application/ports/channel_repository.port'
+import type { ChannelSyncInput } from '#application/use_cases/channels/sync_channels_from_config_use_case'
 import Channel from '#models/channel'
 
 export default class ChannelRepository implements ChannelRepositoryPort {
@@ -14,8 +14,10 @@ export default class ChannelRepository implements ChannelRepositoryPort {
         name: input.name,
         country: input.country,
         parent_category: input.parentCategory,
+        webhookUrl: input.webhookUrl,
+        webhookSecret: input.webhookSecret,
+        webhookEnabled: input.webhookEnabled,
       }
     )
   }
 }
-

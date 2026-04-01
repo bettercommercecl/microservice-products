@@ -1,9 +1,9 @@
-import { HttpContext } from '@adonisjs/core/http'
 import ChannelsService from '#services/channels_service'
-import Logger from '@adonisjs/core/services/logger'
-import { createChannelValidator, updateChannelValidator } from '#validators/channel_validator'
-import { channelNameValidator } from '#validators/channel_name_validator'
 import { channels as channelsConfig } from '#utils/channels/channels'
+import { channelNameValidator } from '#validators/channel_name_validator'
+import { createChannelValidator, updateChannelValidator } from '#validators/channel_validator'
+import { HttpContext } from '@adonisjs/core/http'
+import Logger from '@adonisjs/core/services/logger'
 
 export default class ChannelsController {
   private readonly logger = Logger.child({ service: 'ChannelsController' })
@@ -221,7 +221,7 @@ export default class ChannelsController {
         if (countries && typeof countries === 'object' && !Array.isArray(countries)) {
           for (const [country, config] of Object.entries(countries)) {
             const cfg = config as { CHANNEL?: number }
-            if (cfg?.CHANNEL != null) {
+            if (cfg?.CHANNEL !== undefined) {
               toSync.push({ id: cfg.CHANNEL, name: `${brand}_${country}` })
             }
           }
@@ -233,7 +233,10 @@ export default class ChannelsController {
           await this.channelsService.create({ id, name })
           created++
         } catch (err) {
-          errors.push({ channel: name, message: err instanceof Error ? err.message : 'Error desconocido' })
+          errors.push({
+            channel: name,
+            message: err instanceof Error ? err.message : 'Error desconocido',
+          })
         }
       }
 

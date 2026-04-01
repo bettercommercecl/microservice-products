@@ -21,6 +21,15 @@ export default class Channel extends BaseModel {
   @column()
   declare country: string | null
 
+  @column({ columnName: 'webhook_url' })
+  declare webhookUrl: string | null
+
+  @column({ columnName: 'webhook_secret' })
+  declare webhookSecret: string | null
+
+  @column({ columnName: 'webhook_enabled' })
+  declare webhookEnabled: boolean
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 

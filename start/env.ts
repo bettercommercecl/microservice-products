@@ -251,4 +251,18 @@ export default await Env.create(new URL('../', import.meta.url), {
   ID_SMALL_BOGOTA: Env.schema.number.optional(),
   ID_MEDIUM_BOGOTA: Env.schema.number.optional(),
   ID_BIG_BOGOTA: Env.schema.number.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | Webhooks post-sync (notificacion a marcas / storefront)
+  | URL: {API_URL del canal en utils/channels}/api/webhook-sync-products
+  | Cabecera x-api-key y firma HMAC opcional con esta misma clave
+  |----------------------------------------------------------
+  */
+  SYNC_WEBHOOKS_ENABLED: Env.schema.boolean.optional(),
+  SYNC_WEBHOOK_TIMEOUT_MS: Env.schema.number.optional(),
+  SYNC_WEBHOOK_GLOBAL_STAGGER_MS: Env.schema.number.optional(),
+  API_KEY_BRANDS: Env.schema.string.optional(),
+  /** Alias opcional de API_KEY_BRANDS (mismo uso que x-api-key en webhooks de marcas) */
+  X_API_KEY_BRANDS: Env.schema.string.optional(),
 })

@@ -25,18 +25,19 @@ export default class extends BaseSchema {
 
   async down() {
     this.schema.alterTable(this.tableName, (table) => {
+      // Quitar indices antes de columnas: en PostgreSQL borrar columnas puede eliminar indices asociados
+      table.dropIndex([], 'idx_categories_parent_id')
+      table.dropIndex([], 'idx_categories_is_visible')
+      table.dropIndex([], 'idx_categories_parent_visible')
+      table.dropIndex([], 'idx_categories_parent_visible_order')
+      table.dropIndex([], 'idx_categories_sort_order')
+
       table.dropColumn('description')
       table.dropColumn('page_title')
       table.dropColumn('search_keywords')
       table.dropColumn('meta_keywords')
       table.dropColumn('meta_description')
       table.dropColumn('sort_order')
-
-      table.dropIndex([], 'idx_categories_parent_id')
-      table.dropIndex([], 'idx_categories_is_visible')
-      table.dropIndex([], 'idx_categories_parent_visible')
-      table.dropIndex([], 'idx_categories_parent_visible_order')
-      table.dropIndex([], 'idx_categories_sort_order')
     })
   }
 }

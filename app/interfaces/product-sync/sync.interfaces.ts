@@ -1,3 +1,4 @@
+import type { ChannelConfigInterface } from '#interfaces/channel_interface'
 import type { FormattedVariantForModel } from '#interfaces/formatted_variant_for_model.interface'
 import type { DateTime } from 'luxon'
 
@@ -101,6 +102,17 @@ export interface FormattedProductWithVariants extends Omit<FormattedProduct, '_r
 // RESULTADOS DE SINCRONIZACION
 // ================================================================
 
+export interface SyncProductsCompleteOptions {
+  skipPacks?: boolean
+  /** Si true, no ejecuta sync de filters_products (solo modo canal opcional). */
+  skipFilters?: boolean
+  /** Modo canal: sync acotada a productos BC de este canal (misma logica v2 despues del fetch). */
+  channelId?: number
+  channelConfig?: ChannelConfigInterface
+  /** Nombre legible del canal para logs y respuesta. */
+  channelName?: string
+}
+
 export interface SyncResult {
   success: boolean
   message: string
@@ -113,6 +125,11 @@ export interface SyncResult {
       hidden: number
       totalTime: string
     }
+    /** Solo modo canal */
+    channelId?: number
+    channelName?: string
+    mode?: 'global' | 'channel'
+    channelCleanup?: { staleLinksRemoved: number; orphansRemoved: number }
   }
 }
 

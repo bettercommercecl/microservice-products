@@ -6,6 +6,7 @@ import GlobalProductSyncService from '#services/synchronizations/global_product_
 import PackReserveSyncService from '#services/synchronizations/pack_reserve_sync_service'
 import PacksSyncService from '#services/synchronizations/packs_sync_service'
 import CacheService from '#services/cache_service'
+import SyncWebhookNotifier from '#services/synchronizations/sync_webhook_notifier'
 import syncConfig from '#config/sync'
 import { HttpContext } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
@@ -58,6 +59,16 @@ export default class FullSyncController {
     } catch (e: any) {
       this.logger.error({ err: e }, 'Error sincronizando productos')
       errors.push('Productos: ' + (e?.message ?? 'error'))
+      const hooksEarly = new SyncWebhookNotifier()
+      void hooksEarly
+        .notifyAllChannelsInCountry('full_sync_completed', {
+          success: false,
+          source: 'full_sync',
+          message: 'Sync completo detenido en productos',
+          meta: { errors, stopped_at: 'productos' },
+        })
+        .catch((err) => this.logger.error({ err }, 'Webhook full_sync_completed (fallo productos)'))
+
       return response.status(500).json({
         success: false,
         message: 'Sincronizacion completa fallo en productos',
@@ -93,6 +104,21 @@ export default class FullSyncController {
     } catch (e: any) {
       this.logger.warn({ err: e }, 'Invalidacion de cache Redis omitida')
     }
+
+    const hooks = new SyncWebhookNotifier()
+    void hooks
+      .notifyAllChannelsInCountry('full_sync_completed', {
+        success: errors.length === 0,
+        source: 'full_sync',
+        message:
+          errors.length === 0
+            ? 'Sync completo finalizado'
+            : 'Sync completo finalizado con errores en alguna fase',
+        meta: {
+          errors: errors.length > 0 ? errors : undefined,
+        },
+      })
+      .catch((err) => this.logger.error({ err }, 'Webhook full_sync_completed'))
 
     return response.ok({
       success: errors.length === 0,
