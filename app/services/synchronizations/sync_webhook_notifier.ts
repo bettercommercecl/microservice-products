@@ -1,7 +1,5 @@
-import syncConfig from '#config/sync'
 import Channel from '#models/channel'
 import env from '#start/env'
-import { channels as channelsConfig } from '#utils/channels/channels'
 import Logger from '@adonisjs/core/services/logger'
 import axios, { type AxiosError } from 'axios'
 import { createHmac, randomUUID } from 'node:crypto'
@@ -48,37 +46,34 @@ function webhooksGloballyEnabled(): boolean {
   return env.get('SYNC_WEBHOOKS_ENABLED') !== false
 }
 
+/** Alineado con lock tipico en destino (webhook-sync:300 s); reintentos antes no liberaban el lock. */
+const DEFAULT_WEBHOOK_RETRY_AFTER_MS = 300_000
+/** Lock + margen para que axios no cancele antes de recibir respuesta. */
+const DEFAULT_WEBHOOK_TIMEOUT_MS = 330_000
+
 function timeoutMs(): number {
-  return env.get('SYNC_WEBHOOK_TIMEOUT_MS') ?? 5000
+  return env.get('SYNC_WEBHOOK_TIMEOUT_MS') ?? DEFAULT_WEBHOOK_TIMEOUT_MS
 }
 
 function staggerMs(): number {
   return env.get('SYNC_WEBHOOK_GLOBAL_STAGGER_MS') ?? 90_000
 }
 
-const WEBHOOK_SYNC_PATH = syncConfig.webhookSyncProductsPath
-
-/**
- * Base URL del webhook: mismo criterio que la sync por canal (`SyncController`):
- * `channels` en `utils/channels/channels` indexado por `name` del canal + `COUNTRY_CODE` del env.
- */
-function resolveWebhookUrlFromConfig(channel: Channel): string | null {
-  const name = channel.name
-  if (!name?.trim()) return null
-
-  const country = env.get('COUNTRY_CODE')
-  const byBrand = channelsConfig as Record<string, Record<string, { API_URL?: string }>>
-  const cfg = byBrand[name]?.[country]
-  const apiUrl = cfg?.API_URL?.trim()
-  if (!apiUrl) return null
-
-  const base = apiUrl.replace(/\/$/, '')
-  return `${base}${WEBHOOK_SYNC_PATH}`
+function retryAfterMs(): number {
+  return env.get('SYNC_WEBHOOK_RETRY_AFTER_MS') ?? DEFAULT_WEBHOOK_RETRY_AFTER_MS
 }
 
-/** Clave compartida para x-api-key y HMAC (env). Compatible con .env `X-API-KEY-BRANDS`. */
-function brandsWebhookSecret(): string | undefined {
-  return env.get('API_KEY_BRANDS')?.trim()
+/** Clave para x-api-key y firma: columna `webhook_secret` o env (API_KEY_BRANDS / alias). */
+function brandsWebhookSecretFromEnv(): string | undefined {
+  return (
+    env.get('API_KEY_BRANDS')?.trim() ||
+    env.get('X_API_KEY_BRANDS')?.trim() ||
+    process.env['X-API-KEY-BRANDS']?.trim()
+  )
+}
+
+function effectiveWebhookSecret(channel: Channel): string | undefined {
+  return channel.webhookSecret?.trim() || brandsWebhookSecretFromEnv()
 }
 
 function buildPayload(
@@ -162,7 +157,8 @@ async function postWithRetries(
   context: { event: SyncWebhookEvent; channelId?: number }
 ): Promise<void> {
   const maxAttempts = 3
-  const delays = [0, 500, 1500]
+  const pause = retryAfterMs()
+  const delays = [0, pause, pause]
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (delays[attempt] > 0) {
@@ -218,23 +214,22 @@ export default class SyncWebhookNotifier {
     }
     if (!channel.webhookEnabled) return
 
-    const url = resolveWebhookUrlFromConfig(channel) ?? channel.webhookUrl?.trim() ?? null
+    const url = channel.webhookUrl?.trim() ?? null
     if (!url) {
       logger.warn(
-        {
-          channelId,
-          name: channel.name,
-          countryCode: env.get('COUNTRY_CODE'),
-        },
-        'Webhook: sin API_URL en channels.ts para name+COUNTRY_CODE ni webhook_url en BD'
+        { channelId, name: channel.name },
+        'Webhook canal: webhook_url vacio en BD (rellenar con sync de canales o manual)'
       )
       return
     }
     if (!httpsAllowedForWebhook(url)) return
 
-    const apiKey = brandsWebhookSecret()
-    if (!apiKey) {
-      logger.warn({ channelId }, 'Webhook omitido: define API_KEY_BRANDS en .env')
+    const secret = effectiveWebhookSecret(channel)
+    if (!secret) {
+      logger.warn(
+        { channelId },
+        'Webhook canal: sin webhook_secret en BD ni clave de marcas en env'
+      )
       return
     }
 
@@ -245,10 +240,9 @@ export default class SyncWebhookNotifier {
       channelName: channel.name,
     })
     const rawBody = JSON.stringify(payload)
-    const signingSecret = channel.webhookSecret?.trim() || apiKey
-    const signature = signBody(rawBody, signingSecret)
-
-    await postWithRetries(url, rawBody, signature, apiKey, { event, channelId: channel.id })
+    const signature = signBody(rawBody, secret)
+    logger.info({ channelId, url: url.slice(0, 96) }, 'Webhook channel: inicio POST')
+    await postWithRetries(url, rawBody, signature, secret, { event, channelId: channel.id })
   }
 
   /**
@@ -261,31 +255,23 @@ export default class SyncWebhookNotifier {
   ): Promise<void> {
     if (!webhooksGloballyEnabled()) return
 
-    const apiKey = brandsWebhookSecret()
-    if (!apiKey) {
-      logger.warn(
-        { event },
-        'Webhook global omitido: define API_KEY_BRANDS, X_API_KEY_BRANDS o X-API-KEY-BRANDS'
-      )
-      return
-    }
-
     const countryCode = env.get('COUNTRY_CODE')
     const channels = await Channel.query()
       .where('country', countryCode)
       .where('webhook_enabled', true)
+      .whereNotNull('webhook_url')
       .orderBy('id', 'asc')
 
-    const withUrl = channels.filter((ch) => {
-      const u = resolveWebhookUrlFromConfig(ch) ?? ch.webhookUrl?.trim() ?? ''
-      return u.length > 0
-    })
+    const withUrl = channels.filter((ch) => (ch.webhookUrl?.trim() ?? '').length > 0)
+    const ready = withUrl.filter((ch) => effectiveWebhookSecret(ch))
 
-    const total = withUrl.length
+    const total = ready.length
     if (total === 0) {
       logger.debug(
         { event, countryCode },
-        'Webhook global: sin canales con API_URL en config (o webhook_url en BD) para este pais'
+        withUrl.length > 0
+          ? 'Webhook global: canales con webhook_url pero sin webhook_secret ni clave en env'
+          : 'Webhook global: sin canales con webhook_url relleno y webhook_enabled para este pais'
       )
       return
     }
@@ -293,10 +279,14 @@ export default class SyncWebhookNotifier {
     const gap = staggerMs()
     logger.info({ event, total, staggerMs: gap }, 'Webhook global: inicio tanda')
 
-    for (let i = 0; i < withUrl.length; i++) {
-      const channel = withUrl[i]
-      const url = resolveWebhookUrlFromConfig(channel) ?? channel.webhookUrl?.trim() ?? ''
-      if (!url || !httpsAllowedForWebhook(url)) {
+    for (let i = 0; i < ready.length; i++) {
+      const channel = ready[i]
+      const url = channel.webhookUrl!.trim()
+      const secret = effectiveWebhookSecret(channel)!
+      if (!httpsAllowedForWebhook(url)) {
+        if (i < ready.length - 1) {
+          await sleep(gap)
+        }
         continue
       }
 
@@ -306,12 +296,14 @@ export default class SyncWebhookNotifier {
         staggerTotal: total,
       })
       const rawBody = JSON.stringify(payload)
-      const signingSecret = channel.webhookSecret?.trim() || apiKey
-      const signature = signBody(rawBody, signingSecret)
+      const signature = signBody(rawBody, secret)
+      logger.info(
+        { event, channelId: channel.id, url: url.slice(0, 96) },
+        'Webhook global: inicio POST'
+      )
+      await postWithRetries(url, rawBody, signature, secret, { event, channelId: channel.id })
 
-      await postWithRetries(url, rawBody, signature, apiKey, { event, channelId: channel.id })
-
-      if (i < withUrl.length - 1) {
+      if (i < ready.length - 1) {
         await sleep(gap)
       }
     }

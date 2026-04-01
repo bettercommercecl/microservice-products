@@ -1,5 +1,6 @@
 import { getN8nClient } from '#infrastructure/http/n8n_client'
 import InventoryReserve from '#models/inventory_reserve'
+import N8nAlertService from '#services/n8n_alert_service'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
 
@@ -34,10 +35,10 @@ export default class N8nReserveService {
     total: number
     message: string
   }> {
-    try {
-      const url = this.getUrlByCountry()
+    const reservesUrl = this.getUrlByCountry()
 
-      if (!url) {
+    try {
+      if (!reservesUrl) {
         this.logger.warn('URL_N8N_RESERVES no configurada, omitiendo reservas')
         return { success: true, total: 0, message: 'URL no configurada, omitiendo reservas' }
       }
@@ -45,7 +46,7 @@ export default class N8nReserveService {
       this.logger.info('Obteniendo reservas desde n8n...')
 
       const client = getN8nClient()
-      const response = await client.get<ReserveApiResponse[]>(url)
+      const response = await client.get<ReserveApiResponse[]>(reservesUrl)
 
       if (!Array.isArray(response.data)) {
         throw new Error('La respuesta de n8n no es un array valido')
@@ -86,6 +87,12 @@ export default class N8nReserveService {
         },
         'Error obteniendo reservas desde n8n'
       )
+      if (reservesUrl) {
+        const ref = error?.message ?? String(error)
+        await new N8nAlertService().send('n8n_reservas:fetch_fallido', ref, {
+          country: env.get('COUNTRY_CODE'),
+        })
+      }
       throw error
     }
   }
