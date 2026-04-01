@@ -1,13 +1,14 @@
+import syncConfig from '#config/sync'
 import CalculationAdapter from '#infrastructure/adapters/calculation_adapter'
 import BigCommerceService from '#infrastructure/bigcommerce/bigcommerce_api'
 import BrandService from '#services/brands_service'
+import CacheService from '#services/cache_service'
 import CategoryService from '#services/categories_service'
+import N8nAlertService from '#services/n8n_alert_service'
 import GlobalProductSyncService from '#services/synchronizations/global_product_sync_service'
 import PackReserveSyncService from '#services/synchronizations/pack_reserve_sync_service'
 import PacksSyncService from '#services/synchronizations/packs_sync_service'
-import CacheService from '#services/cache_service'
 import SyncWebhookNotifier from '#services/synchronizations/sync_webhook_notifier'
-import syncConfig from '#config/sync'
 import { HttpContext } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
 
@@ -69,6 +70,11 @@ export default class FullSyncController {
         })
         .catch((err) => this.logger.error({ err }, 'Webhook full_sync_completed (fallo productos)'))
 
+      await new N8nAlertService().send('sync_completo:productos_fallidos', errors.join('; '), {
+        stopped_at: 'productos',
+        errors,
+      })
+
       return response.status(500).json({
         success: false,
         message: 'Sincronizacion completa fallo en productos',
@@ -103,6 +109,12 @@ export default class FullSyncController {
       await cache.invalidateByPrefix(syncConfig.cacheInvalidationPrefixProducts)
     } catch (e: any) {
       this.logger.warn({ err: e }, 'Invalidacion de cache Redis omitida')
+    }
+
+    if (errors.length > 0) {
+      await new N8nAlertService().send('sync_completo:errores_parciales', errors.join('; '), {
+        fases_con_error: errors.length,
+      })
     }
 
     const hooks = new SyncWebhookNotifier()

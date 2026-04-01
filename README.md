@@ -191,7 +191,7 @@ Los controladores v1 y v2 delegan en **`GlobalProductSyncService`** y servicios 
 - **Entorno:** `start/env.ts` define y valida variables; cada país tiene típicamente su `.env` (o copias tipo `.env.colombia`).
 - **Canales por marca/país:** `app/utils/channels/channels.ts` — `CHANNEL`, `API_URL`, `PARENT_CATEGORY`, métodos de envío, etc.
 - **Sync:** `config/sync.ts` — lotes, TTL de caché, path de webhook `webhookSyncProductsPath`.
-- **Webhooks post-sync:** claves `API_KEY_BRANDS` / alias, `SYNC_WEBHOOKS_*`; ver [`docs/sync_flows_and_api.md`](docs/sync_flows_and_api.md).
+- **Webhooks post-sync:** claves `API_KEY_BRANDS` / alias, `SYNC_WEBHOOKS_*`, `SYNC_WEBHOOK_TIMEOUT_MS`, `SYNC_WEBHOOK_RETRY_AFTER_MS` (default 300 s, alineado a lock en destino), `SYNC_WEBHOOK_GLOBAL_STAGGER_MS`; ver [`docs/sync_flows_and_api.md`](docs/sync_flows_and_api.md).
 
 ---
 

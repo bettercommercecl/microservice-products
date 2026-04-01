@@ -14,6 +14,7 @@ import Channel from '#models/channel'
 import FiltersService from '#services/filters_service'
 import FormatOptionsService from '#services/format_options_service'
 import InventoryService from '#services/inventory_service'
+import N8nAlertService from '#services/n8n_alert_service'
 import N8nReserveService from '#services/n8n_reserve_service'
 import ProductService from '#services/product_service'
 import FormatVariantsService from '#services/synchronizations/format_variants_service'
@@ -195,6 +196,12 @@ export default class GlobalProductSyncService {
         { error: error.message, stack: error.stack },
         'Error en sincronizacion de productos'
       )
+      const msg = error?.message ?? String(error)
+      await new N8nAlertService().send('sync_productos:error', msg, {
+        country: env.get('COUNTRY_CODE'),
+        mode: isChannelMode ? 'channel' : 'global',
+        ...(isChannelMode ? { channelId, channelName } : {}),
+      })
       throw error
     }
   }

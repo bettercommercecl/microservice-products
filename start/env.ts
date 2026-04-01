@@ -69,6 +69,8 @@ export default await Env.create(new URL('../', import.meta.url), {
   URL_N8N_RESERVES_PE: Env.schema.string.optional(),
   API_N8N_USER: Env.schema.string.optional(),
   VALUE_API_N8N: Env.schema.string.optional(),
+  /** Webhook n8n para alertas de fallos en sincronizacion (POST JSON title/reference/message) */
+  URL_N8N_NOTIFICATIONS: Env.schema.string.optional(),
 
   /*
   |----------------------------------------------------------
@@ -260,8 +262,12 @@ export default await Env.create(new URL('../', import.meta.url), {
   |----------------------------------------------------------
   */
   SYNC_WEBHOOKS_ENABLED: Env.schema.boolean.optional(),
+  /** Timeout del POST; debe cubrir lock del destino + respuesta (default en codigo ~330s si no se define) */
   SYNC_WEBHOOK_TIMEOUT_MS: Env.schema.number.optional(),
+  /** Pausa entre marcas en fan-out global; si todas pegan al mismo host y hay lock largo, usar >= lock (ej. 300s) */
   SYNC_WEBHOOK_GLOBAL_STAGGER_MS: Env.schema.number.optional(),
+  /** Entre reintentos tras fallo (409, timeout, etc.); alinear con lock del storefront (ej. bigcommerceSyncLock:300 -> 300000) */
+  SYNC_WEBHOOK_RETRY_AFTER_MS: Env.schema.number.optional(),
   API_KEY_BRANDS: Env.schema.string.optional(),
   /** Alias opcional de API_KEY_BRANDS (mismo uso que x-api-key en webhooks de marcas) */
   X_API_KEY_BRANDS: Env.schema.string.optional(),
