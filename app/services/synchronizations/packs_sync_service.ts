@@ -281,7 +281,9 @@ export default class PacksSyncService {
       const newPackIds = [...new Set(packs.map((p) => p.pack_id))]
       const keySet = new Set(packs.map((p) => this.snapshotKeyFromRecord(p)))
 
-      Logger.info(`Sync packs: upsert ${packs.length} lineas en ${newPackIds.length} packs (sin truncate)`)
+      Logger.info(
+        `Sync packs: upsert ${packs.length} lineas en ${newPackIds.length} packs (sin truncate)`
+      )
 
       if (newPackIds.length > 0) {
         await ProductPack.query({ client: trx }).whereNotIn('pack_id', newPackIds).delete()
@@ -348,7 +350,8 @@ export default class PacksSyncService {
             if (!isPackOfVariants && item.variants?.length === 1) {
               const packVariantId = item.variants[0].id
               item.items_packs = item.items_packs.map((it: PackItem) => {
-                const { variant_id: _packVariantIgnored, ...rest } = it
+                const rest = { ...it }
+                delete rest.variant_id
                 return { ...rest, is_variant: false, pack_variant_id: packVariantId }
               })
             }
@@ -368,9 +371,9 @@ export default class PacksSyncService {
                     }))
                   )
 
-                for (let k = 0; k < variantBatch.length; k++) {
+                for (const [k, element] of variantBatch.entries()) {
                   const royalProduct = metafieldsResults[k] ?? []
-                  const linePackVariantId = variantBatch[k].id
+                  const linePackVariantId = element.id
 
                   const formattedMetafieldsVariantsPacks = royalProduct
                     .filter((m: { key: string }) => m.key === 'packs')
@@ -382,7 +385,8 @@ export default class PacksSyncService {
                         metafields = []
                       }
                       return metafields.map((it: PackItem) => {
-                        const { variant_id: _packVariantIgnored, ...rest } = it
+                        const rest = { ...it }
+                        delete rest.variant_id
                         return {
                           ...rest,
                           is_variant: true,
@@ -458,7 +462,8 @@ export default class PacksSyncService {
         const updatedItemsPacks = pack.items_packs.map((variantGroup: PackItem | PackItem[]) => {
           if (Array.isArray(variantGroup)) {
             return variantGroup.map((v) => {
-              const { variant_id: _ignored, ...rest } = v
+              const rest = { ...v }
+              delete rest.variant_id
               return { ...rest, is_variant: true }
             })
           }
@@ -618,8 +623,8 @@ export default class PacksSyncService {
     for (let i = 0; i < targets.length; i += CHUNK) {
       const chunk = targets.slice(i, i + CHUNK)
       await Database.transaction(async (trx) => {
-        for (const { pack_id, pack_variant_id } of chunk) {
-          await trx.from('variants').where('product_id', pack_id).where('id', pack_variant_id).update({
+        for (const { pack_id: packId, pack_variant_id: packVariantId } of chunk) {
+          await trx.from('variants').where('product_id', packId).where('id', packVariantId).update({
             stock: 0,
             updated_at: new Date(),
           })
@@ -627,5 +632,4 @@ export default class PacksSyncService {
       })
     }
   }
-
 }

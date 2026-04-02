@@ -270,5 +270,4 @@ export default await Env.create(new URL('../', import.meta.url), {
   SYNC_WEBHOOK_RETRY_AFTER_MS: Env.schema.number.optional(),
   API_KEY_BRANDS: Env.schema.string.optional(),
   /** Alias opcional de API_KEY_BRANDS (mismo uso que x-api-key en webhooks de marcas) */
-  X_API_KEY_BRANDS: Env.schema.string.optional(),
 })
