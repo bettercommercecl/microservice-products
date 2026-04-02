@@ -8,7 +8,6 @@ import {
 } from '#infrastructure/mappers/variant_format.mapper'
 import CatalogSafeStock from '#models/catalog_safe_stock'
 import FiltersProduct from '#models/filters_product'
-import InventoryReserve from '#models/inventory_reserve'
 import Product from '#models/product'
 import Variant from '#models/variant'
 import ProductTagsCampaignsService from '#services/product_tags_campaigns_service'
@@ -197,22 +196,12 @@ export default class VariantService {
     }
 
     const variantIds = (variants as { id: number }[]).map((v) => v.id)
-    const skus = (variants as { sku?: string }[])
-      .map((v) => v.sku)
-      .filter((s): s is string => typeof s === 'string' && s.length > 0)
 
-    const [inventoryRows, reserveRows] = await Promise.all([
-      CatalogSafeStock.query().whereIn('variant_id', variantIds),
-      skus.length > 0 ? InventoryReserve.query().whereIn('sku', skus) : [],
-    ])
+    const inventoryRows = await CatalogSafeStock.query().whereIn('variant_id', variantIds)
 
     const inventoryByVariantId = new Map<number, CatalogSafeStock>()
     for (const row of inventoryRows) {
       inventoryByVariantId.set(row.variant_id, row)
-    }
-    const reserveBySku = new Map<string, InventoryReserve>()
-    for (const row of reserveRows) {
-      reserveBySku.set(row.sku, row)
     }
 
     const formatOptions = {
@@ -222,7 +211,7 @@ export default class VariantService {
       formatVariantForMarcas(
         toVariantForFormatDTO(v),
         toInventoryForFormatDTO(inventoryByVariantId.get(v.id) ?? null),
-        toReserveForFormatDTO(reserveBySku.get(v.sku) ?? null),
+        toReserveForFormatDTO(v.reserve),
         this.calculation,
         formatOptions
       )
@@ -277,19 +266,6 @@ export default class VariantService {
       const tagsCampaignsMap =
         await this.productTagsCampaignsService.getTagsAndCampaignsForProducts(uniqueProductIds)
 
-      const variantRows = paginated.all() as Variant[]
-      const skusForReserve = variantRows
-        .map((v) => (typeof v.sku === 'string' ? v.sku.trim() : ''))
-        .filter((s) => s.length > 0)
-      const reserveRows =
-        skusForReserve.length > 0
-          ? await InventoryReserve.query().whereIn('sku', skusForReserve)
-          : []
-      const reserveFechaBySku = new Map<string, string | null>()
-      for (const row of reserveRows) {
-        reserveFechaBySku.set(row.sku.trim(), row.fecha_reserva)
-      }
-
       // Cargar datos de productos
       const productsMap = new Map<number, any>()
 
@@ -322,8 +298,8 @@ export default class VariantService {
           )
         }
 
-        const skuKey = typeof variant.sku === 'string' ? variant.sku.trim() : ''
-        const reserveFromInventory = skuKey ? reserveFechaBySku.get(skuKey)?.trim() || null : null
+        const reserveRaw = typeof variant.reserve === 'string' ? variant.reserve.trim() : ''
+        const reserveValue = reserveRaw !== '' ? reserveRaw : null
 
         const processedVariant = {
           id: variant.id,
@@ -371,8 +347,7 @@ export default class VariantService {
           tags: tags.length > 0 ? [...new Set(tags)] : [],
           campaigns: campaigns.length > 0 ? [...new Set(campaigns)] : [],
           reviews: null,
-          reserve:
-            reserveFromInventory && reserveFromInventory !== '' ? reserveFromInventory : null,
+          reserve: reserveValue,
         }
 
         return processedVariant
