@@ -9,7 +9,7 @@ interface ReserveApiResponse {
   row_number: number
   SKU: number
   FECHA: string | null
-  BP: string
+  BPN: string
   WARNING: string | null
   STOCK: number | null
 }
@@ -148,7 +148,7 @@ export default class N8nReserveService {
       return {
         sku: String(item.SKU).trim(),
         fecha_reserva: fechaReserva,
-        bp: item.BP || null,
+        bp: item.BPN || null,
         warning: item.WARNING || null,
         stock: Number(item.STOCK || 0) ?? null,
       }

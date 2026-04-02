@@ -13,6 +13,7 @@ import N8nAlertService from '#services/n8n_alert_service'
 import ProductService from '#services/product_service'
 import GlobalProductSyncService from '#services/synchronizations/global_product_sync_service'
 import PackReserveSyncService from '#services/synchronizations/pack_reserve_sync_service'
+import PacksSyncService from '#services/synchronizations/packs_sync_service'
 import SyncWebhookNotifier from '#services/synchronizations/sync_webhook_notifier'
 import env from '#start/env'
 import { channels as channelsConfig } from '#utils/channels/channels'
@@ -22,8 +23,9 @@ import Logger from '@adonisjs/core/services/logger'
 
 /**
  * Sincronizaciones v1 (legacy): sync por canal, categorias, marcas, canales.
- * syncProducts por canal: marcas -> categorias -> productos (incluye packs) -> packs reserva;
- * errores por fase se acumulan; si hay alguno, alerta n8n con resumen.
+ * syncProducts por canal: mismo orden que sync v2 completa (marcas -> categorias -> productos
+ * con skipPacks -> packs -> packs reserva), pero el catalogo de productos es solo el del canal.
+ * Errores por fase se acumulan; si hay alguno, alerta n8n con resumen.
  */
 export default class SyncController {
   private readonly logger = Logger.child({ service: 'SyncController' })
@@ -110,6 +112,11 @@ export default class SyncController {
       const results: Record<string, unknown> = {}
       const errors: string[] = []
 
+      this.logger.info(
+        { channelId, channelName: channelLabel },
+        'Sync por canal v1: marcas -> categorias -> productos (canal, skipPacks) -> packs -> packs reserva'
+      )
+
       try {
         const brandResult = await this.brandService.syncBrands()
         results.marcas = brandResult
@@ -136,6 +143,7 @@ export default class SyncController {
           channelId,
           channelConfig,
           channelName: channelLabel,
+          skipPacks: true,
         })
         results.productos = syncResult
         if (!syncResult.success) {
@@ -144,6 +152,18 @@ export default class SyncController {
       } catch (e: any) {
         this.logger.error({ err: e }, 'Error sincronizando productos por canal')
         errors.push(`Productos: ${e?.message ?? 'error'}`)
+      }
+
+      try {
+        const packsSyncService = new PacksSyncService(bigcommerceService)
+        const packsResult = await packsSyncService.syncPacksFromBigcommerce()
+        results.packs = packsResult
+        if (packsResult.status >= 400) {
+          errors.push(`Packs: ${packsResult.message ?? 'respuesta no exitosa'}`)
+        }
+      } catch (e: any) {
+        this.logger.error({ err: e }, 'Error sincronizando packs (sync por canal)')
+        errors.push(`Packs: ${e?.message ?? 'error'}`)
       }
 
       try {
