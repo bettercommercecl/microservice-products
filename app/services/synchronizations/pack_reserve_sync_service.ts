@@ -13,6 +13,8 @@ interface GroupedPackProduct {
   stock: number
   quantity: number
   variant_id: number
+  /** variants.id del producto pack (linea); para escribir reserve en la variante correcta */
+  pack_variant_id: number | null
   serial: string | null
   reserve: string | null
 }
@@ -36,6 +38,7 @@ interface PackItemInput {
   quantity: number
   is_variant: boolean
   variant_id: number
+  pack_variant_id: number | null
   serial: string | null
   reserve: string | null
 }
@@ -138,6 +141,8 @@ export default class PackReserveSyncService {
       const packCategoryGroups = this.mergeGroupsByPackForCategories(lineGroups)
 
       const variantsUpdateResult = await this.updateVariantsFromGroupedData(variantMerged)
+      const packVariantReserveResult =
+        await this.updatePackVariantReserveFromPackLines(productsPacksData)
 
       const [productsUpdateResult, categoryProductsResult] = await Promise.allSettled([
         this.updateProductsCategories(packCategoryGroups, Number(reserveCategoryId)),
@@ -216,8 +221,8 @@ export default class PackReserveSyncService {
 
       return {
         paso5_variants: {
-          actualizados: variantsUpdateResult.updated,
-          fallidos: variantsUpdateResult.failed,
+          actualizados: variantsUpdateResult.updated + packVariantReserveResult.updated,
+          fallidos: variantsUpdateResult.failed + packVariantReserveResult.failed,
         },
         paso6_products: {
           actualizados: productsData.updated,
@@ -302,6 +307,7 @@ export default class PackReserveSyncService {
       quantity: item.quantity ?? 0,
       is_variant: item.is_variant,
       variant_id: item.variant_id ?? 0,
+      pack_variant_id: item.pack_variant_id ?? null,
       serial: item.serial,
       reserve: item.reserve,
     }))
@@ -321,6 +327,7 @@ export default class PackReserveSyncService {
         stock: item.stock,
         quantity: item.quantity,
         variant_id: item.variant_id,
+        pack_variant_id: item.pack_variant_id,
         serial: item.serial,
         reserve: item.reserve,
       }
@@ -359,6 +366,61 @@ export default class PackReserveSyncService {
       return { reserve: null, serial: withSerial[0].serial?.trim() || null }
     }
     return { reserve: null, serial: null }
+  }
+
+  /**
+   * Categoria reserva del producto pack (pack_id): basta con que alguna linea hijo tenga serial.
+   */
+  private packGroupHasAnySerial(group: GroupedPackData): boolean {
+    return group.products.some((p) => String(p.serial ?? '').trim() !== '')
+  }
+
+  /**
+   * Asigna `variants.reserve` donde `variants.id` = `pack_variant_id` de la linea en products_packs.
+   * Varias lineas con el mismo pack_variant_id: se usa la fecha mas lejana.
+   */
+  private async updatePackVariantReserveFromPackLines(
+    items: PackItemInput[]
+  ): Promise<{ updated: number; failed: number }> {
+    const byVariant = new Map<number, string[]>()
+    for (const item of items) {
+      const pv = item.pack_variant_id
+      if (pv === null || pv === undefined || pv === 0) continue
+      const r = item.reserve?.trim()
+      if (!r) continue
+      const list = byVariant.get(pv) ?? []
+      list.push(r)
+      byVariant.set(pv, list)
+    }
+    if (byVariant.size === 0) return { updated: 0, failed: 0 }
+
+    const targets = Array.from(byVariant.entries()).map(([variantId, dates]) => ({
+      variantId,
+      reserve: dates.reduce((a, b) => (new Date(b) > new Date(a) ? b : a)),
+    }))
+
+    const results = await this.processInBatches(targets, async ({ variantId, reserve }) => {
+      try {
+        const affected = await Database.from('variants')
+          .where('id', variantId)
+          .update({ reserve, updated_at: new Date() })
+        const n = typeof affected === 'number' ? affected : 0
+        if (n === 0) {
+          Logger.warn({ variantId }, 'Sin fila variants para pack_variant_id al asignar reserve')
+          return { success: false, type: 'not_found' }
+        }
+        return { success: true, type: 'updated' }
+      } catch (error: any) {
+        Logger.error({ err: error, variantId }, 'Error actualizando reserve en variante del pack')
+        return { success: false, type: 'error' }
+      }
+    })
+
+    const resolved = results.map((r) => (r.status === 'fulfilled' ? r.value : { success: false }))
+    return {
+      updated: resolved.filter((x) => x.success && (x as any).type === 'updated').length,
+      failed: resolved.filter((x) => !x.success).length,
+    }
   }
 
   /**
@@ -507,7 +569,7 @@ export default class PackReserveSyncService {
         currentCategories = []
       }
 
-      const hasSerial = !!(group.serial && group.serial.trim() !== '')
+      const hasSerial = this.packGroupHasAnySerial(group)
       let newCategories: number[]
       if (hasSerial) {
         newCategories = currentCategories.includes(reserveCategoryId)
@@ -540,8 +602,8 @@ export default class PackReserveSyncService {
   ): Promise<{ added: number; removed: number; failed: number }> {
     if (!groupedPackData.length) return { added: 0, removed: 0, failed: 0 }
 
-    const packsWithSerial = groupedPackData.filter((g) => g.serial && g.serial.trim() !== '')
-    const packsWithoutSerial = groupedPackData.filter((g) => !g.serial || g.serial.trim() === '')
+    const packsWithSerial = groupedPackData.filter((g) => this.packGroupHasAnySerial(g))
+    const packsWithoutSerial = groupedPackData.filter((g) => !this.packGroupHasAnySerial(g))
 
     let addedCount = 0
     let removedCount = 0
@@ -732,7 +794,7 @@ export default class PackReserveSyncService {
     try {
       const packIdsToRemoveFromReserve = [
         ...new Set(
-          groupedPackData.filter((g) => !g.serial || g.serial.trim() === '').map((g) => g.pack_id)
+          groupedPackData.filter((g) => !this.packGroupHasAnySerial(g)).map((g) => g.pack_id)
         ),
       ]
       if (packIdsToRemoveFromReserve.length > 0) {
@@ -747,7 +809,7 @@ export default class PackReserveSyncService {
 
       const packIdsToAssignReserve = [
         ...new Set(
-          groupedPackData.filter((g) => g.serial && g.serial.trim() !== '').map((g) => g.pack_id)
+          groupedPackData.filter((g) => this.packGroupHasAnySerial(g)).map((g) => g.pack_id)
         ),
       ]
       if (packIdsToAssignReserve.length === 0) {

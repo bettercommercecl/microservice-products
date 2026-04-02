@@ -9,8 +9,10 @@ import Channel from '#models/channel'
 import BrandService from '#services/brands_service'
 import CacheService from '#services/cache_service'
 import CategoryService from '#services/categories_service'
+import N8nAlertService from '#services/n8n_alert_service'
 import ProductService from '#services/product_service'
 import GlobalProductSyncService from '#services/synchronizations/global_product_sync_service'
+import PackReserveSyncService from '#services/synchronizations/pack_reserve_sync_service'
 import SyncWebhookNotifier from '#services/synchronizations/sync_webhook_notifier'
 import env from '#start/env'
 import { channels as channelsConfig } from '#utils/channels/channels'
@@ -20,6 +22,8 @@ import Logger from '@adonisjs/core/services/logger'
 
 /**
  * Sincronizaciones v1 (legacy): sync por canal, categorias, marcas, canales.
+ * syncProducts por canal: marcas -> categorias -> productos (incluye packs) -> packs reserva;
+ * errores por fase se acumulan; si hay alguno, alerta n8n con resumen.
  */
 export default class SyncController {
   private readonly logger = Logger.child({ service: 'SyncController' })
@@ -101,11 +105,56 @@ export default class SyncController {
         calculation: new CalculationAdapter(),
         productService,
       })
-      const syncResult = await globalSyncService.syncProductsComplete({
-        channelId,
-        channelConfig,
-        channelName: channelName ?? String(channelId),
-      })
+
+      const channelLabel = channelName ?? String(channelId)
+      const results: Record<string, unknown> = {}
+      const errors: string[] = []
+
+      try {
+        const brandResult = await this.brandService.syncBrands()
+        results.marcas = brandResult
+        if (!brandResult.success) {
+          errors.push(`Marcas: ${brandResult.message ?? 'fallo'}`)
+        }
+      } catch (e: any) {
+        this.logger.error({ err: e }, 'Error sincronizando marcas (sync por canal)')
+        errors.push(`Marcas: ${e?.message ?? 'error'}`)
+      }
+
+      try {
+        const categoryResult = await this.categoryService.syncCategories()
+        results.categorias = categoryResult
+      } catch (e: any) {
+        this.logger.error({ err: e }, 'Error sincronizando categorias (sync por canal)')
+        errors.push(`Categorias: ${e?.message ?? 'error'}`)
+      }
+
+      let syncResult: Awaited<ReturnType<GlobalProductSyncService['syncProductsComplete']>> | null =
+        null
+      try {
+        syncResult = await globalSyncService.syncProductsComplete({
+          channelId,
+          channelConfig,
+          channelName: channelLabel,
+        })
+        results.productos = syncResult
+        if (!syncResult.success) {
+          errors.push(`Productos: ${syncResult.message ?? 'sync sin exito'}`)
+        }
+      } catch (e: any) {
+        this.logger.error({ err: e }, 'Error sincronizando productos por canal')
+        errors.push(`Productos: ${e?.message ?? 'error'}`)
+      }
+
+      try {
+        const packReserveSyncService = new PackReserveSyncService(bigcommerceService)
+        const reserveResult = await packReserveSyncService.syncPacksReserve()
+        results.packs_reserva = reserveResult
+      } catch (e: any) {
+        this.logger.error({ err: e }, 'Error sincronizando packs reserva (sync por canal)')
+        errors.push(`Packs reserva: ${e?.message ?? 'error'}`)
+      }
+
       try {
         const cache = new CacheService()
         await cache.invalidateByPrefix(syncConfig.cacheInvalidationPrefixProducts)
@@ -113,20 +162,48 @@ export default class SyncController {
         this.logger.warn({ err: e }, 'Invalidacion de cache Redis omitida')
       }
 
+      if (errors.length > 0) {
+        const summary = errors.join(' | ')
+        await new N8nAlertService().send(
+          `microservicio-products:error en sync por canal ${channelLabel}`,
+          summary,
+          {
+            channelId,
+            channelName: channelName ?? String(channelId),
+            country,
+            errors,
+          }
+        )
+      }
+
       const hooks = new SyncWebhookNotifier()
       void hooks
         .notifyChannel(channelId, 'products_sync_completed', {
-          success: !!syncResult?.success,
+          success: errors.length === 0,
           source: 'standalone',
-          message: 'Productos sincronizados para el canal',
+          message:
+            errors.length === 0
+              ? 'Productos sincronizados para el canal'
+              : 'Sync por canal finalizado con errores en alguna fase',
+          meta: errors.length > 0 ? { errors } : undefined,
         })
         .catch((err) => this.logger.error({ err }, 'Webhook products_sync_completed (canal)'))
 
       return response.ok({
-        success: syncResult?.success,
-        message: syncResult?.message,
-        data: syncResult?.data || null,
-        meta: { timestamp: new Date().toISOString(), channelId, channelName, country },
+        success: errors.length === 0,
+        message:
+          errors.length > 0
+            ? `Sync por canal con errores: ${errors.join('; ')}`
+            : (syncResult?.message ?? 'Sincronizacion por canal completada'),
+        data: results,
+        errors: errors.length > 0 ? errors : undefined,
+        meta: {
+          timestamp: new Date().toISOString(),
+          channelId,
+          channelName,
+          country,
+          version: 'channel-sync-v1',
+        },
       })
     } catch (error: any) {
       if (error.messages) {
