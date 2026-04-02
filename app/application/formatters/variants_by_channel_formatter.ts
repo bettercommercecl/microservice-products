@@ -39,7 +39,9 @@ function parseImages(variant: VariantForFormatDTO): string[] {
   const img = variant.image
   const images = variant.images
   if (Array.isArray(images) && images.length > 0) {
-    return images.map((i) => (typeof i === 'string' ? i : (i as { url_standard?: string })?.url_standard || ''))
+    return images.map((i) =>
+      typeof i === 'string' ? i : (i as { url_standard?: string })?.url_standard || ''
+    )
   }
   if (typeof images === 'string') {
     try {
@@ -74,12 +76,9 @@ export function formatVariantForMarcas(
   const mainTitle = product.title || ''
   const normalPrice = Number(variant.normal_price) || 0
   const discountPrice = Number(variant.discount_price) ?? normalPrice
-  const cashPrice = calculation.calculateTransferPrice(
-    normalPrice,
-    discountPrice,
-    percentTransfer
-  )
-  const discountRate = variant.discount_rate || calculation.calculateDiscount(normalPrice, discountPrice)
+  const cashPrice = calculation.calculateTransferPrice(normalPrice, discountPrice, percentTransfer)
+  const discountRate =
+    variant.discount_rate || calculation.calculateDiscount(normalPrice, discountPrice)
 
   const imagesVariation = parseImages(variant)
   const image = imagesVariation[0] || variant.image || ''
@@ -87,7 +86,7 @@ export function formatVariantForMarcas(
   const availableToSell = inventory?.available_to_sell ?? Number(variant.stock) ?? 0
   const warningLevel = inventory?.warning_level ?? Number(variant.warning_stock) ?? 0
 
-  // Fecha desde inventory_reserve (persistida en sync desde n8n); no duplicar fuentes
+  // Fecha desde variants.reserve (mapeada al DTO en la capa de servicio)
   const rawReserve = reserve?.fecha_reserva?.trim() || ''
   const reserveValue = rawReserve !== '' ? rawReserve : undefined
 

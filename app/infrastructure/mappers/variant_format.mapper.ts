@@ -4,7 +4,6 @@ import type {
   VariantForFormatDTO,
 } from '#application/dto/variant_format.dto'
 import type CatalogSafeStock from '#models/catalog_safe_stock'
-import type InventoryReserve from '#models/inventory_reserve'
 import type Variant from '#models/variant'
 
 /**
@@ -38,7 +37,9 @@ export function toVariantForFormatDTO(variant: Variant): VariantForFormatDTO {
   }
 }
 
-export function toInventoryForFormatDTO(row: CatalogSafeStock | null): InventoryForFormatDTO | null {
+export function toInventoryForFormatDTO(
+  row: CatalogSafeStock | null
+): InventoryForFormatDTO | null {
   if (!row) return null
   return {
     available_to_sell: row.available_to_sell,
@@ -46,9 +47,11 @@ export function toInventoryForFormatDTO(row: CatalogSafeStock | null): Inventory
   }
 }
 
-export function toReserveForFormatDTO(row: InventoryReserve | null): ReserveForFormatDTO | null {
-  if (!row) return null
-  return {
-    fecha_reserva: row.fecha_reserva,
-  }
+/** Fecha de reserva desde variants.reserve (la llena el sync; no consultar inventory_reserve aqui) */
+export function toReserveForFormatDTO(
+  variantReserve: string | null | undefined
+): ReserveForFormatDTO | null {
+  const trimmed = variantReserve?.trim() ?? ''
+  if (trimmed === '') return null
+  return { fecha_reserva: trimmed }
 }
