@@ -264,7 +264,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   SYNC_WEBHOOKS_ENABLED: Env.schema.boolean.optional(),
   /** Timeout del POST; debe cubrir lock del destino + respuesta (default en codigo ~330s si no se define) */
   SYNC_WEBHOOK_TIMEOUT_MS: Env.schema.number.optional(),
-  /** Pausa entre marcas en fan-out global; si todas pegan al mismo host y hay lock largo, usar >= lock (ej. 300s) */
+  /** Pausa entre canales en fan-out global (default en codigo 60_000 ms = 1 min) */
   SYNC_WEBHOOK_GLOBAL_STAGGER_MS: Env.schema.number.optional(),
   /** Entre reintentos tras fallo (409, timeout, etc.); alinear con lock del storefront (ej. bigcommerceSyncLock:300 -> 300000) */
   SYNC_WEBHOOK_RETRY_AFTER_MS: Env.schema.number.optional(),

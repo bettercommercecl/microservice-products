@@ -55,8 +55,9 @@ function timeoutMs(): number {
   return env.get('SYNC_WEBHOOK_TIMEOUT_MS') ?? DEFAULT_WEBHOOK_TIMEOUT_MS
 }
 
+/** Pausa entre canales en fan-out global (default 1 min). */
 function staggerMs(): number {
-  return env.get('SYNC_WEBHOOK_GLOBAL_STAGGER_MS') ?? 90_000
+  return env.get('SYNC_WEBHOOK_GLOBAL_STAGGER_MS') ?? 60_000
 }
 
 function retryAfterMs(): number {
