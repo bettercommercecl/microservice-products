@@ -7,7 +7,6 @@ import type { CalculationPort } from '#application/ports/calculation.port'
 
 export interface FormatVariantForMarcasOptions {
   percentTransfer: number
-  idPacks?: number
 }
 
 /** Estructura que esperan las marcas para variantes por canal. */
@@ -57,20 +56,6 @@ function parseImages(variant: VariantForFormatDTO): string[] {
   return img ? [img] : []
 }
 
-function parseCategories(product: { categories?: unknown }): number[] {
-  const c = product.categories
-  if (Array.isArray(c)) return c
-  if (typeof c === 'string') {
-    try {
-      const parsed = JSON.parse(c) as number[]
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }
-  return []
-}
-
 /**
  * Formatea una variante (DTO) al formato que consumen las marcas (by-channel).
  * Recibe DTOs y port de calculos para no depender de #models ni #services.
@@ -82,7 +67,7 @@ export function formatVariantForMarcas(
   calculation: CalculationPort,
   options: FormatVariantForMarcasOptions
 ): VariantForMarcas {
-  const { percentTransfer, idPacks } = options
+  const { percentTransfer } = options
 
   const product = variant.product
 
@@ -102,10 +87,9 @@ export function formatVariantForMarcas(
   const availableToSell = inventory?.available_to_sell ?? Number(variant.stock) ?? 0
   const warningLevel = inventory?.warning_level ?? Number(variant.warning_stock) ?? 0
 
-  const categories = parseCategories(product)
-  const isPack = idPacks != null && categories.includes(Number(idPacks))
-  const reserveValue =
-    !isPack && reserve ? reserve.fecha_reserva || '' : undefined
+  // Fecha desde inventory_reserve (persistida en sync desde n8n); no duplicar fuentes
+  const rawReserve = reserve?.fecha_reserva?.trim() || ''
+  const reserveValue = rawReserve !== '' ? rawReserve : undefined
 
   const result: VariantForMarcas = {
     id: variant.id,

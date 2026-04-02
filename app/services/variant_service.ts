@@ -217,7 +217,6 @@ export default class VariantService {
 
     const formatOptions = {
       percentTransfer: Number(env.get('PERCENT_DISCOUNT_TRANSFER_PRICE')) || 2,
-      idPacks: env.get('ID_PACKS') !== null ? Number(env.get('ID_PACKS')) : undefined,
     }
     const data = (variants as Variant[]).map((v) =>
       formatVariantForMarcas(
@@ -278,6 +277,19 @@ export default class VariantService {
       const tagsCampaignsMap =
         await this.productTagsCampaignsService.getTagsAndCampaignsForProducts(uniqueProductIds)
 
+      const variantRows = paginated.all() as Variant[]
+      const skusForReserve = variantRows
+        .map((v) => (typeof v.sku === 'string' ? v.sku.trim() : ''))
+        .filter((s) => s.length > 0)
+      const reserveRows =
+        skusForReserve.length > 0
+          ? await InventoryReserve.query().whereIn('sku', skusForReserve)
+          : []
+      const reserveFechaBySku = new Map<string, string | null>()
+      for (const row of reserveRows) {
+        reserveFechaBySku.set(row.sku.trim(), row.fecha_reserva)
+      }
+
       // Cargar datos de productos
       const productsMap = new Map<number, any>()
 
@@ -310,6 +322,9 @@ export default class VariantService {
           )
         }
 
+        const skuKey = typeof variant.sku === 'string' ? variant.sku.trim() : ''
+        const reserveFromInventory = skuKey ? reserveFechaBySku.get(skuKey)?.trim() || null : null
+
         const processedVariant = {
           id: variant.id,
           product_id: variant.product_id,
@@ -334,7 +349,6 @@ export default class VariantService {
             type: product.type,
             weight: product.weight,
             sort_order: product.sort_order,
-            reserve: product.reserve,
             sameday: product.sameday,
             free_shipping: product.free_shipping,
             despacho24horas: product.despacho24horas,
@@ -357,6 +371,8 @@ export default class VariantService {
           tags: tags.length > 0 ? [...new Set(tags)] : [],
           campaigns: campaigns.length > 0 ? [...new Set(campaigns)] : [],
           reviews: null,
+          reserve:
+            reserveFromInventory && reserveFromInventory !== '' ? reserveFromInventory : null,
         }
 
         return processedVariant
