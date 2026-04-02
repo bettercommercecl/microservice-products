@@ -144,20 +144,6 @@ export default class PackReserveSyncService {
       const packVariantReserveResult =
         await this.updatePackVariantReserveFromPackLines(productsPacksData)
 
-      const [productsUpdateResult, categoryProductsResult] = await Promise.allSettled([
-        this.updateProductsCategories(packCategoryGroups, Number(reserveCategoryId)),
-        this.updateCategoryProducts(packCategoryGroups, Number(reserveCategoryId)),
-      ])
-
-      const productsData =
-        productsUpdateResult.status === 'fulfilled'
-          ? productsUpdateResult.value
-          : { updated: 0, failed: 0 }
-      const categoryProductsData =
-        categoryProductsResult.status === 'fulfilled'
-          ? categoryProductsResult.value
-          : { added: 0, removed: 0, failed: 0 }
-
       const catalogSafeStockResult = await this.updateCatalogSafeStock(variantMerged)
       const inventoryReserveResult = await this.updateInventoryReserve(variantMerged)
 
@@ -218,6 +204,21 @@ export default class PackReserveSyncService {
         Number(reserveCategoryId),
         deadline
       )
+
+      // Tras asignar/quitar categoria reserva en BC: reflejar en `products` y `category_products`
+      const [productsUpdateResult, categoryProductsResult] = await Promise.allSettled([
+        this.updateProductsCategories(packCategoryGroups, Number(reserveCategoryId)),
+        this.updateCategoryProducts(packCategoryGroups, Number(reserveCategoryId)),
+      ])
+
+      const productsData =
+        productsUpdateResult.status === 'fulfilled'
+          ? productsUpdateResult.value
+          : { updated: 0, failed: 0 }
+      const categoryProductsData =
+        categoryProductsResult.status === 'fulfilled'
+          ? categoryProductsResult.value
+          : { added: 0, removed: 0, failed: 0 }
 
       return {
         paso5_variants: {
@@ -782,7 +783,7 @@ export default class PackReserveSyncService {
   /**
    * En BigCommerce solo se toca la categoria reserva: DELETE del par (pack, ID_RESERVE) si sale de reserva;
    * PUT de asignaciones solo con { product_id: pack_id, category_id: ID_RESERVE } si entra o sigue en reserva.
-   * No se reenvian el resto de categorias del pack (eso vive en category_products local y otros syncs).
+   * Despues de esto, syncPacksReserve actualiza `products.categories` y `category_products` para alinear BD local.
    */
   private async updateBigCommerceProducts(
     groupedPackData: GroupedPackData[],
