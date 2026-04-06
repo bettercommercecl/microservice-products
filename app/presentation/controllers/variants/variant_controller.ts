@@ -54,7 +54,8 @@ export default class VariantController {
   }
 
   /**
-   * Lista variantes por canal en formato marcas (id, sku, image, stock, main_title, precios, reserve, etc.).
+   * Lista variantes por canal en formato marcas (id, product_id, sku, image, stock, main_title, precios, reserve, etc.).
+   * Incluye variantes y productos aunque is_visible sea false (solo filtra por pertenencia al canal).
    * Query: channel_id (number) o brand (string).
    * GET /api/variants/by-channel?channel_id=1 o ?brand=UF
    */

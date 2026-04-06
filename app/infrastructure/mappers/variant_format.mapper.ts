@@ -16,6 +16,7 @@ export function toVariantForFormatDTO(variant: Variant): VariantForFormatDTO {
   }
   return {
     id: variant.id,
+    product_id: variant.product_id,
     sku: variant.sku,
     normal_price: variant.normal_price,
     discount_price: variant.discount_price,

@@ -69,12 +69,11 @@ export default class VariantRepository implements VariantRepositoryPort {
     limit: number,
     parentCategoryId?: number
   ): Promise<{ data: unknown[]; meta: VariantPaginatedMeta }> {
+    // Sin filtro por is_visible: la ruta by-channel debe listar todas las variantes del canal
     const query = Variant.query()
       .join('channel_product', 'variants.product_id', 'channel_product.product_id')
       .where('channel_product.channel_id', channelId)
       .join('products', 'variants.product_id', 'products.id')
-      .where('variants.is_visible', true)
-      .where('products.is_visible', true)
       .select('variants.*')
       .preload('product')
       .orderBy('variants.id', 'asc')
