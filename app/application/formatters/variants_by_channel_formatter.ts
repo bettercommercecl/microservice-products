@@ -12,6 +12,7 @@ export interface FormatVariantForMarcasOptions {
 /** Estructura que esperan las marcas para variantes por canal. */
 export interface VariantForMarcas {
   id: number
+  product_id: number
   sku: string
   type: 'variant'
   image: string
@@ -92,6 +93,7 @@ export function formatVariantForMarcas(
 
   const result: VariantForMarcas = {
     id: variant.id,
+    product_id: variant.product_id,
     sku: variant.sku,
     type: 'variant',
     image,

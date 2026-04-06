@@ -4,6 +4,7 @@
  */
 export interface VariantForFormatDTO {
   id: number
+  product_id: number
   sku: string
   normal_price?: number | string | null
   discount_price?: number | string | null
