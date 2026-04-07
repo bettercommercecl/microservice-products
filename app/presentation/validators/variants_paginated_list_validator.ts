@@ -1,8 +1,9 @@
+import { paginationConfig } from '#config/pagination'
 import vine from '@vinejs/vine'
 
-const DEFAULT_PAGE = 1
-const DEFAULT_LIMIT = 50
-const MAX_LIMIT = 200
+const DEFAULT_PAGE = paginationConfig.defaultPage
+const DEFAULT_LIMIT = paginationConfig.defaultLimit
+const MAX_LIMIT = paginationConfig.maxLimit
 
 /** Query para GET /variants/paginated (solo page y limit). */
 export const variantsPaginatedListSchema = vine.object({

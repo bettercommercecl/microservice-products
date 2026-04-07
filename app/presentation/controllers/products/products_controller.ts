@@ -3,11 +3,13 @@ import GetProductByIdUseCase from '#application/use_cases/products/get_product_b
 import GetProductReviewsPaginatedUseCase from '#application/use_cases/products/get_product_reviews_paginated_use_case'
 import GetProductsByChannelUseCase from '#application/use_cases/products/get_products_by_channel_use_case'
 import GetProductsPaginatedUseCase from '#application/use_cases/products/get_products_paginated_use_case'
+import { paginationConfig } from '#config/pagination'
 import ChannelLookupAdapter from '#infrastructure/adapters/channel_lookup_adapter'
 import ProductCatalogAdapter from '#infrastructure/adapters/product_catalog_adapter'
 import Channel from '#models/channel'
 import ChannelProduct from '#models/channel_product'
 import Variant from '#models/variant'
+import { normalizePaginationQs } from '#utils/pagination_query'
 import { productShowSchema } from '#validators/product_show_validator'
 import { productsByChannelSchema } from '#validators/products_by_channel_validator'
 import { productsPaginatedSchema } from '#validators/products_paginated_validator'
@@ -43,25 +45,25 @@ export default class ProductsController {
   async indexPaginated({ request, response }: HttpContext) {
     const validated = await vine.validate({
       schema: productsPaginatedSchema,
-      data: request.qs(),
+      data: normalizePaginationQs(request.qs()),
     })
-    const page = validated.page ?? 1
-    const limit = validated.limit ?? 50
+    const page = validated.page ?? paginationConfig.defaultPage
+    const limit = validated.limit ?? paginationConfig.defaultLimit
     const result = await this.getProductsPaginatedUseCase.execute(page, limit)
     return response.ok(result)
   }
 
   /**
-   * Lista reseñas de productos paginadas (50 por página).
-   * GET /api/products/reviews/paginated?page=1
+   * Lista reseñas de productos paginadas (?page, ?limit o ?per_page; default limit 50).
+   * GET /api/products/reviews/paginated?page=1&limit=50
    */
   async reviewsPaginated({ request, response }: HttpContext) {
     const validated = await vine.validate({
       schema: reviewsPaginatedSchema,
-      data: request.qs(),
+      data: normalizePaginationQs(request.qs()),
     })
-    const page = validated.page ?? 1
-    const limit = 50
+    const page = validated.page ?? paginationConfig.defaultPage
+    const limit = validated.limit ?? paginationConfig.defaultLimit
     const result = await this.getProductReviewsPaginatedUseCase.execute(page, limit)
     return response.ok(result)
   }
@@ -74,7 +76,7 @@ export default class ProductsController {
   async byChannel({ request, response }: HttpContext) {
     const validated = await vine.validate({
       schema: productsByChannelSchema,
-      data: request.qs(),
+      data: normalizePaginationQs(request.qs()),
     })
     const { channel_id: channelIdParam, brand } = validated
     if (channelIdParam === undefined && !brand) {
@@ -96,8 +98,8 @@ export default class ProductsController {
       }
       channelId = channel.id
     }
-    const page = validated.page ?? 1
-    const limit = validated.limit ?? 50
+    const page = validated.page ?? paginationConfig.defaultPage
+    const limit = validated.limit ?? paginationConfig.defaultLimit
     const result = await this.getProductsByChannelUseCase.execute(channelId, page, limit)
     return response.ok(result)
   }

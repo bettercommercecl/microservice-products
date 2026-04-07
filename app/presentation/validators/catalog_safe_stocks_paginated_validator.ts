@@ -1,8 +1,9 @@
+import { paginationConfig } from '#config/pagination'
 import vine from '@vinejs/vine'
 
-const DEFAULT_PAGE = 1
+const DEFAULT_PAGE = paginationConfig.defaultPage
 const DEFAULT_LIMIT = 1000
-const MAX_LIMIT = 2000
+const MAX_LIMIT = paginationConfig.maxLimit
 
 export const catalogSafeStocksPaginatedSchema = vine.object({
   page: vine
@@ -29,4 +30,3 @@ export const catalogSafeStocksPaginatedSchema = vine.object({
       return numValue > MAX_LIMIT ? MAX_LIMIT : numValue
     }),
 })
-

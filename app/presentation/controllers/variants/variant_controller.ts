@@ -1,5 +1,6 @@
 import GetVariantsByChannelUseCase from '#application/use_cases/variants/get_variants_by_channel_use_case'
 import GetVariantsPaginatedUseCase from '#application/use_cases/variants/get_variants_paginated_use_case'
+import { paginationConfig } from '#config/pagination'
 import CalculationAdapter from '#infrastructure/adapters/calculation_adapter'
 import ChannelLookupAdapter from '#infrastructure/adapters/channel_lookup_adapter'
 import VariantCatalogAdapter from '#infrastructure/adapters/variant_catalog_adapter'
@@ -9,10 +10,14 @@ import type Variant from '#models/variant'
 import CategoryService from '#services/categories_service'
 import ProductTagsCampaignsService from '#services/product_tags_campaigns_service'
 import VariantService from '#services/variant_service'
+import { normalizePaginationQs } from '#utils/pagination_query'
 import { variantsByChannelSchema } from '#validators/variants_by_channel_validator'
 import { variantsByIdsSchema } from '#validators/variants_by_ids_validator'
 import { variantsPaginatedListSchema } from '#validators/variants_paginated_list_validator'
-import { variantsPaginatedSchema } from '#validators/variants_paginated_validator'
+import {
+  VARIANTS_LEGACY_INDEX_DEFAULT_LIMIT,
+  variantsPaginatedSchema,
+} from '#validators/variants_paginated_validator'
 import { HttpContext } from '@adonisjs/core/http'
 import vine from '@vinejs/vine'
 
@@ -44,12 +49,11 @@ export default class VariantController {
   async indexPaginated({ request, response }: HttpContext) {
     const validated = await vine.validate({
       schema: variantsPaginatedListSchema,
-      data: request.qs(),
+      data: normalizePaginationQs(request.qs()),
     })
-    const page = validated.page ?? 1
-    const limit = validated.limit ?? 50
+    const page = validated.page ?? paginationConfig.defaultPage
+    const limit = validated.limit ?? paginationConfig.defaultLimit
     const { data, meta } = await this.getVariantsPaginatedUseCase.execute(page, limit)
-    console.log(data.length)
     return response.ok({ success: true, data, meta })
   }
 
@@ -62,7 +66,7 @@ export default class VariantController {
   async byChannel({ request, response }: HttpContext) {
     const validated = await vine.validate({
       schema: variantsByChannelSchema,
-      data: request.qs(),
+      data: normalizePaginationQs(request.qs()),
     })
     const { channel_id: channelIdParam, brand } = validated
     if (channelIdParam === undefined && !brand) {
@@ -84,8 +88,8 @@ export default class VariantController {
       }
       channelId = channel.id
     }
-    const page = validated.page ?? 1
-    const limit = validated.limit ?? 50
+    const page = validated.page ?? paginationConfig.defaultPage
+    const limit = validated.limit ?? paginationConfig.defaultLimit
     const { data, meta } = await this.getVariantsByChannelUseCase.execute(channelId, page, limit)
     return response.ok({ success: true, data, meta })
   }
@@ -96,17 +100,17 @@ export default class VariantController {
   async index({ request, response }: HttpContext) {
     const validatedData = await vine.validate({
       schema: variantsPaginatedSchema,
-      data: request.qs(),
+      data: normalizePaginationQs(request.qs()),
     })
 
-    const page = validatedData.page ?? 1
-    const limit = validatedData.limit ?? 100
+    const page = validatedData.page ?? paginationConfig.defaultPage
+    const limit = validatedData.limit ?? VARIANTS_LEGACY_INDEX_DEFAULT_LIMIT
     const channelId = validatedData.channel
     let parentCategoryId: number | undefined
 
     if (channelId) {
       const channel = await Channel.find(channelId)
-      if (channel?.parent_category != null) {
+      if (channel !== null && channel.parent_category !== null) {
         parentCategoryId = channel.parent_category
       }
     }

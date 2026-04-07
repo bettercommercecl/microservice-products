@@ -1,7 +1,9 @@
+import { paginationConfig } from '#config/pagination'
 import CatalogSafeStock from '#models/catalog_safe_stock'
+import { normalizePaginationQs } from '#utils/pagination_query'
+import { catalogSafeStocksPaginatedSchema } from '#validators/catalog_safe_stocks_paginated_validator'
 import { HttpContext } from '@adonisjs/core/http'
 import vine from '@vinejs/vine'
-import { catalogSafeStocksPaginatedSchema } from '#validators/catalog_safe_stocks_paginated_validator'
 
 export default class CatalogSafeStocksController {
   /**
@@ -11,10 +13,10 @@ export default class CatalogSafeStocksController {
   async indexPaginated({ request, response }: HttpContext) {
     const validated = await vine.validate({
       schema: catalogSafeStocksPaginatedSchema,
-      data: request.qs(),
+      data: normalizePaginationQs(request.qs()),
     })
 
-    const page = validated.page ?? 1
+    const page = validated.page ?? paginationConfig.defaultPage
     const limit = validated.limit ?? 1000
 
     const paginated = await CatalogSafeStock.query()

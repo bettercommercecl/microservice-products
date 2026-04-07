@@ -145,9 +145,16 @@ export default class PackReserveSyncService {
         await this.updatePackVariantReserveFromPackLines(productsPacksData)
 
       const catalogSafeStockResult = await this.updateCatalogSafeStock(variantMerged)
+      const catalogSafeStockPackParentsResult = await this.updateCatalogSafeStockPackParents(
+        packCategoryGroups,
+        productsPacksData
+      )
       const inventoryReserveResult = await this.updateInventoryReserve(variantMerged)
 
-      const formattedInventoryData = await this.formatDataForBigCommerceInventory(variantMerged)
+      const formattedInventoryData = await this.formatDataForBigCommerceInventory(
+        variantMerged,
+        productsPacksData
+      )
       const countryCode = env.get('COUNTRY_CODE')
       const inventoryLocationId =
         (env.get(`INVENTORY_LOCATION_ID_${countryCode}` as any) as string) ?? ''
@@ -235,8 +242,8 @@ export default class PackReserveSyncService {
           fallidas: categoryProductsData.failed,
         },
         paso7_catalogSafeStock: {
-          actualizados: catalogSafeStockResult.updated,
-          fallidos: catalogSafeStockResult.failed,
+          actualizados: catalogSafeStockResult.updated + catalogSafeStockPackParentsResult.updated,
+          fallidos: catalogSafeStockResult.failed + catalogSafeStockPackParentsResult.failed,
         },
         paso8_inventoryReserve: {
           actualizados: inventoryReserveResult.updated,
@@ -700,6 +707,54 @@ export default class PackReserveSyncService {
     }
   }
 
+  /**
+   * Variante padre del pack (`pack_variant_id`): si el pack entra o sale de reserva,
+   * refleja el serial en `bin_picking_number` o lo limpia. Busca fila por `variant_id`.
+   */
+  async updateCatalogSafeStockPackParents(
+    packCategoryGroups: GroupedPackData[],
+    productsPacksData: PackItemInput[]
+  ): Promise<{ updated: number; failed: number }> {
+    const packIdToBin = new Map<number, string>()
+    for (const g of packCategoryGroups) {
+      const bin = this.packGroupHasAnySerial(g) ? (g.serial?.trim() ?? '') : ''
+      packIdToBin.set(g.pack_id, bin)
+    }
+
+    const variantIds = new Set<number>()
+    const variantToPackId = new Map<number, number>()
+    for (const row of productsPacksData) {
+      const pv = row.pack_variant_id
+      if (pv === null || pv === undefined || pv === 0) continue
+      variantIds.add(pv)
+      variantToPackId.set(pv, row.pack_id)
+    }
+
+    const targets = [...variantIds]
+    if (!targets.length) return { updated: 0, failed: 0 }
+
+    const results = await this.processInBatches(targets, async (packVariantId) => {
+      const packId = variantToPackId.get(packVariantId)
+      if (packId === undefined) return { success: false, type: 'no_pack' }
+      const binPickingNumber = packIdToBin.get(packId) ?? ''
+
+      const catalogRecord = await CatalogSafeStock.query()
+        .select('id', 'product_id', 'variant_id')
+        .where('variant_id', packVariantId)
+        .first()
+      if (!catalogRecord) return { success: false, type: 'not_found' }
+      catalogRecord.bin_picking_number = binPickingNumber
+      await catalogRecord.save()
+      return { success: true, type: 'updated' }
+    })
+
+    const resolved = results.map((r) => (r.status === 'fulfilled' ? r.value : { success: false }))
+    return {
+      updated: resolved.filter((x) => x.success && (x as any).type === 'updated').length,
+      failed: resolved.filter((x) => !x.success).length,
+    }
+  }
+
   async updateInventoryReserve(
     _groupedPackData: GroupedPackData[]
   ): Promise<{ updated: number; skipped: number }> {
@@ -717,7 +772,10 @@ export default class PackReserveSyncService {
     return { updated: 0, skipped: _groupedPackData.length }
   }
 
-  async formatDataForBigCommerceInventory(groupedPackData: GroupedPackData[]): Promise<
+  async formatDataForBigCommerceInventory(
+    groupedPackData: GroupedPackData[],
+    productsPacksData: PackItemInput[]
+  ): Promise<
     Array<{
       settings: Array<{
         identity?: { sku?: string }
@@ -728,44 +786,54 @@ export default class PackReserveSyncService {
       }>
     }>
   > {
-    if (!groupedPackData.length) return []
-    const variantIds = [
-      ...new Set(
-        groupedPackData.filter((g) => g.variant_id && g.variant_id !== 0).map((g) => g.variant_id)
-      ),
-    ]
-    const packIds = [
-      ...new Set(
-        groupedPackData.filter((g) => !g.variant_id || g.variant_id === 0).map((g) => g.pack_id)
-      ),
-    ]
+    type InventoryPayloadItem = {
+      settings: Array<{
+        identity?: { sku?: string }
+        safety_stock?: number
+        is_in_stock?: boolean
+        warning_level?: number
+        bin_picking_number?: string
+      }>
+    }
 
-    const [byProduct, byVariant] = await Promise.all([
-      packIds.length > 0
-        ? Database.from('catalog_safe_stocks')
-            .select('product_id', 'sku', 'safety_stock', 'warning_level', 'bin_picking_number')
-            .whereIn('product_id', packIds)
-        : [],
-      variantIds.length > 0
-        ? Database.from('catalog_safe_stocks')
-            .select('variant_id', 'sku', 'safety_stock', 'warning_level', 'bin_picking_number')
-            .whereIn('variant_id', variantIds)
-        : [],
-    ])
+    const childRows: InventoryPayloadItem[] = []
+    if (groupedPackData.length > 0) {
+      const variantIds = [
+        ...new Set(
+          groupedPackData.filter((g) => g.variant_id && g.variant_id !== 0).map((g) => g.variant_id)
+        ),
+      ]
+      const packIds = [
+        ...new Set(
+          groupedPackData.filter((g) => !g.variant_id || g.variant_id === 0).map((g) => g.pack_id)
+        ),
+      ]
 
-    const byProductMap = new Map<number, any>()
-    const byVariantMap = new Map<number, any>()
-    ;(byProduct as any[]).forEach((r) => byProductMap.set(r.product_id, r))
-    ;(byVariant as any[]).forEach((r) => byVariantMap.set(r.variant_id, r))
+      const [byProduct, byVariant] = await Promise.all([
+        packIds.length > 0
+          ? Database.from('catalog_safe_stocks')
+              .select('product_id', 'sku', 'safety_stock', 'warning_level', 'bin_picking_number')
+              .whereIn('product_id', packIds)
+          : [],
+        variantIds.length > 0
+          ? Database.from('catalog_safe_stocks')
+              .select('variant_id', 'sku', 'safety_stock', 'warning_level', 'bin_picking_number')
+              .whereIn('variant_id', variantIds)
+          : [],
+      ])
 
-    return groupedPackData
-      .map((group) => {
+      const byProductMap = new Map<number, any>()
+      const byVariantMap = new Map<number, any>()
+      ;(byProduct as any[]).forEach((r) => byProductMap.set(r.product_id, r))
+      ;(byVariant as any[]).forEach((r) => byVariantMap.set(r.variant_id, r))
+
+      for (const group of groupedPackData) {
         const record =
           group.variant_id && group.variant_id !== 0
             ? byVariantMap.get(group.variant_id)
             : byProductMap.get(group.pack_id)
-        if (!record) return null
-        return {
+        if (!record) continue
+        childRows.push({
           settings: [
             {
               identity: { sku: record.sku },
@@ -775,9 +843,65 @@ export default class PackReserveSyncService {
               bin_picking_number: group.serial ?? '',
             },
           ],
-        }
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null)
+        })
+      }
+    }
+
+    const parentVariantIds = [
+      ...new Set(
+        productsPacksData
+          .map((r) => r.pack_variant_id)
+          .filter((id): id is number => typeof id === 'number' && id !== 0)
+      ),
+    ]
+
+    let parentRows: InventoryPayloadItem[] = []
+    if (parentVariantIds.length > 0) {
+      const parentRecords = await Database.from('catalog_safe_stocks')
+        .select('variant_id', 'sku', 'safety_stock', 'warning_level', 'bin_picking_number')
+        .whereIn('variant_id', parentVariantIds)
+
+      parentRows = (parentRecords as any[]).map((record) => ({
+        settings: [
+          {
+            identity: { sku: record.sku },
+            safety_stock: record.safety_stock,
+            is_in_stock: true,
+            warning_level: record.warning_level,
+            bin_picking_number: String(record.bin_picking_number ?? '').trim(),
+          },
+        ],
+      }))
+    }
+
+    return this.mergeInventoryPayloadBySkuLastWins([...childRows, ...parentRows])
+  }
+
+  /**
+   * Misma SKU en hijo y padre: gana la ultima entrada (padre va despues del hijo).
+   */
+  private mergeInventoryPayloadBySkuLastWins(
+    items: Array<{
+      settings: Array<{
+        identity?: { sku?: string }
+        safety_stock?: number
+        is_in_stock?: boolean
+        warning_level?: number
+        bin_picking_number?: string
+      }>
+    }>
+  ): typeof items {
+    const bySku = new Map<string, (typeof items)[number]>()
+    let noSkuIdx = 0
+    for (const item of items) {
+      const sku = item.settings[0]?.identity?.sku
+      if (sku && sku.trim() !== '') {
+        bySku.set(sku, item)
+      } else {
+        bySku.set(`__empty_${noSkuIdx++}`, item)
+      }
+    }
+    return [...bySku.values()]
   }
 
   /**
