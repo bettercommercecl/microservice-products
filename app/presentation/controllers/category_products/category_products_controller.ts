@@ -1,9 +1,11 @@
+import { paginationConfig } from '#config/pagination'
 import Channel from '#models/channel'
 import TableShapeService from '#services/table_shape_service'
-import { HttpContext } from '@adonisjs/core/http'
-import vine from '@vinejs/vine'
+import { normalizePaginationQs } from '#utils/pagination_query'
 import { productsByChannelSchema } from '#validators/products_by_channel_validator'
 import { productsPaginatedSchema } from '#validators/products_paginated_validator'
+import { HttpContext } from '@adonisjs/core/http'
+import vine from '@vinejs/vine'
 
 /**
  * Relación producto-categoría (category_products) en estructura de tabla para GET desde marcas y persistir.
@@ -14,10 +16,10 @@ export default class CategoryProductsController {
   async indexPaginated({ request, response }: HttpContext) {
     const validated = await vine.validate({
       schema: productsPaginatedSchema,
-      data: request.qs(),
+      data: normalizePaginationQs(request.qs()),
     })
-    const page = validated.page ?? 1
-    const limit = validated.limit ?? 50
+    const page = validated.page ?? paginationConfig.defaultPage
+    const limit = validated.limit ?? paginationConfig.defaultLimit
     const { data, meta } = await this.tableShapeService.getCategoryProductsPaginated(page, limit)
     return response.ok({ success: true, data, meta })
   }
@@ -25,7 +27,7 @@ export default class CategoryProductsController {
   async byChannel({ request, response }: HttpContext) {
     const validated = await vine.validate({
       schema: productsByChannelSchema,
-      data: request.qs(),
+      data: normalizePaginationQs(request.qs()),
     })
     const { channel_id: channelIdParam, brand } = validated
     if (channelIdParam === undefined && !brand) {
@@ -47,10 +49,13 @@ export default class CategoryProductsController {
       }
       channelId = channel.id
     }
-    const page = validated.page ?? 1
-    const limit = validated.limit ?? 50
-    const { data, meta } =
-      await this.tableShapeService.getCategoryProductsByChannel(channelId, page, limit)
+    const page = validated.page ?? paginationConfig.defaultPage
+    const limit = validated.limit ?? paginationConfig.defaultLimit
+    const { data, meta } = await this.tableShapeService.getCategoryProductsByChannel(
+      channelId,
+      page,
+      limit
+    )
     return response.ok({ success: true, data, meta })
   }
 }

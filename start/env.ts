@@ -74,6 +74,13 @@ export default await Env.create(new URL('../', import.meta.url), {
 
   /*
   |----------------------------------------------------------
+  | Listados paginados (GET): tope máximo de ?limit / ?per_page (default 10000)
+  |----------------------------------------------------------
+  */
+  PAGINATION_MAX_LIMIT: Env.schema.number.optional(),
+
+  /*
+  |----------------------------------------------------------
   | M2M auth: API key enviada en Authorization
   |----------------------------------------------------------
   */

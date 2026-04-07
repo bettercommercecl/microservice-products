@@ -1,6 +1,7 @@
-import vine from '@vinejs/vine'
+import { paginationConfig } from '#config/pagination'
 import env from '#start/env'
 import { channels } from '#utils/channels/channels'
+import vine from '@vinejs/vine'
 
 // 🌍 Obtener el country code del environment
 const countryCode = env.get('COUNTRY_CODE') as 'CL' | 'CO' | 'PE'
@@ -23,7 +24,9 @@ const getValidChannelIds = (country: 'CL' | 'CO' | 'PE'): number[] => {
 const validChannelIds = getValidChannelIds(countryCode)
 
 const DEFAULT_PAGE = 1
-const DEFAULT_LIMIT = 2000
+/** Default del listado legacy GET /api/variants (sin query) */
+export const VARIANTS_LEGACY_INDEX_DEFAULT_LIMIT = 2000
+const DEFAULT_LIMIT = VARIANTS_LEGACY_INDEX_DEFAULT_LIMIT
 
 // Esquema de validación para variantes paginadas (page y limit opcionales con valores por defecto)
 export const variantsPaginatedSchema = vine.object({
@@ -51,6 +54,9 @@ export const variantsPaginatedSchema = vine.object({
       const numValue = Number(value)
       if (Number.isNaN(numValue) || numValue <= 0) {
         throw new Error('El límite debe ser un número positivo mayor a 0')
+      }
+      if (numValue > paginationConfig.maxLimit) {
+        return paginationConfig.maxLimit
       }
       return numValue
     }),

@@ -1,9 +1,9 @@
+import { paginationConfig } from '#config/pagination'
 import vine from '@vinejs/vine'
 
-const DEFAULT_PAGE = 1
-const DEFAULT_LIMIT = 50
-/** Sync masivo por canal: permite paginas grandes; el servidor acota memoria/timeout */
-const MAX_LIMIT = 10_000
+const DEFAULT_PAGE = paginationConfig.defaultPage
+const DEFAULT_LIMIT = paginationConfig.defaultLimit
+const MAX_LIMIT = paginationConfig.maxLimit
 
 /** Query para GET /variants/by-channel: channel_id (number) o brand (string). */
 export const variantsByChannelSchema = vine.object({

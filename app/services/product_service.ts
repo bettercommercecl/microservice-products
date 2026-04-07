@@ -83,7 +83,10 @@ export default class ProductService {
 
       const product = await this.productRepository.findById(id)
       if (!product) throw new Error(`Producto no encontrado: ${id}`)
-      const result = { success: true as const, data: (product as { serialize: () => unknown }).serialize() }
+      const result = {
+        success: true as const,
+        data: (product as { serialize: () => unknown }).serialize(),
+      }
       await this.cache.set(cacheKey, JSON.stringify(result), syncConfig.cacheTtlProductsSeconds)
       return result
     } catch (error) {
@@ -164,7 +167,7 @@ export default class ProductService {
   }
 
   /**
-   * Lista reseñas de productos paginadas (50 por página).
+   * Lista reseñas de productos paginadas (tamaño de página segun el controlador).
    * Incluye sku de la primera variante (orden por id); aqui id y product_id coinciden con el catalogo.
    */
   async getProductReviewsPaginated(page: number, limit: number) {
@@ -220,7 +223,8 @@ export default class ProductService {
       if (list.length === 0) return null
       return {
         product_id:
-          productId ?? (typeof obj.product_id === 'number' ? (obj.product_id as number) : undefined),
+          productId ??
+          (typeof obj.product_id === 'number' ? (obj.product_id as number) : undefined),
         sku,
         quantity: typeof obj.quantity === 'number' ? obj.quantity : undefined,
         rating: typeof obj.rating === 'number' ? obj.rating : undefined,
@@ -257,7 +261,9 @@ export default class ProductService {
       limit,
       parentCategoryId
     )
-    const { formatProductForMarcas } = await import('#application/formatters/products_by_channel_formatter')
+    const { formatProductForMarcas } = await import(
+      '#application/formatters/products_by_channel_formatter'
+    )
     const options = {
       percentTransfer: Number(env.get('PERCENT_DISCOUNT_TRANSFER_PRICE')) || 2,
       idPacks: env.get('ID_PACKS') != null ? Number(env.get('ID_PACKS')) : undefined,
