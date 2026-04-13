@@ -8,6 +8,7 @@ import N8nAlertService from '#services/n8n_alert_service'
 import GlobalProductSyncService from '#services/synchronizations/global_product_sync_service'
 import PackReserveSyncService from '#services/synchronizations/pack_reserve_sync_service'
 import PacksSyncService from '#services/synchronizations/packs_sync_service'
+import SearchIndexRefreshNotifier from '#services/synchronizations/search_index_refresh_notifier'
 import SyncWebhookNotifier from '#services/synchronizations/sync_webhook_notifier'
 import { HttpContext } from '@adonisjs/core/http'
 import Logger from '@adonisjs/core/services/logger'
@@ -70,6 +71,8 @@ export default class FullSyncController {
         })
         .catch((err) => this.logger.error({ err }, 'Webhook full_sync_completed (fallo productos)'))
 
+      new SearchIndexRefreshNotifier().scheduleRefreshAllInBackground()
+
       await new N8nAlertService().send('sync_completo:productos_fallidos', errors.join('; '), {
         stopped_at: 'productos',
         errors,
@@ -131,6 +134,8 @@ export default class FullSyncController {
         },
       })
       .catch((err) => this.logger.error({ err }, 'Webhook full_sync_completed'))
+
+    new SearchIndexRefreshNotifier().scheduleRefreshAllInBackground()
 
     return response.ok({
       success: errors.length === 0,

@@ -11,6 +11,8 @@ export interface ChannelSyncInput {
   webhookUrl: string | null
   webhookSecret: string | null
   webhookEnabled: boolean
+  searchIndexRefreshUrl: string | null
+  searchIndexRefreshEnabled: boolean
 }
 
 export interface SyncChannelsFromConfigResult {
@@ -25,6 +27,19 @@ function brandsApiKeyFromEnv(): string | undefined {
     env.get('X_API_KEY_BRANDS')?.trim() ||
     process.env['X-API-KEY-BRANDS']?.trim()
   )
+}
+
+/** Solo persiste URL de refresco si viene definida y es URL absoluta valida. */
+function searchIndexRefreshUrlOrNull(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  try {
+    new URL(trimmed)
+    return trimmed
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -47,12 +62,13 @@ export default class SyncChannelsFromConfigUseCase {
         continue
       }
 
-      const { CHANNEL, PARENT_CATEGORY, API_URL } = countryConfig
+      const { CHANNEL, PARENT_CATEGORY, API_URL, API_URL_SEARCH_INDEX_REFRESH } = countryConfig
       const apiUrl = typeof API_URL === 'string' ? API_URL.trim() : ''
       const webhookUrl =
         apiUrl.length > 0
           ? `${apiUrl.replace(/\/$/, '')}${syncConfig.webhookSyncProductsPath}`
           : null
+      const searchIndexRefreshUrl = searchIndexRefreshUrlOrNull(API_URL_SEARCH_INDEX_REFRESH)
       const webhookSecret = brandsApiKeyFromEnv() ?? null
 
       const input: ChannelSyncInput = {
@@ -63,6 +79,8 @@ export default class SyncChannelsFromConfigUseCase {
         webhookUrl,
         webhookSecret,
         webhookEnabled: true,
+        searchIndexRefreshUrl,
+        searchIndexRefreshEnabled: true,
       }
 
       await this.channelRepo.upsertChannel(input)

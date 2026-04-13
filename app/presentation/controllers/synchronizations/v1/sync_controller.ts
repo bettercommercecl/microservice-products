@@ -14,6 +14,7 @@ import ProductService from '#services/product_service'
 import GlobalProductSyncService from '#services/synchronizations/global_product_sync_service'
 import PackReserveSyncService from '#services/synchronizations/pack_reserve_sync_service'
 import PacksSyncService from '#services/synchronizations/packs_sync_service'
+import SearchIndexRefreshNotifier from '#services/synchronizations/search_index_refresh_notifier'
 import SyncWebhookNotifier from '#services/synchronizations/sync_webhook_notifier'
 import env from '#start/env'
 import { channels as channelsConfig } from '#utils/channels/channels'
@@ -209,6 +210,8 @@ export default class SyncController {
         })
         .catch((err) => this.logger.error({ err }, 'Webhook products_sync_completed (canal)'))
 
+      new SearchIndexRefreshNotifier().scheduleRefreshChannel(channelId)
+
       return response.ok({
         success: errors.length === 0,
         message:
@@ -263,6 +266,8 @@ export default class SyncController {
       })
       .catch((err) => this.logger.error({ err }, 'Webhook categories_sync_completed'))
 
+    new SearchIndexRefreshNotifier().scheduleRefreshAllInBackground()
+
     return response.ok({
       success: true,
       message: result.message,
@@ -282,6 +287,8 @@ export default class SyncController {
           message: 'Marcas sincronizadas',
         })
         .catch((err) => this.logger.error({ err }, 'Webhook brands_sync_completed'))
+
+      new SearchIndexRefreshNotifier().scheduleRefreshAllInBackground()
 
       return response.ok({
         success: result.success,

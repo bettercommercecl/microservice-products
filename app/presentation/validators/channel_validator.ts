@@ -15,5 +15,7 @@ export const updateChannelValidator = vine.compile(
     tree_id: vine.number().optional().nullable(),
     parent_category: vine.number().optional().nullable(),
     country: vine.string().trim().maxLength(10).optional().nullable(),
+    search_index_refresh_url: vine.string().trim().maxLength(2048).optional().nullable(),
+    search_index_refresh_enabled: vine.boolean().optional(),
   })
 )

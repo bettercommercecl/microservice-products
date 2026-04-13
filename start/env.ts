@@ -275,6 +275,10 @@ export default await Env.create(new URL('../', import.meta.url), {
   SYNC_WEBHOOK_GLOBAL_STAGGER_MS: Env.schema.number.optional(),
   /** Entre reintentos tras fallo (409, timeout, etc.); alinear con lock del storefront (ej. bigcommerceSyncLock:300 -> 300000) */
   SYNC_WEBHOOK_RETRY_AFTER_MS: Env.schema.number.optional(),
+  /** GET a search_index_refresh_url tras sync. false desactiva; si no se define, activo */
+  SEARCH_INDEX_REFRESH_ENABLED: Env.schema.boolean.optional(),
+  /** Timeout por GET de refresco de indice (default 60_000 ms) */
+  SEARCH_INDEX_REFRESH_TIMEOUT_MS: Env.schema.number.optional(),
   API_KEY_BRANDS: Env.schema.string.optional(),
   /** Alias opcional de API_KEY_BRANDS (mismo uso que x-api-key en webhooks de marcas) */
 })

@@ -1,6 +1,6 @@
-import { DateTime } from 'luxon'
 import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
 import type { HasMany } from '@adonisjs/lucid/types/relations'
+import { DateTime } from 'luxon'
 import ChannelProduct from './channel_product.js'
 
 export default class Channel extends BaseModel {
@@ -29,6 +29,12 @@ export default class Channel extends BaseModel {
 
   @column({ columnName: 'webhook_enabled' })
   declare webhookEnabled: boolean
+
+  @column({ columnName: 'search_index_refresh_url' })
+  declare searchIndexRefreshUrl: string | null
+
+  @column({ columnName: 'search_index_refresh_enabled' })
+  declare searchIndexRefreshEnabled: boolean
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
