@@ -13,6 +13,8 @@ export const channels = {
           ? 'https://ultimatefitness.cl'
           : 'https://dev.ultimatefitness.cl',
       CURRENCY: env.get('CL_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1&filename=ufchile.json&country=cl&collection=products_ufchile',
       PARENT_CATEGORY: 4159,
       ID_SAMEDAY: 234,
       ID_24HORAS: 298,
@@ -80,6 +82,8 @@ export const channels = {
         env.get('NODE_ENV') === 'production'
           ? 'https://ultimatefitness.com.co'
           : 'https://dev.ultimatefitness.com.co',
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1&filename=ufcolombia.json&country=co&collection=products_ufcolombia',
       CURRENCY: env.get('CO_CURRENCY'),
       PARENT_CATEGORY: 3056,
       ID_SAMEDAY: null,
@@ -149,6 +153,8 @@ export const channels = {
           ? 'https://ultimatefitness.pe'
           : 'https://dev.ultimatefitness.pe',
       CURRENCY: env.get('PE_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1&filename=ufperu.json&country=pe&collection=products_ufperu',
       PARENT_CATEGORY: 2780,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -217,6 +223,8 @@ export const channels = {
       CLIENT_URL:
         env.get('NODE_ENV') === 'production' ? 'https://firstcare.cl' : 'https://dev.firstcare.cl',
       CURRENCY: env.get('CL_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1420393&filename=fcchile.json&country=cl&collection=products_fcchile',
       PARENT_CATEGORY: 1338,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -283,6 +291,8 @@ export const channels = {
       CLIENT_URL:
         env.get('NODE_ENV') === 'production' ? 'https://firstcare.pe' : 'https://dev.firstcare.pe',
       CURRENCY: env.get('PE_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1420393&filename=fcperu.json&country=pe&collection=products_fcperu',
       PARENT_CATEGORY: 1470,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -351,6 +361,8 @@ export const channels = {
       CLIENT_URL:
         env.get('NODE_ENV') === 'production' ? 'https://aquaforce.cl' : 'https://dev.aquaforce.cl',
       CURRENCY: env.get('CL_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1443267&filename=afchile.json&country=cl&collection=products_afchile',
       PARENT_CATEGORY: null,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -419,6 +431,8 @@ export const channels = {
           ? 'https://aquaforce.com.co'
           : 'https://dev.aquaforce.com.co',
       CURRENCY: env.get('CO_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1443267&filename=afcolombia.json&country=co&collection=products_afcolombia',
       PARENT_CATEGORY: 2933,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -485,6 +499,8 @@ export const channels = {
       CLIENT_URL:
         env.get('NODE_ENV') === 'production' ? 'https://aquaforce.pe' : 'https://dev.aquaforce.pe',
       CURRENCY: env.get('PE_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1443267&filename=afperu.json&country=pe&collection=products_afperu',
       PARENT_CATEGORY: 1838,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -551,6 +567,8 @@ export const channels = {
       CLIENT_URL:
         env.get('NODE_ENV') === 'production' ? 'https://tspin.cl' : 'https://dev.tspin.cl',
       CURRENCY: env.get('CL_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1461778&filename=tschile.json&country=cl&collection=products_tschile',
       PARENT_CATEGORY: null,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -621,6 +639,8 @@ export const channels = {
           ? 'https://terraforce.cl'
           : 'https://dev.terraforce.cl',
       CURRENCY: env.get('CL_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1457601&filename=tfchile.json&country=cl&collection=products_tfchile',
       PARENT_CATEGORY: 4158,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -689,6 +709,8 @@ export const channels = {
           ? 'https://terraforce.com.co'
           : 'https://dev.terraforce.com.co',
       CURRENCY: env.get('CO_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1457601&filename=tfcolombia.json&country=co&collection=products_tfcolombia',
       PARENT_CATEGORY: 2931,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -757,6 +779,8 @@ export const channels = {
           ? 'https://terraforce.pe'
           : 'https://dev.terraforce.pe',
       CURRENCY: env.get('PE_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1457601&filename=tfperu.json&country=pe&collection=products_tfperu',
       PARENT_CATEGORY: 2717,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -823,6 +847,8 @@ export const channels = {
       CLIENT_URL:
         env.get('NODE_ENV') === 'production' ? 'https://around.cl' : 'https://dev.around.cl',
       CURRENCY: env.get('CL_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1501686&filename=archile.json&country=cl&collection=products_archile',
       PARENT_CATEGORY: null,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -891,6 +917,8 @@ export const channels = {
           ? 'https://aroundtravel.co'
           : 'https://dev.aroundtravel.co',
       CURRENCY: env.get('CO_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1501686&filename=arcolombia.json&country=co&collection=products_arcolombia',
       PARENT_CATEGORY: 3057,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -955,6 +983,8 @@ export const channels = {
       CLIENT_URL:
         env.get('NODE_ENV') === 'production' ? 'https://around.pe' : 'https://dev.around.pe',
       CURRENCY: env.get('PE_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1501686&filename=arperu.json&country=pe&collection=products_arperu',
       PARENT_CATEGORY: 2674,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -1025,6 +1055,8 @@ export const channels = {
           ? 'https://camillaschile.cl'
           : 'https://dev.camillaschile.cl',
       CURRENCY: env.get('CL_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1567036&filename=ccchile.json&country=cl&collection=products_ccchile',
       PARENT_CATEGORY: 1342,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -1093,6 +1125,8 @@ export const channels = {
       CLIENT_URL:
         env.get('NODE_ENV') === 'production' ? 'https://snowforce.cl' : 'https://dev.snowforce.cl',
       CURRENCY: env.get('CL_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1573014&filename=sfchile.json&country=cl&collection=products_sfchile',
       PARENT_CATEGORY: null,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -1163,6 +1197,8 @@ export const channels = {
           ? 'https://ultimateclothing.cl'
           : 'https://dev.ultimateclothing.cl',
       CURRENCY: env.get('CL_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1598942&filename=ucchile.json&country=cl&collection=products_ucchile',
       PARENT_CATEGORY: 1828,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -1231,6 +1267,8 @@ export const channels = {
           ? 'https://ultimateclothing.com.co'
           : 'https://dev.ultimateclothing.com.co',
       CURRENCY: env.get('CO_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1598942&filename=uccolombia.json&country=co&collection=products_uccolombia',
       PARENT_CATEGORY: 2423,
       ID_SAMEDAY: null,
       ID_24HORAS: null,
@@ -1299,6 +1337,8 @@ export const channels = {
           ? 'https://ultimateclothing.pe'
           : 'https://dev.ultimateclothing.pe',
       CURRENCY: env.get('PE_CURRENCY'),
+      API_URL_SEARCH_INDEX_REFRESH:
+        'https://typesense.bettercommerce.cl/api/generate-json?channel=1598942&filename=ucperu.json&country=pe&collection=products_ucperu',
       PARENT_CATEGORY: 2203,
       ID_SAMEDAY: null,
       ID_24HORAS: null,

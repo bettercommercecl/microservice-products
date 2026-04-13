@@ -2,6 +2,8 @@ export interface ChannelConfigInterface {
   CHANNEL: number
   API_URL: string
   CLIENT_URL: string
+  /** GET al servicio de indice; si falta o es invalida, search_index_refresh_url queda vacio en BD */
+  API_URL_SEARCH_INDEX_REFRESH?: string
   CURRENCY: 'CLP' | 'COP' | 'PEN'
   PARENT_CATEGORY: number | null
   ID_SAMEDAY: number | null

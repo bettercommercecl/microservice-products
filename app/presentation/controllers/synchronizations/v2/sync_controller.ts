@@ -7,6 +7,7 @@ import CacheService from '#services/cache_service'
 import GlobalProductSyncService from '#services/synchronizations/global_product_sync_service'
 import PackReserveSyncService from '#services/synchronizations/pack_reserve_sync_service'
 import PacksSyncService from '#services/synchronizations/packs_sync_service'
+import SearchIndexRefreshNotifier from '#services/synchronizations/search_index_refresh_notifier'
 import StockSyncService from '#services/synchronizations/stock_sync_service'
 import SyncWebhookNotifier from '#services/synchronizations/sync_webhook_notifier'
 import env from '#start/env'
@@ -55,6 +56,8 @@ export default class SyncControllerV2 {
       })
       .catch((err) => this.logger.error({ err }, 'Webhook products_sync_completed (global)'))
 
+    new SearchIndexRefreshNotifier().scheduleRefreshAllInBackground()
+
     return response.ok({
       success: result.success,
       message: result.message,
@@ -79,6 +82,8 @@ export default class SyncControllerV2 {
       })
       .catch((err) => this.logger.error({ err }, 'Webhook packs_sync_completed'))
 
+    new SearchIndexRefreshNotifier().scheduleRefreshAllInBackground()
+
     return response.status(status).json({
       success: result.status < 400,
       message: result.message ?? (result.status === 201 ? 'Packs sincronizados' : 'Sin packs'),
@@ -101,6 +106,8 @@ export default class SyncControllerV2 {
       })
       .catch((err) => this.logger.error({ err }, 'Webhook packs_reserve_sync_completed'))
 
+    new SearchIndexRefreshNotifier().scheduleRefreshAllInBackground()
+
     return response.ok({
       success: true,
       message: 'Packs reserva sincronizados',
@@ -122,6 +129,8 @@ export default class SyncControllerV2 {
         message: 'Stock sincronizado',
       })
       .catch((err) => this.logger.error({ err }, 'Webhook stock_sync_completed'))
+
+    new SearchIndexRefreshNotifier().scheduleRefreshAllInBackground()
 
     return response.ok({
       success: true,

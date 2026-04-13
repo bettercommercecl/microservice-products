@@ -1,7 +1,7 @@
 import Channel from '#models/channel'
 import ChannelProduct from '#models/channel_product'
-import Logger from '@adonisjs/core/services/logger'
 import env from '#start/env'
+import Logger from '@adonisjs/core/services/logger'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 
 export interface CreateChannelPayload {
@@ -16,6 +16,8 @@ export interface UpdateChannelPayload {
   tree_id?: number | null
   parent_category?: number | null
   country?: string | null
+  search_index_refresh_url?: string | null
+  search_index_refresh_enabled?: boolean
 }
 
 /**
@@ -60,6 +62,12 @@ export default class ChannelsService {
     if (payload.tree_id !== undefined) channel.tree_id = payload.tree_id
     if (payload.parent_category !== undefined) channel.parent_category = payload.parent_category
     if (payload.country !== undefined) channel.country = payload.country
+    if (payload.search_index_refresh_url !== undefined) {
+      channel.searchIndexRefreshUrl = payload.search_index_refresh_url
+    }
+    if (payload.search_index_refresh_enabled !== undefined) {
+      channel.searchIndexRefreshEnabled = payload.search_index_refresh_enabled
+    }
 
     await channel.save()
     this.logger.info(`Canal actualizado: ${channel.id}`)
@@ -83,7 +91,10 @@ export default class ChannelsService {
    * Devuelve canales agrupados por pais para debug/monitoreo de configuracion.
    */
   async getByCountry(): Promise<
-    { country: string | null; channels: { id: number; name: string; parent_category: number | null }[] }[]
+    {
+      country: string | null
+      channels: { id: number; name: string; parent_category: number | null }[]
+    }[]
   > {
     const channels = await Channel.query().orderBy('country', 'asc').orderBy('id', 'asc')
 

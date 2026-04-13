@@ -17,6 +17,8 @@ export default class ChannelRepository implements ChannelRepositoryPort {
         webhookUrl: input.webhookUrl,
         webhookSecret: input.webhookSecret,
         webhookEnabled: input.webhookEnabled,
+        searchIndexRefreshUrl: input.searchIndexRefreshUrl,
+        searchIndexRefreshEnabled: input.searchIndexRefreshEnabled,
       }
     )
   }
