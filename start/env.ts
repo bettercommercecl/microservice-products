@@ -149,6 +149,14 @@ export default await Env.create(new URL('../', import.meta.url), {
 
   /*
   |----------------------------------------------------------
+  | BigCommerce (axios): timeout por defecto del cliente y catalogo paginado.
+  | Sin definir: 120_000 ms. Subir si aparece "timeout of 30000ms exceeded" en sync.
+  |----------------------------------------------------------
+  */
+  BIGCOMMERCE_HTTP_TIMEOUT_MS: Env.schema.number.optional(),
+
+  /*
+  |----------------------------------------------------------
   | ID de la categoria raiz "Filtros" para sincronizar filters_products.
   | Si no esta definido, la sync de filtros se omite.
   |----------------------------------------------------------

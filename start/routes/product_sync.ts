@@ -14,16 +14,16 @@ router
       .use(middleware.rateLimit({ max: 10, windowMs: 60_000, key: 'global' }))
     router
       .get('/productos', [SyncControllerV2, 'syncProducts'])
-      .use(middleware.rateLimit({ max: 4, windowMs: 60_000, key: 'global' }))
+      .use(middleware.rateLimit({ max: 1, windowMs: 180_000, key: 'global' }))
     router
       .get('/packs', [SyncControllerV2, 'syncPacks'])
-      .use(middleware.rateLimit({ max: 1, windowMs: 15_000, key: 'global' }))
+      .use(middleware.rateLimit({ max: 1, windowMs: 60_000, key: 'global' }))
     router
       .get('/packs-reserva', [SyncControllerV2, 'syncPacksReserve'])
-      .use(middleware.rateLimit({ max: 1, windowMs: 20_000, key: 'global' }))
+      .use(middleware.rateLimit({ max: 1, windowMs: 60_000, key: 'global' }))
     router
       .get('/stock', [SyncControllerV2, 'syncStock'])
-      .use(middleware.rateLimit({ max: 1, windowMs: 10_000, key: 'global' }))
+      .use(middleware.rateLimit({ max: 1, windowMs: 30_000, key: 'global' }))
   })
   .use(middleware.m2mAuth())
   .prefix('api/sync')
