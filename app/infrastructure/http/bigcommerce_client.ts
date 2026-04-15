@@ -16,9 +16,11 @@ export function getBigcommerceClient(): AxiosInstance {
     const storeHash = env.get('BIGCOMMERCE_API_STORE_ID') || ''
     const baseURL = `${env.get('BIGCOMMERCE_API_URL') || ''}${storeHash}`
 
+    const httpTimeoutMs = env.get('BIGCOMMERCE_HTTP_TIMEOUT_MS') ?? 120_000
+
     const instance = axiosCreate({
       baseURL,
-      timeout: 30_000,
+      timeout: httpTimeoutMs,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

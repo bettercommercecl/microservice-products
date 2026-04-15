@@ -7,7 +7,7 @@ router
   .group(() => {
     router
       .get('/sincronizar-productos/:channel_id', [SyncController, 'syncProducts'])
-      .use(middleware.rateLimit({ max: 4, windowMs: 60_000, key: 'global' }))
+      .use(middleware.rateLimit({ max: 1, windowMs: 240_000, key: 'global' }))
     router
       .get('/sincronizar-categorias', [SyncController, 'syncCategories'])
       .use(middleware.rateLimit({ max: 1, windowMs: 15_000, key: 'global' }))

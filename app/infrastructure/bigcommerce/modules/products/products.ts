@@ -1,3 +1,4 @@
+import env from '#start/env'
 import type { Logger } from '@adonisjs/core/logger'
 import type { AxiosInstance } from 'axios'
 
@@ -106,12 +107,14 @@ export default class ProductsApi {
       let allProducts: any[] = []
       let page = params.page ? Number(params.page) : 1
 
+      const catalogPageTimeoutMs = env.get('BIGCOMMERCE_HTTP_TIMEOUT_MS') ?? 120_000
+
       while (true) {
         params.page = page
 
         const response = await this.client.get('/v3/catalog/products', {
           params,
-          timeout: 30_000,
+          timeout: catalogPageTimeoutMs,
         })
 
         const body = response.data as {

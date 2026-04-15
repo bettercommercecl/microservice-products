@@ -4,6 +4,24 @@ import Logger from '@adonisjs/core/services/logger'
 import type { AxiosError } from 'axios'
 
 const REFERENCE_MAX_LENGTH = 600
+const DETAILS_MAX_LENGTH = 4000
+
+function detailsForN8n(message: unknown): string {
+  if (message === undefined || message === null) {
+    return ''
+  }
+  if (typeof message === 'string') {
+    return message.length > DETAILS_MAX_LENGTH
+      ? `${message.slice(0, DETAILS_MAX_LENGTH)}…`
+      : message
+  }
+  try {
+    const s = JSON.stringify(message)
+    return s.length > DETAILS_MAX_LENGTH ? `${s.slice(0, DETAILS_MAX_LENGTH)}…` : s
+  } catch {
+    return String(message)
+  }
+}
 
 /**
  * Envía alertas operativas a n8n (errores críticos de sync).
@@ -41,7 +59,12 @@ export default class N8nAlertService {
     const referenceTrunc =
       refTrim.length > REFERENCE_MAX_LENGTH ? `${refTrim.slice(0, REFERENCE_MAX_LENGTH)}…` : refTrim
 
-    const payload = { title: titleTrim, reference: referenceTrunc, message }
+    const payload = {
+      title: titleTrim,
+      reference: referenceTrunc,
+      message,
+      details: detailsForN8n(message),
+    }
 
     try {
       const client = getN8nClient()
