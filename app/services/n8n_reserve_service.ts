@@ -3,6 +3,7 @@ import InventoryReserve from '#models/inventory_reserve'
 import N8nAlertService from '#services/n8n_alert_service'
 import env from '#start/env'
 import Logger from '@adonisjs/core/services/logger'
+import db from '@adonisjs/lucid/services/db'
 
 // Estructura que devuelve el webhook de n8n
 interface ReserveApiResponse {
@@ -28,7 +29,8 @@ export default class N8nReserveService {
 
   /**
    * Obtiene todas las reservas desde n8n, normaliza y persiste en inventory_reserve.
-   * En cada sincronizacion se actualizan o crean los registros por SKU.
+   * Solo persiste o purga tras HTTP 200 y payload JSON en forma de array (axios ya rechaza otros status).
+   * Lista vacia [] legitima: vacia inventory_reserve. Filas con datos pero sin ningun SKU valido: error, sin tocar BD.
    */
   async fetchAndSaveReserves(): Promise<{
     success: boolean
@@ -46,21 +48,31 @@ export default class N8nReserveService {
       this.logger.info('Obteniendo reservas desde n8n...')
 
       const client = getN8nClient()
-      const response = await client.get<ReserveApiResponse[]>(reservesUrl)
+      const response = await client.get<ReserveApiResponse[]>(reservesUrl, {
+        validateStatus: (status) => status === 200,
+      })
 
       if (!Array.isArray(response.data)) {
         throw new Error('La respuesta de n8n no es un array valido')
       }
 
-      const rawNormalized = this.normalizeResponse(response.data)
-      const normalized = this.dedupeBySkuLastWins(rawNormalized)
-
-      if (normalized.length === 0) {
-        this.logger.info('n8n no retorno reservas para este pais')
-        return { success: true, total: 0, message: 'Sin reservas disponibles' }
+      const payload = response.data
+      for (const [i, row] of payload.entries()) {
+        if (row === null || typeof row !== 'object' || Array.isArray(row)) {
+          throw new Error(`n8n fila ${i}: se esperaba un objeto por fila`)
+        }
       }
 
-      if (rawNormalized.length !== normalized.length) {
+      const rawNormalized = this.normalizeResponse(payload)
+      const normalized = this.dedupeBySkuLastWins(rawNormalized)
+
+      if (payload.length > 0 && normalized.length === 0) {
+        throw new Error(
+          'n8n devolvio filas pero ningun SKU valido; se aborta para no vaciar inventory_reserve por error de datos'
+        )
+      }
+
+      if (rawNormalized.length > 0 && rawNormalized.length !== normalized.length) {
         this.logger.warn(
           {
             filas_n8n: rawNormalized.length,
@@ -70,14 +82,37 @@ export default class N8nReserveService {
         )
       }
 
-      await InventoryReserve.updateOrCreateMany('sku', normalized)
+      if (payload.length === 0) {
+        return await this.syncWhenN8nReturnedEmpty()
+      }
 
-      this.logger.info({ total: normalized.length }, 'Reservas sincronizadas correctamente')
+      const skusFromN8n = normalized.map((row) => row.sku)
+
+      let removed = 0
+      await db.transaction(async (trx) => {
+        await InventoryReserve.updateOrCreateMany('sku', normalized, { client: trx })
+        const orphanCountRow = await InventoryReserve.query({ client: trx })
+          .whereNotIn('sku', skusFromN8n)
+          .count('* as total')
+          .first()
+        removed = Number((orphanCountRow as { $extras?: { total?: number } })?.$extras?.total ?? 0)
+        if (removed > 0) {
+          await InventoryReserve.query({ client: trx }).whereNotIn('sku', skusFromN8n).delete()
+        }
+      })
+
+      this.logger.info(
+        { total: normalized.length, eliminadas: removed },
+        'Reservas sincronizadas correctamente'
+      )
 
       return {
         success: true,
         total: normalized.length,
-        message: `${normalized.length} reservas sincronizadas`,
+        message:
+          removed > 0
+            ? `${normalized.length} reservas sincronizadas; ${removed} obsoletas eliminadas`
+            : `${normalized.length} reservas sincronizadas`,
       }
     } catch (error: any) {
       this.logger.error(
@@ -94,6 +129,38 @@ export default class N8nReserveService {
         })
       }
       throw error
+    }
+  }
+
+  /** Solo con array vacio en respuesta 200: vacia inventory_reserve (no usar cuando hubo filas invalidas). */
+  private async syncWhenN8nReturnedEmpty(): Promise<{
+    success: boolean
+    total: number
+    message: string
+  }> {
+    const countRow = await InventoryReserve.query().count('* as total').first()
+    const existingCount = Number(
+      (countRow as { $extras?: { total?: number } })?.$extras?.total ?? 0
+    )
+
+    if (existingCount === 0) {
+      this.logger.info('n8n sin filas y inventory_reserve ya vacio')
+      return {
+        success: true,
+        total: 0,
+        message: 'Sin reservas en n8n; inventory_reserve sin cambios',
+      }
+    }
+
+    await db.transaction(async (trx) => {
+      await InventoryReserve.query({ client: trx }).delete()
+    })
+    this.logger.info({ eliminadas: existingCount }, 'n8n sin filas; inventory_reserve purgado')
+
+    return {
+      success: true,
+      total: 0,
+      message: `Sin reservas en n8n; ${existingCount} filas eliminadas en inventory_reserve`,
     }
   }
 
