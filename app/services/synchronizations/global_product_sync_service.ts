@@ -173,6 +173,9 @@ export default class GlobalProductSyncService {
       } else {
         await this.cleanupService.run(products.map((p) => p.id))
       }
+      await this.cleanupService.deleteVariantsWithTemporarySyncSku(
+        this.collectVariantIdsFromBigCommerceProducts(products)
+      )
 
       // 7. Poblar filters_products desde categorias
       if (!options?.skipFilters) {
@@ -209,6 +212,19 @@ export default class GlobalProductSyncService {
   // ================================================================
   // PASOS DEL FLUJO
   // ================================================================
+
+  /** IDs de variante BC del catalogo persistido en este run (despues del filtro de price list si aplica). */
+  private collectVariantIdsFromBigCommerceProducts(products: BigCommerceProduct[]): Set<number> {
+    const ids = new Set<number>()
+    for (const p of products) {
+      for (const v of p.variants ?? []) {
+        if (Number.isFinite(v.id)) {
+          ids.add(v.id)
+        }
+      }
+    }
+    return ids
+  }
 
   /**
    * Fuera de Chile: mapa de precios del lote leido solo desde pricelist_variant_records
