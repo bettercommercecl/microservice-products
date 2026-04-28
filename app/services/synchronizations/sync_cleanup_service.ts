@@ -4,6 +4,7 @@ import CategoryProduct from '#models/category_product'
 import ChannelProduct from '#models/channel_product'
 import FiltersProduct from '#models/filters_product'
 import Option from '#models/option'
+import PricelistVariantRecord from '#models/pricelist_variant_record'
 import Product from '#models/product'
 import ProductPack from '#models/product_pack'
 import Variant from '#models/variant'
@@ -13,6 +14,7 @@ import db from '@adonisjs/lucid/services/db'
 /**
  * Responsabilidad unica: detectar y limpiar productos descontinuados.
  * Implementa un safety threshold para evitar limpiezas masivas por error de API.
+ * Tras sync, elimina variantes _sync_* huérfanas (id no incluido en el snapshot BC del mismo run).
  */
 export default class SyncCleanupService {
   private readonly logger = Logger.child({ service: 'SyncCleanupService' })
@@ -245,5 +247,42 @@ export default class SyncCleanupService {
     }
 
     return false
+  }
+
+  /**
+   * Borra variantes con "_sync_" en sku solo si su id no esta en el snapshot BC de este sync.
+   * Limpia catalog_safe_stocks, pricelist_variant_records y products_packs antes de borrar la variante.
+   */
+  async deleteVariantsWithTemporarySyncSku(syncedVariantIds: Set<number>): Promise<void> {
+    if (syncedVariantIds.size === 0) {
+      this.logger.warn(
+        'Omitiendo borrado _sync_: snapshot sin variantes (no se asume catalogo vacio como criterio seguro)'
+      )
+      return
+    }
+
+    const excludeIds = [...syncedVariantIds]
+    const rows = await Variant.query()
+      .whereRaw('strpos(sku, ?) > 0', ['_sync_'])
+      .whereNotIn('id', excludeIds)
+      .select('id')
+
+    const ids = rows.map((r) => r.id)
+    if (ids.length === 0) {
+      return
+    }
+
+    await db.transaction(async (trx) => {
+      await CatalogSafeStock.query({ client: trx }).whereIn('variant_id', ids).delete()
+      await PricelistVariantRecord.query({ client: trx }).whereIn('variant_id', ids).delete()
+      await ProductPack.query({ client: trx }).whereIn('variant_id', ids).delete()
+      await ProductPack.query({ client: trx }).whereIn('pack_variant_id', ids).delete()
+      await Variant.query({ client: trx }).whereIn('id', ids).delete()
+    })
+
+    this.logger.info(
+      { eliminadas: ids.length, variantes_en_snapshot: excludeIds.length },
+      'Variantes _sync_ huérfanas (no en snapshot) eliminadas'
+    )
   }
 }

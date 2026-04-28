@@ -95,7 +95,9 @@ export function assignUniqueSkusForIntraBatchDuplicates<T extends { id: number; 
  * variants.sku es UNIQUE: solo una fila puede tener ''. BC a veces envia SKU vacio en varias variantes
  * y Postgres responde Key (sku)=() already exists.
  */
-export function assignPlaceholderSkuIfEmpty<T extends { id: number; sku?: unknown }>(rows: T[]): T[] {
+export function assignPlaceholderSkuIfEmpty<T extends { id: number; sku?: unknown }>(
+  rows: T[]
+): T[] {
   const norm = (s: unknown) => (typeof s === 'string' ? s.trim() : '')
   return rows.map((row) => {
     if (norm(row.sku).length > 0) return row
@@ -111,10 +113,12 @@ export async function stashVariantRowsWithBatchPlaceholderSku(
 ): Promise<void> {
   const now = new Date()
   for (const v of toUpdate) {
-    await Variant.query({ client: trx }).where('id', v.id).update({
-      sku: `_batch_tmp_${v.id}`,
-      updated_at: now,
-    })
+    await Variant.query({ client: trx })
+      .where('id', v.id)
+      .update({
+        sku: `_batch_tmp_${v.id}`,
+        updated_at: now,
+      })
   }
 }
 
