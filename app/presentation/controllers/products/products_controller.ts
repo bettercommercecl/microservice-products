@@ -69,8 +69,10 @@ export default class ProductsController {
   }
 
   /**
-   * Lista productos por canal. Query: channel_id (number) o brand (string).
-   * Si viene brand, se busca el canal por nombre en la tabla channels y se usa su id.
+   * Lista productos por canal. Query: channel_id y/o brand (al menos uno).
+   * Canal efectivo: channel_id si viene; si no, se resuelve por channels.name usando brand,
+   * sin distinguir mayúsculas/minúsculas. Si llegan ambos, brand es redundante (misma lógica que solo channel_id).
+   * Si channels.parent_category tiene valor en ese canal, además aplican registros en category_products.
    * GET /api/products/by-channel?channel_id=1 o ?brand=UF
    */
   async byChannel({ request, response }: HttpContext) {
@@ -89,7 +91,9 @@ export default class ProductsController {
     if (channelIdParam !== undefined) {
       channelId = channelIdParam
     } else {
-      const channel = await Channel.query().where('name', brand!).first()
+      const channel = await Channel.query()
+        .whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [brand!])
+        .first()
       if (!channel) {
         return response.notFound({
           success: false,

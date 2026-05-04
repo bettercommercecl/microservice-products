@@ -6,8 +6,10 @@ const DEFAULT_LIMIT = paginationConfig.defaultLimit
 const MAX_LIMIT = paginationConfig.maxLimit
 
 /**
- * Query para GET products/by-channel: channel_id (number) o brand (string).
- * Al menos uno debe venir; si vienen ambos, se usa channel_id.
+ * Query para GET products/by-channel: channel_id (number) y/o brand (string).
+ * Al menos uno obligatorio.
+ * Canal efectivo: si viene channel_id se usa ese id; si no, canal por nombre (brand) ignorando mayúsculas/minúsculas.
+ * Si vienen ambos, channel_id tiene prioridad; brand no altera la consulta (cliente puede enviarlo igual que en otros entornos).
  */
 export const productsByChannelSchema = vine.object({
   channel_id: vine
