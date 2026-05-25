@@ -12,16 +12,17 @@ export function priceResultFromBcPricelistRecord(
   calculation: CalculationPort,
   percentDiscount: number
 ): PriceResult {
+  const price = record.price ?? 0
   const salePrice =
     record.calculated_price !== undefined && record.calculated_price !== null
       ? record.calculated_price
-      : (record.sale_price ?? record.price)
+      : (record.sale_price ?? price)
 
-  const discount = calculation.calculateDiscount(record.price, salePrice)
-  const cashPrice = calculation.calculateTransferPrice(record.price, salePrice, percentDiscount)
+  const discount = calculation.calculateDiscount(price, salePrice)
+  const cashPrice = calculation.calculateTransferPrice(price, salePrice, percentDiscount)
 
   return {
-    normal_price: record.price,
+    normal_price: price,
     discount_price: salePrice,
     cash_price: cashPrice,
     discount,

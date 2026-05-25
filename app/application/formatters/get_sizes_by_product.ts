@@ -17,10 +17,7 @@ function storeEntry(
  * Devuelve el objeto sizes por tienda segun categorias del producto.
  * Usa config inyectada (sin depender de env); el caller construye la config desde env.
  */
-export function getSizesByProduct(
-  categories: number[],
-  config: SizesConfig
-): StoreSizes {
+export function getSizesByProduct(categories: number[], config: SizesConfig): StoreSizes {
   const result: StoreSizes = {}
   for (const [storeName, ids] of Object.entries(config.stores)) {
     result[storeName] = storeEntry(categories, ids)

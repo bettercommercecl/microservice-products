@@ -5,11 +5,7 @@
 export interface CalculationPort {
   calculateDiscount(price: number, salePrice: number): string
 
-  calculateTransferPrice(
-    price: number,
-    salePrice: number,
-    transferPercent?: number
-  ): number
+  calculateTransferPrice(price: number, salePrice: number, transferPercent?: number): number
 
   calculateVolumetricWeight(
     width: number,

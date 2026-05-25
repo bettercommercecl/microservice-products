@@ -1,7 +1,7 @@
 import {
-    formatPacksRecords,
-    type InventoryEntry,
-    type PackInput,
+  formatPacksRecords,
+  type InventoryEntry,
+  type PackInput,
 } from '#utils/format_packs_records'
 import { test } from '@japa/runner'
 
@@ -169,9 +169,7 @@ test.group('formatPacksRecords', () => {
   })
 
   test('stock 0 cuando available_to_sell es 0', ({ assert }) => {
-    const packs: PackInput[] = [
-      { id: 350, items_packs: [{ product: 'SKU-ZERO', quantity: 1 }] },
-    ]
+    const packs: PackInput[] = [{ id: 350, items_packs: [{ product: 'SKU-ZERO', quantity: 1 }] }]
     const inventoryMap = new Map<string, InventoryEntry>([
       [
         'SKU-ZERO',

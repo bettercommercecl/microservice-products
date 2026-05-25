@@ -31,7 +31,20 @@ export default class BigcommerceRateLimitInterceptor {
    */
   public setup(client: AxiosInstance): void {
     const clientWithInterceptors = client as AxiosInstance & {
-      interceptors: { request: { use: (onFulfilled?: (c: unknown) => unknown, onRejected?: (e: unknown) => unknown) => number }; response: { use: (onFulfilled?: (r: AxiosResponse) => AxiosResponse | Promise<AxiosResponse>, onRejected?: (e: unknown) => unknown) => number } }
+      interceptors: {
+        request: {
+          use: (
+            onFulfilled?: (c: unknown) => unknown,
+            onRejected?: (e: unknown) => unknown
+          ) => number
+        }
+        response: {
+          use: (
+            onFulfilled?: (r: AxiosResponse) => AxiosResponse | Promise<AxiosResponse>,
+            onRejected?: (e: unknown) => unknown
+          ) => number
+        }
+      }
       request: (config: AxiosRequestConfig) => Promise<unknown>
     }
     clientWithInterceptors.interceptors.request.use(
@@ -144,7 +157,9 @@ export default class BigcommerceRateLimitInterceptor {
         this.requestsLeft = this.quota
         this.timeResetMs = 0
 
-        return (client as unknown as { request(config: AxiosRequestConfig): Promise<unknown> }).request(config)
+        return (
+          client as unknown as { request(config: AxiosRequestConfig): Promise<unknown> }
+        ).request(config)
       } else {
         Logger.error(`Rate limit excedido después de ${this.MAX_RETRIES} reintentos`)
         throw new Error(`Rate limit excedido después de ${this.MAX_RETRIES} intentos`)

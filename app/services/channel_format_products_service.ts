@@ -199,9 +199,17 @@ export default class ChannelFormatProductsService {
       const rawTimer = Array.isArray(timerMetafield) ? timerMetafield : timerMetafield
       const parsed =
         typeof rawTimer === 'string'
-          ? (JSON.parse(rawTimer) as { timer_price?: number; timer_status?: boolean; timer_datetime?: string } | null)
+          ? (JSON.parse(rawTimer) as {
+              timer_price?: number
+              timer_status?: boolean
+              timer_datetime?: string
+            } | null)
           : rawTimer && typeof rawTimer === 'object'
-            ? (rawTimer as { timer_price?: number; timer_status?: boolean; timer_datetime?: string })
+            ? (rawTimer as {
+                timer_price?: number
+                timer_status?: boolean
+                timer_datetime?: string
+              })
             : null
 
       if (!parsed) {
@@ -238,10 +246,7 @@ export default class ChannelFormatProductsService {
   ) {
     try {
       if (this.country === 'CL') {
-        const discount = this.calculation.calculateDiscount(
-          product.price,
-          product.sale_price
-        )
+        const discount = this.calculation.calculateDiscount(product.price, product.sale_price)
         const percentDiscount = this.calculation.calculateTransferPrice(
           product.price,
           product.sale_price,

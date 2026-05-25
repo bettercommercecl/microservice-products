@@ -227,9 +227,7 @@ export default class FormatOptionsService {
     }
 
     return options.map((elem) => {
-      const raw = elem.value_data?.colors
-        ? elem.value_data.colors
-        : elem.value_data?.image_url
+      const raw = elem.value_data?.colors ? elem.value_data.colors : elem.value_data?.image_url
 
       return {
         id: elem.id,

@@ -4,6 +4,7 @@ import type {
   BigCommerceProductVariant,
 } from '#infrastructure/bigcommerce/modules/products/interfaces/bigcommerce_product.interface'
 import type { PriceResult } from '#interfaces/product-sync/sync.interfaces'
+import logger from '@adonisjs/core/services/logger'
 
 /**
  * Contrato para calculo de precios desde el payload de producto/variante de BigCommerce (Chile).
@@ -28,15 +29,16 @@ export class ClPricingStrategy implements PricingStrategy {
     product: BigCommerceProduct,
     percentDiscount: number
   ): Promise<PriceResult> {
-    const discount = this.calculation.calculateDiscount(product.price, product.sale_price)
+    const price = product.price ?? 0
+    const discount = this.calculation.calculateDiscount(price, product.sale_price)
     const cashPrice = this.calculation.calculateTransferPrice(
-      product.price,
+      price,
       product.sale_price,
       percentDiscount
     )
 
     return {
-      normal_price: product.price,
+      normal_price: price,
       discount_price: product.sale_price,
       cash_price: cashPrice,
       discount,
@@ -47,16 +49,19 @@ export class ClPricingStrategy implements PricingStrategy {
     variant: BigCommerceProductVariant,
     percentDiscount: number
   ): Promise<PriceResult> {
+    const price = variant.price ?? variant.calculated_price ?? variant.sale_price ?? 0
+    if (price === 0) {
+      logger.warn(
+        { variant_id: variant.id, sku: variant.sku, product_id: variant.product_id },
+        '[DEBUG-PRICE] variant sin precio en BC (price, calculated_price y sale_price son null)'
+      )
+    }
     const salePrice = variant.sale_price || variant.calculated_price
-    const discount = this.calculation.calculateDiscount(variant.price, salePrice)
-    const cashPrice = this.calculation.calculateTransferPrice(
-      variant.price,
-      salePrice,
-      percentDiscount
-    )
+    const discount = this.calculation.calculateDiscount(price, salePrice)
+    const cashPrice = this.calculation.calculateTransferPrice(price, salePrice, percentDiscount)
 
     return {
-      normal_price: variant.price,
+      normal_price: price,
       discount_price: salePrice,
       cash_price: cashPrice,
       discount,

@@ -1,4 +1,7 @@
-import type { VariantCatalogPort, VariantsPaginatedMeta } from '#application/ports/variant_catalog.port'
+import type {
+  VariantCatalogPort,
+  VariantsPaginatedMeta,
+} from '#application/ports/variant_catalog.port'
 import VariantService from '#services/variant_service'
 import CategoryService from '#services/categories_service'
 import ProductTagsCampaignsService from '#services/product_tags_campaigns_service'
