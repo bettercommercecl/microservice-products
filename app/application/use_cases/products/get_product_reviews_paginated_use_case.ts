@@ -17,4 +17,3 @@ export default class GetProductReviewsPaginatedUseCase {
     return this.catalog.getProductReviewsPaginated(page, limit)
   }
 }
-

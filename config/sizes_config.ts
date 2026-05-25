@@ -31,11 +31,7 @@ export function getSizesConfig(): SizesConfig {
         quilicura: storeIds('ID_SMALL_QUILICURA', 'ID_MEDIUM_QUILICURA', 'ID_BIG_QUILICURA'),
         vina: storeIds('ID_SMALL_VINA', 'ID_MEDIUM_VINA', 'ID_BIG_VINA'),
         concon: storeIds('ID_SMALL_CONCON', 'ID_MEDIUM_CONCON', 'ID_BIG_CONCON'),
-        concepcion: storeIds(
-          'ID_SMALL_CONCEPCION',
-          'ID_MEDIUM_CONCEPCION',
-          'ID_BIG_CONCEPCION'
-        ),
+        concepcion: storeIds('ID_SMALL_CONCEPCION', 'ID_MEDIUM_CONCEPCION', 'ID_BIG_CONCEPCION'),
         retirocondes: storeIds(
           'ID_SMALL_RETIROCONDES',
           'ID_MEDIUM_RETIROCONDES',
@@ -66,16 +62,8 @@ export function getSizesConfig(): SizesConfig {
       ),
       urbano: storeIds('ID_SMALL_URBANO', 'ID_MEDIUM_URBANO', 'ID_BIG_URBANO'),
       surco: storeIds('ID_SMALL_SURCO', 'ID_MEDIUM_SURCO', 'ID_BIG_SURCO'),
-      miraflores: storeIds(
-        'ID_SMALL_MIRAFLORES',
-        'ID_MEDIUM_MIRAFLORES',
-        'ID_BIG_MIRAFLORES'
-      ),
-      sanmiguel: storeIds(
-        'ID_SMALL_SANMIGUEL',
-        'ID_MEDIUM_SANMIGUEL',
-        'ID_BIG_SANMIGUEL'
-      ),
+      miraflores: storeIds('ID_SMALL_MIRAFLORES', 'ID_MEDIUM_MIRAFLORES', 'ID_BIG_MIRAFLORES'),
+      sanmiguel: storeIds('ID_SMALL_SANMIGUEL', 'ID_MEDIUM_SANMIGUEL', 'ID_BIG_SANMIGUEL'),
       sanjuan: storeIds('ID_SMALL_SANJUAN', 'ID_MEDIUM_SANJUAN', 'ID_BIG_SANJUAN'),
     },
   }

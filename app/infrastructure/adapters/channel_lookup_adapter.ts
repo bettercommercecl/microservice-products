@@ -8,4 +8,3 @@ export default class ChannelLookupAdapter implements ChannelLookupPort {
     return parentCategoryId == null ? undefined : parentCategoryId
   }
 }
-

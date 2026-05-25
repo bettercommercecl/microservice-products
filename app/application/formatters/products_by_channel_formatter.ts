@@ -51,7 +51,9 @@ export interface ProductForMarcas {
   total_sold: number
 }
 
-function parseImages(images: unknown): Array<{ is_thumbnail?: boolean; url_standard?: string; description?: string }> {
+function parseImages(
+  images: unknown
+): Array<{ is_thumbnail?: boolean; url_standard?: string; description?: string }> {
   if (!images) return []
   if (Array.isArray(images)) return images
   if (typeof images === 'string') {
@@ -144,7 +146,11 @@ export async function formatProductForMarcas(
     result.reserve = ''
   }
 
-  if (product.reviews != null && typeof product.reviews === 'object' && Object.keys(product.reviews).length > 0) {
+  if (
+    product.reviews != null &&
+    typeof product.reviews === 'object' &&
+    Object.keys(product.reviews).length > 0
+  ) {
     result.reviews = product.reviews
   } else if (product.reviews != null && typeof product.reviews === 'string') {
     try {
@@ -161,7 +167,9 @@ export async function formatProductForMarcas(
   result.pickup_in_store = product.pickup_in_store ?? undefined
   result.turbo = product.turbo ?? undefined
   result.meta_keywords =
-    product.meta_keywords && String(product.meta_keywords).length > 0 ? product.meta_keywords : undefined
+    product.meta_keywords && String(product.meta_keywords).length > 0
+      ? product.meta_keywords
+      : undefined
   result.meta_description =
     product.meta_description && String(product.meta_description).length > 0
       ? product.meta_description
@@ -172,7 +180,7 @@ export async function formatProductForMarcas(
     product.timer_datetime != null
       ? typeof product.timer_datetime === 'string'
         ? product.timer_datetime
-        : (product.timer_datetime as { toISO?: () => string }).toISO?.() ?? null
+        : ((product.timer_datetime as { toISO?: () => string }).toISO?.() ?? null)
       : null
   result.nextday = product.nextday ?? undefined
 

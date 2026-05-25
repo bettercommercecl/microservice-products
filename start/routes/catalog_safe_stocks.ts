@@ -9,7 +9,9 @@ router
     router
       .get('/catalog-safe-stocks', [CatalogSafeStocksController, 'indexPaginated'])
       .use(middleware.rateLimit({ max: 120, windowMs: 60_000, key: 'ip' }))
+    router
+      .post('/catalog-safe-stocks/by-skus', [CatalogSafeStocksController, 'bySkus'])
+      .use(middleware.rateLimit({ max: 120, windowMs: 60_000, key: 'ip' }))
   })
   .use(middleware.m2mAuth())
   .prefix('api')
-

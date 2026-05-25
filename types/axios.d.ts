@@ -31,8 +31,16 @@ declare module 'axios' {
       data?: unknown,
       config?: AxiosRequestConfig
     ): Promise<AxiosResponse<T>>
-    put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>
-    patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>
+    put<T = unknown>(
+      url: string,
+      data?: unknown,
+      config?: AxiosRequestConfig
+    ): Promise<AxiosResponse<T>>
+    patch<T = unknown>(
+      url: string,
+      data?: unknown,
+      config?: AxiosRequestConfig
+    ): Promise<AxiosResponse<T>>
     delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>
   }
 

@@ -19,7 +19,10 @@ export default class CategoriesApi {
           timeout: 15_000,
         })
 
-        const body = results.data as { data: unknown[]; meta: { pagination: { total_pages: number } } }
+        const body = results.data as {
+          data: unknown[]
+          meta: { pagination: { total_pages: number } }
+        }
         const { data, meta } = body
         allCategories.push(...data)
         totalPages = meta.pagination.total_pages

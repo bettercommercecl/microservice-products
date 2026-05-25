@@ -15,16 +15,8 @@ export default class CalculationAdapter implements CalculationPort {
     return this.calculationService.calculateDiscount(price, salePrice)
   }
 
-  calculateTransferPrice(
-    price: number,
-    salePrice: number,
-    transferPercent?: number
-  ): number {
-    return this.calculationService.calculateTransferPrice(
-      price,
-      salePrice,
-      transferPercent
-    )
+  calculateTransferPrice(price: number, salePrice: number, transferPercent?: number): number {
+    return this.calculationService.calculateTransferPrice(price, salePrice, transferPercent)
   }
 
   calculateVolumetricWeight(

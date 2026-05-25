@@ -3,4 +3,3 @@ import type { ChannelSyncInput } from '#application/use_cases/channels/sync_chan
 export interface ChannelRepositoryPort {
   upsertChannel(input: ChannelSyncInput): Promise<void>
 }
-
