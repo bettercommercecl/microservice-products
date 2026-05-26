@@ -250,13 +250,14 @@ export default class SyncCleanupService {
   }
 
   /**
-   * Borra variantes con "_sync_" en sku solo si su id no esta en el snapshot BC de este sync.
+   * Borra variantes con SKU temporal (prefijo _sync_) solo si su id no esta en el snapshot BC de este sync.
+   * Patrones: _sync_conflict_, _sync_dup_, _sync_missing_, _sync_stash_.
    * Limpia catalog_safe_stocks, pricelist_variant_records y products_packs antes de borrar la variante.
    */
   async deleteVariantsWithTemporarySyncSku(syncedVariantIds: Set<number>): Promise<void> {
     if (syncedVariantIds.size === 0) {
       this.logger.warn(
-        'Omitiendo borrado _sync_: snapshot sin variantes (no se asume catalogo vacio como criterio seguro)'
+        'Omitiendo borrado de SKUs temporales: snapshot sin variantes (no se asume catalogo vacio como criterio seguro)'
       )
       return
     }
@@ -282,7 +283,7 @@ export default class SyncCleanupService {
 
     this.logger.info(
       { eliminadas: ids.length, variantes_en_snapshot: excludeIds.length },
-      'Variantes _sync_ huérfanas (no en snapshot) eliminadas'
+      'Variantes con SKU temporal (_sync_*) huérfanas eliminadas'
     )
   }
 }
