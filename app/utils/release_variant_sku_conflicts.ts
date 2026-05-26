@@ -20,7 +20,7 @@ export function partitionVariantsByBigCommerceId<T extends { id: number }>(
 
 /**
  * Libera variants_sku_unique antes de upsert de un lote: filas que aun tienen un SKU
- * que otra variante del lote va a tomar pasan a un SKU temporal (_sync_{id}).
+ * que otra variante del lote va a tomar pasan a un SKU temporal (_sync_conflict_{id}).
  * Usado por sync global (v2) y sync por canal (v1).
  */
 export async function releaseVariantSkuConflicts(
@@ -50,13 +50,13 @@ export async function releaseVariantSkuConflicts(
       if (row.id === desiredId) continue
       await Variant.query({ client: trx })
         .where('id', row.id)
-        .update({ sku: `_sync_${row.id}`, updated_at: new Date() })
+        .update({ sku: `_sync_conflict_${row.id}`, updated_at: new Date() })
       continue
     }
     if (createSkus.has(sku)) {
       await Variant.query({ client: trx })
         .where('id', row.id)
-        .update({ sku: `_sync_${row.id}`, updated_at: new Date() })
+        .update({ sku: `_sync_conflict_${row.id}`, updated_at: new Date() })
     }
   }
 }
@@ -102,7 +102,7 @@ export function assignPlaceholderSkuIfEmpty<T extends { id: number; sku?: unknow
   return rows.map((row) => {
     if (norm(row.sku).length > 0) return row
     log.warn({ variantId: row.id }, 'SKU vacio; placeholder unico para cumplir variants_sku_unique')
-    return { ...row, sku: `__missing_sku__${row.id}` }
+    return { ...row, sku: `_sync_missing_${row.id}` }
   })
 }
 
@@ -116,7 +116,7 @@ export async function stashVariantRowsWithBatchPlaceholderSku(
     await Variant.query({ client: trx })
       .where('id', v.id)
       .update({
-        sku: `_batch_tmp_${v.id}`,
+        sku: `_sync_stash_${v.id}`,
         updated_at: now,
       })
   }
