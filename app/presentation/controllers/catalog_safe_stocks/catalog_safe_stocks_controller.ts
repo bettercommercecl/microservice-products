@@ -27,6 +27,8 @@ interface SkuStockItem {
 interface PackItem {
   sku: string
   title: string
+  /** Unidades de esta variante/SKU por cada unidad vendida del pack (1 pack = N del ítem). */
+  quantity: number
   stock: number
   available: boolean
   discount_price: number | null
@@ -64,34 +66,68 @@ export default class CatalogSafeStocksController {
       packRows.map((r: { product_id: number }) => Number(r.product_id))
     )
 
-    // Carga líneas de pack para los productos que son packs
-    const packItemsByProductId = new Map<number, PackItem[]>()
+    /**
+     * Líneas del pack asociadas a la variante vendida (SKU del payload).
+     * products_packs.pack_variant_id = variants.id del pack en BC; debe coincidir con la variante consultada.
+     * Si no hay filas para ese par (sync antiguo), se usan solo líneas con pack_variant_id NULL para ese pack_id.
+     */
+    const packItemsByVariantId = new Map<number, PackItem[]>()
     if (packProductIds.size > 0) {
-      const packLines = await ProductPack.query()
-        .whereIn('pack_id', [...packProductIds])
-        .whereNotNull('variant_id')
-        .preload('variant', (q) => q.preload('stockData').preload('product'))
+      const packVariantIds = variants
+        .filter((v) => packProductIds.has(v.product_id))
+        .map((v) => v.id)
 
-      for (const line of packLines) {
-        if (!line.variant) continue
-        const v = line.variant
-        const childIsReserve = !!v.stockData?.bin_picking_number
+      if (packVariantIds.length > 0) {
+        const packLines = await ProductPack.query()
+          .whereIn('pack_id', [...packProductIds])
+          .whereNotNull('variant_id')
+          .where((q) => {
+            void q.whereIn('pack_variant_id', packVariantIds).orWhereNull('pack_variant_id')
+          })
+          .orderBy('line_index', 'asc')
+          .preload('variant', (q) => q.preload('stockData').preload('product'))
 
-        if (!packItemsByProductId.has(line.pack_id)) {
-          packItemsByProductId.set(line.pack_id, [])
+        const linesForPackVariant = (packId: number, variantId: number): typeof packLines => {
+          const explicit = packLines.filter(
+            (l) => l.pack_id === packId && l.pack_variant_id === variantId
+          )
+          if (explicit.length > 0) {
+            return explicit
+          }
+          return packLines.filter((l) => l.pack_id === packId && l.pack_variant_id === null)
         }
 
-        packItemsByProductId.get(line.pack_id)!.push({
-          sku: v.sku,
-          title: `Item Pack (${v.sku}): ${v.product?.title ?? v.title}`,
-          stock: v.stock,
-          available: v.stock >= 1,
-          discount_price: v.discount_price ?? null,
-          image: v.image ?? null,
-          is_reserve: childIsReserve,
-          bin_picking_number: v.stockData?.bin_picking_number ?? null,
-          date_reserve: childIsReserve ? (v.reserve ?? null) : null,
-        } satisfies PackItem)
+        for (const parent of variants) {
+          if (!packProductIds.has(parent.product_id)) {
+            continue
+          }
+          const chosenLines = linesForPackVariant(parent.product_id, parent.id)
+          const items: PackItem[] = []
+          for (const line of chosenLines) {
+            if (!line.variant) {
+              continue
+            }
+            const v = line.variant
+            const childIsReserve = !!v.stockData?.bin_picking_number
+            const quantityPerPack =
+              line.quantity !== null && Number.isFinite(line.quantity) && line.quantity > 0
+                ? line.quantity
+                : 1
+            items.push({
+              sku: v.sku,
+              title: `Item Pack (${v.sku}): ${v.product?.title ?? v.title}`,
+              quantity: quantityPerPack,
+              stock: v.stock,
+              available: v.stock >= 1,
+              discount_price: v.discount_price ?? null,
+              image: v.image ?? null,
+              is_reserve: childIsReserve,
+              bin_picking_number: v.stockData?.bin_picking_number ?? null,
+              date_reserve: childIsReserve ? (v.reserve ?? null) : null,
+            } satisfies PackItem)
+          }
+          packItemsByVariantId.set(parent.id, items)
+        }
       }
     }
 
@@ -110,7 +146,7 @@ export default class CatalogSafeStocksController {
         bin_picking_number: v.stockData?.bin_picking_number ?? null,
         date_reserve: isReserve ? (v.reserve ?? null) : null,
         is_pack: isPack,
-        pack_items: isPack ? (packItemsByProductId.get(v.product_id) ?? []) : [],
+        pack_items: isPack ? (packItemsByVariantId.get(v.id) ?? []) : [],
       } satisfies SkuStockItem
     })
 

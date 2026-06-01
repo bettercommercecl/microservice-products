@@ -3,10 +3,16 @@ import { middleware } from '#start/kernel'
 
 // 🚀 Controlador lazy importado
 const ProductsController = () => import('#controllers/products/products_controller')
+const ProductSearchController = () =>
+  import('#controllers/products/product_search_controller')
 
 // Rutas de productos
 router
   .group(() => {
+    // Búsqueda full-text — debe ir antes de /products/:id para no ser capturada
+    router
+      .get('/products/search', [ProductSearchController, 'search'])
+      .use(middleware.rateLimit({ max: 120, windowMs: 60_000, key: 'ip' }))
     router
       .get('/products', [ProductsController, 'index'])
       .use(middleware.rateLimit({ max: 120, windowMs: 60_000, key: 'ip' }))
