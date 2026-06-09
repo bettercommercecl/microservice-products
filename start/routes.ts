@@ -21,6 +21,7 @@ import './routes/packs.js'
 import './routes/options.js'
 import './routes/category_products.js'
 import './routes/catalog_safe_stocks.js'
+import './routes/meta_catalog.js'
 
 // Ruta principal
 router.get('/', async () => {
