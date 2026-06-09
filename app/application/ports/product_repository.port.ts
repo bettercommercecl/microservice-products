@@ -32,4 +32,9 @@ export interface ProductRepositoryPort {
     limit: number,
     parentCategoryId?: number
   ): Promise<ProductPaginatedResult>
+
+  findAllVisibleByChannel(
+    channelId: number,
+    parentCategoryId?: number
+  ): Promise<unknown[]>
 }

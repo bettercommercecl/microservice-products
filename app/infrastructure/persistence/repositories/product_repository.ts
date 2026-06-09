@@ -65,4 +65,29 @@ export default class ProductRepository implements ProductRepositoryPort {
     const meta = paginated.getMeta()
     return { data, meta }
   }
+
+  async findAllVisibleByChannel(channelId: number, parentCategoryId?: number): Promise<unknown[]> {
+    const productIdsSubquery = ChannelProduct.query()
+      .select('product_id')
+      .where('channel_id', channelId)
+
+    const query = Product.query().whereIn('id', productIdsSubquery).where('is_visible', true)
+
+    if (parentCategoryId != null) {
+      query.whereExists((sub) => {
+        sub
+          .from('category_products')
+          .select('id')
+          .where('category_id', parentCategoryId)
+          .whereRaw('category_products.product_id = products.id')
+      })
+    }
+
+    return query
+      .preload('brand')
+      .preload('variants', (variantsQuery) => {
+        variantsQuery.where('is_visible', true).orderBy('id', 'asc').preload('stockData')
+      })
+      .orderBy('id', 'asc')
+  }
 }
