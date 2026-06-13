@@ -1,0 +1,109 @@
+name: Deploy Prod
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      country:
+        description: 'Country to deploy'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - CL
+          - CO
+          - PE
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  AWS_REGION: sa-east-1
+  ECR_REPOSITORY: microservice-products
+
+jobs:
+  resolve-matrix:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: [self-hosted, linux, x64, bettercommerce]
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    steps:
+      - name: Resolve deploy matrix
+        id: set-matrix
+        run: |
+          COUNTRY="${{ github.event.inputs.country || 'all' }}"
+
+          ALL='[
+            {"country":"cl","service":"microservice-products-cl-prod","role":"github-actions-microservice-products"},
+            {"country":"co","service":"microservice-products-co-prod","role":"github-actions-microservice-products"},
+            {"country":"pe","service":"microservice-products-pe-prod","role":"github-actions-microservice-products"}
+          ]'
+
+          if [ "$COUNTRY" = "all" ]; then
+            MATRIX=$(echo "$ALL" | jq -c '.')
+          else
+            COUNTRY_LOWER=$(echo "$COUNTRY" | tr '[:upper:]' '[:lower:]')
+            MATRIX=$(echo "$ALL" | jq -c --arg c "$COUNTRY_LOWER" '[.[] | select(.country == $c)]')
+          fi
+
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: resolve-matrix
+    runs-on: [self-hosted, linux, x64, bettercommerce]
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.resolve-matrix.outputs.matrix) }}
+
+    concurrency:
+      group: deploy-prod-${{ matrix.country }}
+      cancel-in-progress: true
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::197659676576:role/${{ matrix.role }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag and push image to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Deploy to ECS (${{ matrix.country }})
+        run: |
+          aws ecs update-service \
+            --cluster microservices-bettercommerce-prod \
+            --service ${{ matrix.service }} \
+            --force-new-deployment \
+            --region $AWS_REGION
+
