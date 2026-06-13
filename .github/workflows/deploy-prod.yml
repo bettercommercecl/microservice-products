@@ -37,9 +37,9 @@ jobs:
           COUNTRY="${{ github.event.inputs.country || 'all' }}"
 
           ALL='[
-            {"country":"cl","service":"microservice-products-cl-prod","role":"github-actions-microservice-products-cl"},
-            {"country":"co","service":"microservice-products-co-prod","role":"github-actions-microservice-products-co"},
-            {"country":"pe","service":"microservice-products-pe-prod","role":"github-actions-microservice-products-pe"}
+            {"country":"cl","service":"microservice-products-cl-prod","role":"github-actions-microservice-products"},
+            {"country":"co","service":"microservice-products-co-prod","role":"github-actions-microservice-products"},
+            {"country":"pe","service":"microservice-products-pe-prod","role":"github-actions-microservice-products"}
           ]'
 
           if [ "$COUNTRY" = "all" ]; then
@@ -54,6 +54,7 @@ jobs:
   deploy:
     needs: resolve-matrix
     runs-on: [self-hosted, linux, x64, bettercommerce]
+    timeout-minutes: 20
     strategy:
       matrix:
         include: ${{ fromJson(needs.resolve-matrix.outputs.matrix) }}
@@ -106,9 +107,3 @@ jobs:
             --force-new-deployment \
             --region $AWS_REGION
 
-      - name: Wait for service stability (${{ matrix.country }})
-        run: |
-          aws ecs wait services-stable \
-            --cluster microservices-bettercommerce-prod \
-            --services ${{ matrix.service }} \
-            --region $AWS_REGION
